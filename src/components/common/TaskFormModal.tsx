@@ -110,7 +110,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
   const [outcome, setOutcome] = useState<string>('');
   const [category, setCategory] = useState<Category>('Bisnis');
   const [subcategory, setSubcategory] = useState<Subcategory>('Aktivitas Umum, AM dan Bisnis');
-  const [validatorTags, setValidatorTags] = useState<string[]>(['Pak Taka']);
+  const [validatorTags, setValidatorTags] = useState<string[]>([]);
   const [validatorInput, setValidatorInput] = useState<string>('');
   const [privacyWarning, setPrivacyWarning] = useState<boolean>(false);
 
@@ -151,7 +151,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
       setOutcome(editingTask.outcome || '');
       setCategory(editingTask.category || 'Bisnis');
       setSubcategory(editingTask.subcategory || 'Aktivitas Umum, AM dan Bisnis');
-      setValidatorTags(editingTask.validator ? editingTask.validator.split(',').map(s => s.trim()) : ['Pak Taka']);
+      setValidatorTags(editingTask.validator ? editingTask.validator.split(',').map(s => s.trim()) : []);
     } else {
       setTanggal(new Date().toISOString().split('T')[0]);
       setDeskripsiTugas('');
@@ -175,7 +175,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
       setOutcome('');
       setCategory('Bisnis');
       setSubcategory('Aktivitas Umum, AM dan Bisnis');
-      setValidatorTags(['Pak Taka']);
+      setValidatorTags([]);
       setValidatorInput('');
     }
   }, [editingTask, defaultMemberTab, isOpen, autoAssignedTo]);
