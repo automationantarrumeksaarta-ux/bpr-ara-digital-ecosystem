@@ -16,7 +16,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isMobileOpen = false,
   onMobileClose
 }) => {
-  const { currentUser, ewsAlerts, creditApplications, ptpRecords, flowTasks } = useApp();
+  const { currentUser, ewsAlerts, creditApplications, ptpRecords, flowTasks, rolePermissions } = useApp();
   const location = useLocation();
   const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
 
@@ -58,8 +58,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Scrollable Navigation List */}
       <div className="flex-1 overflow-y-auto py-6 px-4 space-y-8 scrollbar-hide">
         {navigationConfig.map((group, groupIndex) => {
+          const dynamicPerms = rolePermissions && rolePermissions[currentUser.role];
           const visibleItems = group.items.filter(
-            (item) => !item.allowedRoles || item.allowedRoles.includes(currentUser.role)
+            (item) => {
+              // If dynamic permissions exist for this role, use them
+              if (dynamicPerms && dynamicPerms.length > 0) {
+                return dynamicPerms.includes(item.title);
+              }
+              // Fallback to static allowedRoles
+              return !item.allowedRoles || item.allowedRoles.includes(currentUser.role);
+            }
           );
 
           if (visibleItems.length === 0) return null;
@@ -112,7 +120,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             {item.children?.map(child => {
                               const ChildIcon = child.icon;
                               const childBadgeCount = getBadgeCount(child.badgeType);
-                              if (child.allowedRoles && !child.allowedRoles.includes(currentUser.role)) return null;
+                              if (dynamicPerms && dynamicPerms.length > 0) {
+                                if (!dynamicPerms.includes(child.title)) return null;
+                              } else if (child.allowedRoles && !child.allowedRoles.includes(currentUser.role)) return null;
 
                               return (
                                 <NavLink
