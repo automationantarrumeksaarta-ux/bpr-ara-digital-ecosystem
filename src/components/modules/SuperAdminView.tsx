@@ -48,8 +48,33 @@ export const SuperAdminView: React.FC = () => {
   // Mock manual routing state (Mapping UserId -> SupervisorId)
   const [taskRoutes, setTaskRoutes] = useState<Record<string, string>>({});
   
-  const handleRoleChange = (userId: string, newRole: string) => {
+  const handleRoleChange = async (userId: string, newRole: string) => {
+    // Update local mock state
     setUsers(users.map((u: any) => u.id === userId ? { ...u, role: newRole } : u));
+    // Update DB users state
+    setDbUsers(dbUsers.map((u: any) => u.id === userId ? { ...u, role: newRole } : u));
+
+    // Persist to database via API
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+      try {
+        const res = await fetch(`/api/auth/users/${userId}/role`, {
+          method: 'PUT',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}` 
+          },
+          body: JSON.stringify({ role: newRole })
+        });
+        if (res.ok) {
+          console.log(`Role updated for ${userId} to ${newRole}`);
+        } else {
+          console.error('Failed to update role in DB');
+        }
+      } catch (e) {
+        console.error('Error updating role:', e);
+      }
+    }
   };
 
   const handleRouteUpdate = (userId: string, supervisorId: string) => {
