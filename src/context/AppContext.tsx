@@ -285,17 +285,24 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   useEffect(() => {
     const fetchPerms = async () => {
       const token = localStorage.getItem('auth_token');
-      if (!token) return;
+      if (!token) {
+        console.log('[RolePerms] No auth_token found, skipping fetch');
+        return;
+      }
       try {
+        console.log('[RolePerms] Fetching role permissions from DB...');
         const res = await fetch('/api/auth/role-permissions', {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (res.ok) {
           const data = await res.json();
+          console.log('[RolePerms] Fetched from DB:', JSON.stringify(data.rolePermissions));
           setRolePermissions(data.rolePermissions || {});
+        } else {
+          console.error('[RolePerms] API returned error:', res.status, await res.text());
         }
       } catch (e) {
-        console.error('Failed to fetch role permissions from DB', e);
+        console.error('[RolePerms] Failed to fetch role permissions from DB', e);
       }
     };
     fetchPerms();

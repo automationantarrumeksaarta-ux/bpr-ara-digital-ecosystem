@@ -58,15 +58,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Scrollable Navigation List */}
       <div className="flex-1 overflow-y-auto py-6 px-4 space-y-8 scrollbar-hide">
         {navigationConfig.map((group, groupIndex) => {
-          const dynamicPerms = rolePermissions && rolePermissions[currentUser.role];
+          const userRole = currentUser?.role || '';
+          const dynamicPerms = rolePermissions?.[userRole];
+          const hasDynamicPerms = dynamicPerms && dynamicPerms.length > 0;
           const visibleItems = group.items.filter(
             (item) => {
               // If dynamic permissions exist for this role, use them
-              if (dynamicPerms && dynamicPerms.length > 0) {
+              if (hasDynamicPerms) {
                 return dynamicPerms.includes(item.title);
               }
               // Fallback to static allowedRoles
-              return !item.allowedRoles || item.allowedRoles.includes(currentUser.role);
+              return !item.allowedRoles || item.allowedRoles.includes(userRole as any);
             }
           );
 
@@ -120,9 +122,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             {item.children?.map(child => {
                               const ChildIcon = child.icon;
                               const childBadgeCount = getBadgeCount(child.badgeType);
-                              if (dynamicPerms && dynamicPerms.length > 0) {
+                              if (hasDynamicPerms) {
                                 if (!dynamicPerms.includes(child.title)) return null;
-                              } else if (child.allowedRoles && !child.allowedRoles.includes(currentUser.role)) return null;
+                              } else if (child.allowedRoles && !child.allowedRoles.includes(userRole as any)) return null;
 
                               return (
                                 <NavLink
