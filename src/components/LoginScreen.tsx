@@ -27,7 +27,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   
   // OTP State
   const [otpCode, setOtpCode] = useState('');
-  const [pendingUser, setPendingUser] = useState<UserProfile | null>(null);
+  const pendingUserRef = React.useRef<UserProfile | null>(null);
   const [pendingToken, setPendingToken] = useState<string>('');
   const [otpContext, setOtpContext] = useState<'login' | 'register'>('login');
   const [errorMsg, setErrorMsg] = useState('');
@@ -370,7 +370,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                         const loginData = await loginRes.json();
                         if (loginRes.ok) {
                           localStorage.setItem('auth_token', loginData.token);
-                          setPendingUser(loginData.user);
+                          pendingUserRef.current = loginData.user;
                           return true;
                         }
                       }
@@ -383,8 +383,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                   }
                 }}
                 onSuccessComplete={() => {
-                  if (pendingUser) {
-                    onLoginSuccess(pendingUser);
+                  if (pendingUserRef.current) {
+                    onLoginSuccess(pendingUserRef.current);
                   }
                 }}
               />
