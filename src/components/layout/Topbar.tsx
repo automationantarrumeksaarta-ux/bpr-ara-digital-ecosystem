@@ -42,6 +42,7 @@ export const Topbar: React.FC<TopbarProps> = ({ onMobileMenuToggle }) => {
     setIsAiAssistantOpen,
     ewsAlerts,
     creditApplications,
+    setIsAuthenticated,
   } = useApp();
 
   const [isRoleMenuOpen, setIsRoleMenuOpen] = useState(false);
