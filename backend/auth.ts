@@ -368,4 +368,61 @@ router.put('/role-permissions/:role', async (req, res) => {
   }
 });
 
+// Get all task routes
+router.get('/task-routes', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const token = authHeader.split(' ')[1];
+    jwt.verify(token, JWT_SECRET);
+
+    const routes = db.prepare('SELECT * FROM task_routes').all() as any[];
+    const formatted: Record<string, string> = {};
+    for (const r of routes) {
+      formatted[r.user_id] = r.supervisor_id;
+    }
+    res.json({ taskRoutes: formatted });
+  } catch (error) {
+    console.error('Get task routes error:', error);
+    res.status(500).json({ error: 'Failed to fetch task routes' });
+  }
+});
+
+// Update a single task route
+router.put('/task-routes/:userId', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const token = authHeader.split(' ')[1];
+    const decoded = jwt.verify(token, JWT_SECRET) as any;
+
+    const requestingUser = db.prepare('SELECT role, roleTier FROM users WHERE id = ?').get(decoded.id) as any;
+    if (!requestingUser || (requestingUser.role !== 'Super Admin' && requestingUser.role !== 'Master Admin' && requestingUser.roleTier !== 'Super Admin')) {
+      return res.status(403).json({ error: 'Forbidden: Admin access required' });
+    }
+
+    const { userId } = req.params;
+    const { supervisorId } = req.body;
+
+    if (!userId || !supervisorId) {
+      return res.status(400).json({ error: 'userId and supervisorId are required' });
+    }
+
+    db.prepare(`
+      INSERT INTO task_routes (user_id, supervisor_id, updated_at)
+      VALUES (?, ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(user_id) DO UPDATE SET supervisor_id = excluded.supervisor_id, updated_at = CURRENT_TIMESTAMP
+    `).run(userId, supervisorId);
+
+    res.json({ message: 'Task route updated successfully' });
+  } catch (error) {
+    console.error('Update task route error:', error);
+    res.status(500).json({ error: 'Failed to update task route' });
+  }
+});
+
 export default router;

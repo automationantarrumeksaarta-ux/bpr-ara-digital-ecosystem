@@ -102,6 +102,8 @@ interface AppContextType {
   switchUserByRole: (role: UserRole) => void;
   rolePermissions: Record<string, string[]>;
   updateRolePermissions: (role: string, perms: string[]) => void;
+  taskRoutes: Record<string, string>;
+  updateTaskRoute: (userId: string, supervisorId: string) => Promise<boolean>;
   allUsers: User[];
   branches: Branch[];
   selectedBranchId: BranchId | 'ALL';
@@ -330,6 +332,56 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         return true;
       } catch (e) {
         console.error('Failed to save role permissions to DB', e);
+        return false;
+      }
+    }
+    return false;
+  };
+
+  // === TASK ROUTES (Routing Manual FlowTask) ===
+  const [taskRoutes, setTaskRoutes] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const fetchRoutes = async () => {
+      const token = localStorage.getItem('auth_token');
+      if (!token) return;
+      try {
+        const res = await fetch('/api/auth/task-routes', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          console.log('[TaskRoutes] Fetched from DB:', JSON.stringify(data.taskRoutes));
+          setTaskRoutes(data.taskRoutes || {});
+        }
+      } catch (e) {
+        console.error('[TaskRoutes] Failed to fetch from DB', e);
+      }
+    };
+    fetchRoutes();
+  }, [isAuthenticated]);
+
+  const updateTaskRoute = async (userId: string, supervisorId: string): Promise<boolean> => {
+    setTaskRoutes(prev => ({ ...prev, [userId]: supervisorId }));
+
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+      try {
+        const res = await fetch(`/api/auth/task-routes/${encodeURIComponent(userId)}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ supervisorId })
+        });
+        if (!res.ok) {
+          console.error('[TaskRoutes] API error', await res.text());
+          return false;
+        }
+        return true;
+      } catch (e) {
+        console.error('[TaskRoutes] Failed to save to DB', e);
         return false;
       }
     }
@@ -1338,6 +1390,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         switchUserByRole,
         rolePermissions,
         updateRolePermissions,
+        taskRoutes,
+        updateTaskRoute,
         allUsers: INITIAL_USERS,
         branches: INITIAL_BRANCHES,
         selectedBranchId,

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { TaskItem, JenisTeknis, Timeline, Prioritas, BEISTaskItemStatus as TaskStatus, BEISUserRole as UserRole, BEISLevelCode, BEISDomainCode, BEISUserProfile as UserProfile, Category, Subcategory } from '../../types';
 import { BEIS_DOMAINS, BEIS_STATUSES, BEIS_UNITS, generateBeisTaskId, generateEvidenceId, sanitizePersonalData, getBeisCategoriesForDomain } from '../../utils/beisUtils';
 import { INITIAL_USERS } from '../../mock/initialData';
+import { useApp } from '../../context/AppContext';
 import { X, Calendar, Check, ShieldCheck, ShieldAlert, Award, Search, ChevronDown } from 'lucide-react';
 
 // Statuses that staff can pick when creating/editing tasks
@@ -87,8 +88,20 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
   const isNewTask = !editingTask;
   const isLockedForStaff = isCutoffPassed && isStaff && isNewTask;
 
-  // PIC auto-assigned to current user's tab
-  const autoAssignedTo = currentUser?.assignedMemberTab || (defaultMemberTab === 'REKAP PUSAT' ? 'EGI' : defaultMemberTab);
+  // Get taskRoutes from context to determine PIC based on admin routing
+  const { taskRoutes, allUsers } = useApp();
+  
+  // Resolve PIC: use routing from admin if available, otherwise use current user's tab
+  const getRoutedPIC = () => {
+    if (currentUser?.id && taskRoutes[currentUser.id]) {
+      const supervisorId = taskRoutes[currentUser.id];
+      // Find supervisor name from allUsers or INITIAL_USERS
+      const supervisor = [...allUsers, ...INITIAL_USERS].find(u => u.id === supervisorId);
+      return supervisor?.name || supervisorId;
+    }
+    return currentUser?.assignedMemberTab || (defaultMemberTab === 'REKAP PUSAT' ? currentUser?.name || defaultMemberTab : defaultMemberTab);
+  };
+  const autoAssignedTo = getRoutedPIC();
 
   const [tanggal, setTanggal] = useState(new Date().toISOString().split('T')[0]);
   const [deskripsiTugas, setDeskripsiTugas] = useState('');

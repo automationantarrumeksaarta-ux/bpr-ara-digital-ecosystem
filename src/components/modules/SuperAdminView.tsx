@@ -15,7 +15,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs';
 import { Modal } from '../ui/Modal';
 
 export const SuperAdminView: React.FC = () => {
-  const { rolePermissions, updateRolePermissions } = useApp();
+  const { rolePermissions, updateRolePermissions, taskRoutes, updateTaskRoute } = useApp();
   const [users, setUsers] = useState(INITIAL_USERS);
   const [dbUsers, setDbUsers] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -41,47 +41,34 @@ export const SuperAdminView: React.FC = () => {
   }, []);
   
   
-  // Permissions Edit State
-  const [editingRole, setEditingRole] = useState<string | null>(null);
-  const [editingPermissions, setEditingPermissions] = useState<string[]>([]);
-  
-  // Mock manual routing state (Mapping UserId -> SupervisorId)
-  const [taskRoutes, setTaskRoutes] = useState<Record<string, string>>({});
-  
   const handleRoleChange = async (userId: string, newRole: string) => {
-    // Update local mock state
     setUsers(users.map((u: any) => u.id === userId ? { ...u, role: newRole } : u));
-    // Update DB users state
     setDbUsers(dbUsers.map((u: any) => u.id === userId ? { ...u, role: newRole } : u));
-
-    // Persist to database via API
     const token = localStorage.getItem('auth_token');
     if (token) {
       try {
         const res = await fetch(`/api/auth/users/${userId}/role`, {
           method: 'PUT',
-          headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}` 
-          },
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
           body: JSON.stringify({ role: newRole })
         });
-        if (res.ok) {
-          console.log(`Role updated for ${userId} to ${newRole}`);
-        } else {
-          console.error('Failed to update role in DB');
-        }
-      } catch (e) {
-        console.error('Error updating role:', e);
-      }
+        if (res.ok) console.log(`Role updated for ${userId} to ${newRole}`);
+        else console.error('Failed to update role in DB');
+      } catch (e) { console.error('Error updating role:', e); }
     }
   };
 
-  const handleRouteUpdate = (userId: string, supervisorId: string) => {
-    setTaskRoutes(prev => ({
-      ...prev,
-      [userId]: supervisorId
-    }));
+  // Permissions Edit State
+  const [editingRole, setEditingRole] = useState<string | null>(null);
+  const [editingPermissions, setEditingPermissions] = useState<string[]>([]);
+  
+  const handleRouteUpdate = async (userId: string, supervisorId: string) => {
+    const success = await updateTaskRoute(userId, supervisorId);
+    if (success) {
+      console.log(`Route saved: ${userId} -> ${supervisorId}`);
+    } else {
+      alert('Gagal menyimpan routing ke database!');
+    }
   };
 
   const getAccessibleMenus = (role: string) => {

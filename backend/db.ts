@@ -40,6 +40,12 @@ export function initDb() {
       permissions TEXT NOT NULL,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
+
+    CREATE TABLE IF NOT EXISTS task_routes (
+      user_id TEXT PRIMARY KEY,
+      supervisor_id TEXT NOT NULL,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
   `);
   
   // Seed initial admin user if table is empty
