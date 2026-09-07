@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { User as UserProfile, RoleTier, UserRole } from '../types';
 import { INITIAL_USERS } from '../mock/initialData';
 import { BEIS_UNITS } from '../utils/beisUtils';
-import { Lock, User, KeyRound, Shield, AlertCircle, ArrowRight, UserPlus, Building, BadgeCheck, Mail, Users, ArrowLeft } from 'lucide-react';
+import { Lock, User, KeyRound, Shield, AlertCircle, ArrowRight, UserPlus, Building, BadgeCheck, Mail, Users, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { OTPVerification } from './OTPVerification';
 
 interface LoginScreenProps {
@@ -32,6 +32,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   const [pendingToken, setPendingToken] = useState<string>('');
   const [otpContext, setOtpContext] = useState<'login' | 'register'>('login');
   const [errorMsg, setErrorMsg] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showRegPassword, setShowRegPassword] = useState(false);
 
   const TIER_MAP: Record<string, RoleTier> = {
     'High': 'HIGH', 'Mid': 'MID', 'Low': 'LOW',
@@ -225,17 +227,20 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                       <div className="w-px h-8 bg-gray-200 dark:bg-gray-700"></div>
                       <div className="flex-1 px-4 relative flex flex-col justify-center min-h-[56px]">
                         <input
-                          type="password"
+                          type={showPassword ? 'text' : 'password'}
                           id="password"
                           value={password}
                           onChange={(e) => { setPassword(e.target.value); setErrorMsg(''); }}
                           placeholder=" "
-                          className="peer w-full bg-transparent text-sm font-bold text-gray-900 dark:text-white focus:outline-none pt-4 pb-1 z-10 relative"
+                          className="peer w-full bg-transparent text-sm font-bold text-gray-900 dark:text-white focus:outline-none pt-4 pb-1 z-10 relative pr-10"
                         />
                         <label htmlFor="password" className="absolute left-4 top-1/2 -translate-y-[22px] scale-[0.85] origin-left text-xs font-bold text-gray-400 uppercase tracking-wider transition-transform duration-300 ease-out pointer-events-none peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:scale-100 peer-focus:-translate-y-[22px] peer-focus:scale-[0.85] z-0">
                           Password
                         </label>
                       </div>
+                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="pr-4 pl-2 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
+                        {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                      </button>
                     </div>
                   </div>
 
@@ -324,17 +329,20 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                       <div className="relative flex items-center border border-gray-200 dark:border-gray-700 rounded-2xl bg-white dark:bg-[#18181A] overflow-hidden focus-within:border-gray-400 transition-colors group shadow-sm">
                         <div className="flex-1 px-4 relative flex flex-col justify-center min-h-[56px]">
                           <input
-                            type="password"
+                            type={showRegPassword ? 'text' : 'password'}
                             id="regPassword"
                             required
                             value={regPassword}
                             onChange={(e) => setRegPassword(e.target.value)}
                             placeholder=" "
-                            className="peer w-full bg-transparent text-sm font-bold text-gray-900 dark:text-white focus:outline-none pt-4 pb-1 z-10 relative"
+                            className="peer w-full bg-transparent text-sm font-bold text-gray-900 dark:text-white focus:outline-none pt-4 pb-1 z-10 relative pr-8"
                           />
                           <label htmlFor="regPassword" className="absolute left-4 top-1/2 -translate-y-[22px] scale-[0.85] origin-left text-xs font-bold text-gray-400 uppercase tracking-wider transition-transform duration-300 ease-out pointer-events-none peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:scale-100 peer-focus:-translate-y-[22px] peer-focus:scale-[0.85] z-0">
                             Password
                           </label>
+                          <button type="button" onClick={() => setShowRegPassword(!showRegPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors z-20">
+                            {showRegPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
                         </div>
                       </div>
                     </div>

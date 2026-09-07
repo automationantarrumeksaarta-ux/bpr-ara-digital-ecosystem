@@ -39,7 +39,7 @@ export function initDb() {
   // Seed initial admin user if table is empty
   const userCount = db.prepare('SELECT count(*) as count FROM users').get() as { count: number };
   if (userCount.count === 0) {
-    // $2a$10$C82oR8B/8J10hE4Z1l3IieFw6aA/D4Y7zLp7QZ.qK2uK.fF3G.7e2 is bcrypt hash of 'password123'
+    // bcrypt hash of 'admin123'
     db.prepare(`
       INSERT INTO users (id, username, email, password_hash, name, role, roleTier, unit)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -47,7 +47,7 @@ export function initDb() {
       'usr-admin-01',
       'admin',
       'admin@bprara.co.id',
-      '$2a$10$C82oR8B/8J10hE4Z1l3IieFw6aA/D4Y7zLp7QZ.qK2uK.fF3G.7e2',
+      '$2b$10$FOqd0BtlRvKhi2Yrn.3cnu0wUJrSzc6wmkMOreYn.7FCMFfPSoxoC',
       'Administrator',
       'Super Admin',
       'Super Admin',
