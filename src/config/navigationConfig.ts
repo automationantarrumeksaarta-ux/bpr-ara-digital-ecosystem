@@ -82,7 +82,7 @@ export const navigationConfig: NavGroup[] = [
         title: 'Super Admin',
         path: '/super-admin',
         icon: ShieldAlert,
-        allowedRoles: ['Master Admin'],
+        allowedRoles: ['Master Admin', 'Super Admin'],
       }
     ],
   },

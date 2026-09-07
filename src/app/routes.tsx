@@ -77,6 +77,12 @@ export const AppRouter: React.FC = () => {
         <Route path="*" element={<LoginScreen onLoginSuccess={(user) => {
           setCurrentUser(user);
           setIsAuthenticated(true);
+          // Auto-navigate based on role
+          if (user.role === 'Super Admin' || user.role === 'Master Admin' || user.roleTier === 'Super Admin') {
+            window.location.href = '/super-admin';
+          } else {
+            window.location.href = '/dashboard';
+          }
         }} />} />
       </Routes>
     );
