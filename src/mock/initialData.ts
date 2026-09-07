@@ -80,24 +80,7 @@ export const INITIAL_BRANCHES: Branch[] = [
 ];
 
 export const INITIAL_USERS = [
-  { id: 'usr-superadmin', nip: 'ARA-00000', name: 'Demo Super Admin', email: 'superadmin@bprara.co.id', role: 'Master Admin', roleTitle: 'Super Admin', branchId: 'KC_PUSAT', branchName: 'KC Pusat', department: 'IT', status: 'ACTIVE' },
-  { id: 'usr-dirut', nip: 'ARA-01001', name: 'Demo Dirut', email: 'dirut@bprara.co.id', role: 'Direktur Utama', roleTitle: 'Direktur Utama', branchId: 'KC_PUSAT', branchName: 'KC Pusat', department: 'Direksi', status: 'ACTIVE' },
-  { id: 'usr-dir-ymfk', nip: 'ARA-01002', name: 'Demo Dir. YMFK', email: 'dirymfk@bprara.co.id', role: 'Direktur YMFK', roleTitle: 'Direktur YMFK', branchId: 'KC_PUSAT', branchName: 'KC Pusat', department: 'Direksi', status: 'ACTIVE' },
-  { id: 'usr-pe-bisnis', nip: 'ARA-01003', name: 'Demo PE Bisnis', email: 'pebisnis@bprara.co.id', role: 'PE Literasi & Edukasi, PE Bisnis & Collection', roleTitle: 'PE Bisnis & Collection', branchId: 'KC_PUSAT', branchName: 'KC Pusat', department: 'Eksekutif', status: 'ACTIVE' },
-  { id: 'usr-pe-kepatuhan', nip: 'ARA-01004', name: 'Demo PE Kepatuhan', email: 'pekepatuhan@bprara.co.id', role: 'PE Kepatuhan, Manrisk, APU PPT', roleTitle: 'PE Kepatuhan', branchId: 'KC_PUSAT', branchName: 'KC Pusat', department: 'Eksekutif', status: 'ACTIVE' },
-  { id: 'usr-pe-audit', nip: 'ARA-01005', name: 'Demo PE Audit', email: 'peaudit@bprara.co.id', role: 'PE Audit Intern & Strategi Anti Fraud', roleTitle: 'PE Audit', branchId: 'KC_PUSAT', branchName: 'KC Pusat', department: 'Eksekutif', status: 'ACTIVE' },
-  { id: 'usr-kacab', nip: 'ARA-02001', name: 'Demo Kacab', email: 'kacab@bprara.co.id', role: 'Kepala Cabang', roleTitle: 'Kepala Cabang', branchId: 'KC_PUSAT', branchName: 'KC Pusat', department: 'Cabang', status: 'ACTIVE' },
-  { id: 'usr-kakas', nip: 'ARA-02002', name: 'Demo Kepala Kas', email: 'kakas@bprara.co.id', role: 'Kepala Kas', roleTitle: 'Kepala Kas', branchId: 'KC_PUSAT', branchName: 'KK Solo', department: 'Kantor Kas', status: 'ACTIVE' },
-  { id: 'usr-ao', nip: 'ARA-03001', name: 'Demo Account Officer', email: 'ao@bprara.co.id', role: 'Account Officer', roleTitle: 'Account Officer', branchId: 'KC_PUSAT', branchName: 'KC Pusat', department: 'Bisnis', status: 'ACTIVE' },
-  { id: 'usr-funding', nip: 'ARA-03002', name: 'Demo Funding', email: 'funding@bprara.co.id', role: 'Marketing Dana (Funding)', roleTitle: 'Marketing Dana', branchId: 'KC_PUSAT', branchName: 'KC Pusat', department: 'Bisnis', status: 'ACTIVE' },
-  { id: 'usr-surveyor', nip: 'ARA-03003', name: 'Demo Surveyor', email: 'surveyor@bprara.co.id', role: 'Surveyor', roleTitle: 'Surveyor', branchId: 'KC_PUSAT', branchName: 'KC Pusat', department: 'Bisnis', status: 'ACTIVE' },
-  { id: 'usr-analis', nip: 'ARA-04001', name: 'Demo Analis Kredit', email: 'analis@bprara.co.id', role: 'Analis Kredit', roleTitle: 'Analis Kredit', branchId: 'KC_PUSAT', branchName: 'KC Pusat', department: 'Operasional', status: 'ACTIVE' },
-  { id: 'usr-legal', nip: 'ARA-04002', name: 'Demo Admin Legal', email: 'legal@bprara.co.id', role: 'Admin Legal', roleTitle: 'Admin Legal', branchId: 'KC_PUSAT', branchName: 'KC Pusat', department: 'Operasional', status: 'ACTIVE' },
-  { id: 'usr-sdm', nip: 'ARA-04003', name: 'Demo HRD', email: 'sdm@bprara.co.id', role: 'PENGEMBANGAN SDM', roleTitle: 'HRD', branchId: 'KC_PUSAT', branchName: 'KC Pusat', department: 'Operasional', status: 'ACTIVE' },
-  { id: 'usr-teller', nip: 'ARA-05001', name: 'Demo Teller', email: 'teller@bprara.co.id', role: 'Teller', roleTitle: 'Teller', branchId: 'KC_PUSAT', branchName: 'KC Pusat', department: 'Layanan', status: 'ACTIVE' },
-  { id: 'usr-cs', nip: 'ARA-05002', name: 'Demo CS', email: 'cs@bprara.co.id', role: 'CUSTOMER SERVICE', roleTitle: 'CS', branchId: 'KC_PUSAT', branchName: 'KC Pusat', department: 'Layanan', status: 'ACTIVE' },
-  { id: 'usr-kolektor-spv', nip: 'ARA-06001', name: 'Demo Koor. Collection', email: 'kolektorspv@bprara.co.id', role: 'KOORDINATOR COLLECTION', roleTitle: 'Koor Collection', branchId: 'KC_PUSAT', branchName: 'KC Pusat', department: 'Collection', status: 'ACTIVE' },
-  { id: 'usr-kolektor', nip: 'ARA-06002', name: 'Demo Staff Collection', email: 'kolektor@bprara.co.id', role: 'STAFF COLLECTION', roleTitle: 'Staff Collection', branchId: 'KC_PUSAT', branchName: 'KC Pusat', department: 'Collection', status: 'ACTIVE' },
+  { id: 'usr-admin', nip: 'ARA-00000', name: 'Administrator', email: 'admin@bprara.co.id', role: 'Master Admin', roleTitle: 'Super Admin', branchId: 'KC_PUSAT', branchName: 'KC Pusat', department: 'IT', status: 'ACTIVE' },
 ] as User[];
 
 export const MACRO_PORTFOLIO_DATA = {
