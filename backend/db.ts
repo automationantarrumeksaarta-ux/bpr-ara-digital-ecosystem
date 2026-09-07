@@ -156,6 +156,35 @@ export function initDb() {
       officer_name TEXT,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
+
+    CREATE TABLE IF NOT EXISTS beis_tasks (
+      id TEXT PRIMARY KEY,
+      tanggal TEXT,
+      deskripsi_tugas TEXT,
+      jenis_teknis TEXT,
+      timeline TEXT,
+      prioritas TEXT,
+      status TEXT DEFAULT 'In Progress',
+      tanggal_fu TEXT,
+      penyelesaian TEXT,
+      pic TEXT,
+      assigned_to TEXT,
+      validator TEXT,
+      beis_domain TEXT,
+      beis_level TEXT,
+      beis_category TEXT,
+      unit TEXT,
+      output_dod TEXT,
+      output_dod2 TEXT,
+      outcome TEXT,
+      category TEXT,
+      subcategory TEXT,
+      arahan TEXT,
+      synced_to_calendar INTEGER DEFAULT 0,
+      created_by TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
   `);
   console.log('Database initialized successfully.');
 }

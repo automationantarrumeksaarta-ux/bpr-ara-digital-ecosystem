@@ -264,7 +264,70 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [collectionCases, setCollectionCases] = useState<CollectionCase[]>(INITIAL_COLLECTION_CASES);
   const [ptpRecords, setPtpRecords] = useState<PromiseToPayRecord[]>(INITIAL_PROMISE_TO_PAY);
   const [restructurings, setRestructurings] = useState<RestructuringRecord[]>(INITIAL_RESTRUCTURING);
-  const [flowTasks, setFlowTasks] = useState<TaskItem[]>(INITIAL_TASKS);
+  const [flowTasks, setFlowTasks] = useState<TaskItem[]>([]);
+
+  // Fetch tasks from database on auth
+  useEffect(() => {
+    const fetchTasks = async () => {
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        setFlowTasks(INITIAL_TASKS);
+        return;
+      }
+      try {
+        const res = await fetch('/api/auth/tasks', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.tasks && data.tasks.length > 0) {
+            // Map DB column names to JS property names
+            const mapped = data.tasks.map((t: any) => ({
+              id: t.id,
+              taskId: t.id,
+              parentCaseId: 'CASE-DB',
+              unit: t.unit || 'BIS',
+              pic: t.pic || '',
+              assignedTo: t.assigned_to || t.pic || '',
+              tanggal: t.tanggal || '',
+              deskripsiTugas: t.deskripsi_tugas || '',
+              jenisTeknis: t.jenis_teknis || 'Rutinitas Harian',
+              timeline: t.timeline || 'Harian',
+              arahanAtasan: t.arahan || '-',
+              arahanAtasanUtama: '',
+              prioritas: t.prioritas || 'P1',
+              status: t.status || 'In Progress',
+              penyelesaian: t.penyelesaian || '',
+              tanggalFU: t.tanggal_fu || '',
+              validator: t.validator || '',
+              outputDoD: t.output_dod || '',
+              outputDoD2: t.output_dod2 || '',
+              outcome: t.outcome || '',
+              category: t.category || '',
+              subcategory: t.subcategory || '',
+              beisLevel: t.beis_level || '',
+              beisDomain: t.beis_domain || '',
+              beisCategory: t.beis_category || '',
+              syncedToCalendar: !!t.synced_to_calendar,
+              createdAt: t.created_at || new Date().toISOString(),
+              updatedAt: t.updated_at || new Date().toISOString()
+            }));
+            console.log('[Tasks] Loaded', mapped.length, 'tasks from DB');
+            setFlowTasks(mapped);
+          } else {
+            console.log('[Tasks] DB empty, using initial tasks');
+            setFlowTasks(INITIAL_TASKS);
+          }
+        } else {
+          setFlowTasks(INITIAL_TASKS);
+        }
+      } catch (e) {
+        console.error('[Tasks] Failed to fetch from DB, using initial', e);
+        setFlowTasks(INITIAL_TASKS);
+      }
+    };
+    fetchTasks();
+  }, [isAuthenticated]);
   const [ewsAlerts, setEwsAlerts] = useState<EwsAlert[]>(INITIAL_EWS_ALERTS);
   const [antiFraudFlags, setAntiFraudFlags] = useState<AntiFraudRedFlag[]>(INITIAL_ANTI_FRAUD_FLAGS);
   const [auditTrail, setAuditTrail] = useState<AuditTrailRecord[]>(INITIAL_AUDIT_TRAIL);
@@ -1113,6 +1176,22 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     );
   };
 
+  // Helper: sync a task to database
+  const syncTaskToDb = async (task: Partial<TaskItem>, method: 'POST' | 'PUT' = 'POST') => {
+    const token = localStorage.getItem('auth_token');
+    if (!token) return;
+    try {
+      const url = method === 'POST' ? '/api/auth/tasks' : `/api/auth/tasks/${encodeURIComponent(task.id || '')}`;
+      await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(task)
+      });
+    } catch (e) {
+      console.error('[Tasks] Failed to sync task to DB', e);
+    }
+  };
+
   const createFlowTask = (taskData: Partial<TaskItem> & Partial<FlowTaskLegacy>) => {
     const newTask: TaskItem = {
       id: Date.now().toString(),
@@ -1148,6 +1227,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     setFlowTasks((prev) => [newTask, ...prev]);
 
+    // Sync to database
+    syncTaskToDb(newTask, 'POST');
+
     if (taskData.mentions && taskData.mentions.length > 0) {
       const newNotifs = taskData.mentions.map((roleId, index) => ({
         id: `notif-mention-${Date.now()}-${index}`,
@@ -1181,6 +1263,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             penyelesaian: evidenceNote || t.penyelesaian,
             updatedAt: new Date().toISOString()
           };
+
+          // Sync update to database
+          syncTaskToDb({ id: taskId, status, penyelesaian: evidenceNote || t.penyelesaian }, 'PUT');
 
           recordAuditLog(
             'SYSTEM',

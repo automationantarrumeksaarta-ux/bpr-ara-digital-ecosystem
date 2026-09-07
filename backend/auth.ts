@@ -425,4 +425,132 @@ router.put('/task-routes/:userId', async (req, res) => {
   }
 });
 
+// ==================== BEIS TASKS CRUD ====================
+
+// Get all tasks
+router.get('/tasks', (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const token = authHeader.split(' ')[1];
+    jwt.verify(token, JWT_SECRET);
+
+    const tasks = db.prepare('SELECT * FROM beis_tasks ORDER BY created_at DESC').all();
+    res.json({ tasks });
+  } catch (error) {
+    console.error('Get tasks error:', error);
+    res.status(500).json({ error: 'Failed to fetch tasks' });
+  }
+});
+
+// Create a new task
+router.post('/tasks', (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const token = authHeader.split(' ')[1];
+    const decoded = jwt.verify(token, JWT_SECRET) as any;
+
+    const t = req.body;
+    if (!t.id) {
+      return res.status(400).json({ error: 'Task ID is required' });
+    }
+
+    db.prepare(`
+      INSERT OR REPLACE INTO beis_tasks 
+      (id, tanggal, deskripsi_tugas, jenis_teknis, timeline, prioritas, status,
+       tanggal_fu, penyelesaian, pic, assigned_to, validator, beis_domain, beis_level,
+       beis_category, unit, output_dod, output_dod2, outcome, category, subcategory,
+       arahan, synced_to_calendar, created_by, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    `).run(
+      t.id, t.tanggal || '', t.deskripsiTugas || '', t.jenisTeknis || '',
+      t.timeline || '', t.prioritas || '', t.status || 'In Progress',
+      t.tanggalFU || '', t.penyelesaian || '', t.pic || '', t.assignedTo || '',
+      t.validator || '', t.beisDomain || '', t.beisLevel || '',
+      t.beisCategory || '', t.unit || '', t.outputDoD || '', t.outputDoD2 || '',
+      t.outcome || '', t.category || '', t.subcategory || '',
+      t.arahan || '', t.syncedToCalendar ? 1 : 0, decoded.id || ''
+    );
+
+    res.status(201).json({ message: 'Task created', id: t.id });
+  } catch (error) {
+    console.error('Create task error:', error);
+    res.status(500).json({ error: 'Failed to create task' });
+  }
+});
+
+// Update a task
+router.put('/tasks/:taskId', (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const token = authHeader.split(' ')[1];
+    jwt.verify(token, JWT_SECRET);
+
+    const { taskId } = req.params;
+    const t = req.body;
+
+    // Build dynamic update
+    const fields: string[] = [];
+    const values: any[] = [];
+
+    const fieldMap: Record<string, string> = {
+      tanggal: 'tanggal', deskripsiTugas: 'deskripsi_tugas', jenisTeknis: 'jenis_teknis',
+      timeline: 'timeline', prioritas: 'prioritas', status: 'status',
+      tanggalFU: 'tanggal_fu', penyelesaian: 'penyelesaian', pic: 'pic',
+      assignedTo: 'assigned_to', validator: 'validator', beisDomain: 'beis_domain',
+      beisLevel: 'beis_level', beisCategory: 'beis_category', unit: 'unit',
+      outputDoD: 'output_dod', outputDoD2: 'output_dod2', outcome: 'outcome',
+      category: 'category', subcategory: 'subcategory', arahan: 'arahan',
+      syncedToCalendar: 'synced_to_calendar'
+    };
+
+    for (const [jsKey, dbCol] of Object.entries(fieldMap)) {
+      if (t[jsKey] !== undefined) {
+        fields.push(`${dbCol} = ?`);
+        values.push(jsKey === 'syncedToCalendar' ? (t[jsKey] ? 1 : 0) : t[jsKey]);
+      }
+    }
+
+    if (fields.length === 0) {
+      return res.status(400).json({ error: 'No fields to update' });
+    }
+
+    fields.push('updated_at = CURRENT_TIMESTAMP');
+    values.push(taskId);
+
+    db.prepare(`UPDATE beis_tasks SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+    res.json({ message: 'Task updated' });
+  } catch (error) {
+    console.error('Update task error:', error);
+    res.status(500).json({ error: 'Failed to update task' });
+  }
+});
+
+// Delete a task
+router.delete('/tasks/:taskId', (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const token = authHeader.split(' ')[1];
+    jwt.verify(token, JWT_SECRET);
+
+    const { taskId } = req.params;
+    db.prepare('DELETE FROM beis_tasks WHERE id = ?').run(taskId);
+    res.json({ message: 'Task deleted' });
+  } catch (error) {
+    console.error('Delete task error:', error);
+    res.status(500).json({ error: 'Failed to delete task' });
+  }
+});
+
 export default router;
