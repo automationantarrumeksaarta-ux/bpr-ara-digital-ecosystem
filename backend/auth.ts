@@ -243,4 +243,29 @@ router.get('/me', (req, res) => {
   }
 });
 
+// Get all users (for Super Admin panel)
+router.get('/users', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const token = authHeader.split(' ')[1];
+    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    
+    // Verify the requesting user is admin
+    const requestingUser = db.prepare('SELECT role, roleTier FROM users WHERE id = ?').get(decoded.id) as any;
+    if (!requestingUser || (requestingUser.role !== 'Super Admin' && requestingUser.role !== 'Master Admin' && requestingUser.roleTier !== 'Super Admin')) {
+      return res.status(403).json({ error: 'Forbidden: Admin access required' });
+    }
+
+    const users = db.prepare('SELECT id, username, email, name, role, roleTier, unit, status, created_at FROM users').all();
+    res.json({ users });
+  } catch (error) {
+    console.error('Get users error:', error);
+    res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
 export default router;

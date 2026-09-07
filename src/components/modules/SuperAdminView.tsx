@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { INITIAL_USERS } from '../../mock/initialData';
 import { navigationConfig } from '../../config/navigationConfig';
 import { 
@@ -17,7 +17,29 @@ import { Modal } from '../ui/Modal';
 export const SuperAdminView: React.FC = () => {
   const { rolePermissions, updateRolePermissions } = useApp();
   const [users, setUsers] = useState(INITIAL_USERS);
+  const [dbUsers, setDbUsers] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Fetch real users from database
+  useEffect(() => {
+    const fetchUsers = async () => {
+      const token = localStorage.getItem('auth_token');
+      if (!token) return;
+      try {
+        const res = await fetch('/api/auth/users', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setDbUsers(data.users || []);
+        }
+      } catch (e) {
+        console.error('Failed to fetch users from DB:', e);
+      }
+    };
+    fetchUsers();
+  }, []);
+  
   
   // Permissions Edit State
   const [editingRole, setEditingRole] = useState<string | null>(null);
@@ -81,10 +103,33 @@ export const SuperAdminView: React.FC = () => {
     alert("Konfigurasi sistem berhasil disimpan!");
   };
 
-  const filteredUsers = users.filter((u: any) => 
-    u.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    u.role.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    u.branchId.toLowerCase().includes(searchTerm.toLowerCase())
+  // Merge mock users with real DB users
+  const allUsers = (() => {
+    const mockIds = new Set(users.map((u: any) => u.id));
+    const dbMapped = dbUsers
+      .filter(u => !mockIds.has(u.id))
+      .map(u => ({
+        id: u.id,
+        name: u.name || u.username,
+        username: u.username,
+        email: u.email,
+        role: u.role || 'User',
+        roleTier: u.roleTier || 'LOW',
+        roleTitle: u.role || 'User',
+        branchId: u.unit || 'PMO',
+        unit: u.unit || 'PMO',
+        status: u.status || 'active',
+        avatarColor: '#6366f1',
+        created_at: u.created_at,
+      }));
+    return [...users, ...dbMapped];
+  })();
+
+  const filteredUsers = allUsers.filter((u: any) => 
+    (u.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+    (u.role || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (u.branchId || u.unit || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (u.email || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
