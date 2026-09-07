@@ -21,9 +21,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   const [regName, setRegName] = useState('');
   const [regUsername, setRegUsername] = useState('');
   const [regEmail, setRegEmail] = useState('');
-  const [regPassword, setRegPassword] = useState('123');
-  const [regUnit, setRegUnit] = useState<string>('BIS');
-  const [regRoleTier, setRegRoleTier] = useState<RoleTier>('LOW');
+  const [loginEmail, setLoginEmail] = useState('');
+  const [regPassword, setRegPassword] = useState('');
+  const [regUnit, setRegUnit] = useState<string>('');
+  const [regRoleTier, setRegRoleTier] = useState<RoleTier | ''>('');
   
   // OTP State
   const [otpCode, setOtpCode] = useState('');
@@ -63,7 +64,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
     }
   };
 
-  const handleLogin = (e?: React.FormEvent) => {
+  const handleLogin = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setErrorMsg('');
 
@@ -73,17 +74,34 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
       return;
     }
 
-    setOtpContext('login');
-    setOtpCode('');
-    setAuthStep('otp');
+    try {
+      const res = await fetch('/api/auth/login-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifier: query, password })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setErrorMsg(data.error || 'Login gagal. Periksa kembali kredensial Anda.');
+        return;
+      }
+
+      setLoginEmail(data.maskedEmail || data.email);
+      setOtpContext('login');
+      setOtpCode('');
+      setAuthStep('otp');
+    } catch (error) {
+      setErrorMsg('Gagal menghubungi server');
+    }
   };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
 
-    if (!regName.trim() || !regUsername.trim() || !regEmail.trim()) {
-      setErrorMsg('Harap isi Nama Lengkap, Username, dan Email.');
+    if (!regName.trim() || !regUsername.trim() || !regEmail.trim() || !regPassword || !regUnit || !regRoleTier) {
+      setErrorMsg('Harap lengkapi semua kolom form pendaftaran.');
       return;
     }
 
@@ -239,52 +257,108 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                 /* Register Form (Langkah 1) */
                 <form onSubmit={handleRegister} className="space-y-4">
                   <div className="space-y-3">
-                    <div className="relative flex items-center border border-gray-200 dark:border-gray-700 rounded-2xl bg-white dark:bg-[#18181A] overflow-hidden focus-within:border-gray-400 transition-colors group shadow-sm">
-                      <div className="pl-4 pr-3 text-gray-400 group-focus-within:text-gray-900 dark:group-focus-within:text-white"><Mail className="w-5 h-5" /></div>
+                    {/* Alamat Email */}
+                    <div className="relative flex items-center border border-gray-200 dark:border-gray-700 rounded-2xl bg-white dark:bg-[#18181A] overflow-hidden focus-within:border-gray-400 transition-colors group shadow-sm hover:border-gray-300 dark:hover:border-gray-600">
+                      <div className="pl-4 pr-3 flex items-center justify-center text-gray-400 group-focus-within:text-gray-900 dark:group-focus-within:text-white transition-colors">
+                        <Mail className="w-5 h-5" />
+                      </div>
                       <div className="w-px h-8 bg-gray-200 dark:bg-gray-700"></div>
-                      <div className="flex-1 px-4 py-2 flex flex-col justify-center">
-                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Alamat Email</label>
-                        <input type="email" required value={regEmail} onChange={(e) => setRegEmail(e.target.value)} className="w-full bg-transparent text-sm font-bold text-gray-900 dark:text-white focus:outline-none" />
+                      <div className="flex-1 px-4 relative flex flex-col justify-center min-h-[56px]">
+                        <input
+                          type="email"
+                          id="regEmail"
+                          required
+                          value={regEmail}
+                          onChange={(e) => setRegEmail(e.target.value)}
+                          placeholder=" "
+                          className="peer w-full bg-transparent text-sm font-bold text-gray-900 dark:text-white focus:outline-none pt-4 pb-1 z-10 relative"
+                        />
+                        <label htmlFor="regEmail" className="absolute left-4 top-1/2 -translate-y-[22px] scale-[0.85] origin-left text-xs font-bold text-gray-400 uppercase tracking-wider transition-transform duration-300 ease-out pointer-events-none peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:scale-100 peer-focus:-translate-y-[22px] peer-focus:scale-[0.85] z-0">
+                          Alamat Email
+                        </label>
                       </div>
                     </div>
 
-                    <div className="relative flex items-center border border-gray-200 dark:border-gray-700 rounded-2xl bg-white dark:bg-[#18181A] overflow-hidden focus-within:border-gray-400 transition-colors group shadow-sm">
-                      <div className="pl-4 pr-3 text-gray-400 group-focus-within:text-gray-900 dark:group-focus-within:text-white"><User className="w-5 h-5" /></div>
+                    {/* Nama Lengkap */}
+                    <div className="relative flex items-center border border-gray-200 dark:border-gray-700 rounded-2xl bg-white dark:bg-[#18181A] overflow-hidden focus-within:border-gray-400 transition-colors group shadow-sm hover:border-gray-300 dark:hover:border-gray-600">
+                      <div className="pl-4 pr-3 flex items-center justify-center text-gray-400 group-focus-within:text-gray-900 dark:group-focus-within:text-white transition-colors">
+                        <User className="w-5 h-5" />
+                      </div>
                       <div className="w-px h-8 bg-gray-200 dark:bg-gray-700"></div>
-                      <div className="flex-1 px-4 py-2 flex flex-col justify-center">
-                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Nama Lengkap</label>
-                        <input type="text" required value={regName} onChange={(e) => setRegName(e.target.value)} className="w-full bg-transparent text-sm font-bold text-gray-900 dark:text-white focus:outline-none" />
+                      <div className="flex-1 px-4 relative flex flex-col justify-center min-h-[56px]">
+                        <input
+                          type="text"
+                          id="regName"
+                          required
+                          value={regName}
+                          onChange={(e) => setRegName(e.target.value)}
+                          placeholder=" "
+                          className="peer w-full bg-transparent text-sm font-bold text-gray-900 dark:text-white focus:outline-none pt-4 pb-1 z-10 relative"
+                        />
+                        <label htmlFor="regName" className="absolute left-4 top-1/2 -translate-y-[22px] scale-[0.85] origin-left text-xs font-bold text-gray-400 uppercase tracking-wider transition-transform duration-300 ease-out pointer-events-none peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:scale-100 peer-focus:-translate-y-[22px] peer-focus:scale-[0.85] z-0">
+                          Nama Lengkap
+                        </label>
                       </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">
+                      {/* Username */}
                       <div className="relative flex items-center border border-gray-200 dark:border-gray-700 rounded-2xl bg-white dark:bg-[#18181A] overflow-hidden focus-within:border-gray-400 transition-colors group shadow-sm">
-                        <div className="flex-1 px-4 py-2 flex flex-col justify-center">
-                          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Username</label>
-                          <input type="text" required value={regUsername} onChange={(e) => setRegUsername(e.target.value)} className="w-full bg-transparent text-sm font-bold text-gray-900 dark:text-white focus:outline-none" />
+                        <div className="flex-1 px-4 relative flex flex-col justify-center min-h-[56px]">
+                          <input
+                            type="text"
+                            id="regUsername"
+                            required
+                            value={regUsername}
+                            onChange={(e) => setRegUsername(e.target.value)}
+                            placeholder=" "
+                            className="peer w-full bg-transparent text-sm font-bold text-gray-900 dark:text-white focus:outline-none pt-4 pb-1 z-10 relative"
+                          />
+                          <label htmlFor="regUsername" className="absolute left-4 top-1/2 -translate-y-[22px] scale-[0.85] origin-left text-xs font-bold text-gray-400 uppercase tracking-wider transition-transform duration-300 ease-out pointer-events-none peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:scale-100 peer-focus:-translate-y-[22px] peer-focus:scale-[0.85] z-0">
+                            Username
+                          </label>
                         </div>
                       </div>
+
+                      {/* Password */}
                       <div className="relative flex items-center border border-gray-200 dark:border-gray-700 rounded-2xl bg-white dark:bg-[#18181A] overflow-hidden focus-within:border-gray-400 transition-colors group shadow-sm">
-                        <div className="flex-1 px-4 py-2 flex flex-col justify-center">
-                          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Password</label>
-                          <input type="password" value={regPassword} onChange={(e) => setRegPassword(e.target.value)} className="w-full bg-transparent text-sm font-bold text-gray-900 dark:text-white focus:outline-none" />
+                        <div className="flex-1 px-4 relative flex flex-col justify-center min-h-[56px]">
+                          <input
+                            type="password"
+                            id="regPassword"
+                            required
+                            value={regPassword}
+                            onChange={(e) => setRegPassword(e.target.value)}
+                            placeholder=" "
+                            className="peer w-full bg-transparent text-sm font-bold text-gray-900 dark:text-white focus:outline-none pt-4 pb-1 z-10 relative"
+                          />
+                          <label htmlFor="regPassword" className="absolute left-4 top-1/2 -translate-y-[22px] scale-[0.85] origin-left text-xs font-bold text-gray-400 uppercase tracking-wider transition-transform duration-300 ease-out pointer-events-none peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:scale-100 peer-focus:-translate-y-[22px] peer-focus:scale-[0.85] z-0">
+                            Password
+                          </label>
                         </div>
                       </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">
+                      {/* Kode Unit */}
                       <div className="relative flex items-center border border-gray-200 dark:border-gray-700 rounded-2xl bg-white dark:bg-[#18181A] overflow-hidden focus-within:border-gray-400 transition-colors group shadow-sm">
                         <div className="flex-1 px-4 py-2 flex flex-col justify-center">
                           <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Kode Unit</label>
-                          <select value={regUnit} onChange={(e) => setRegUnit(e.target.value)} className="w-full bg-transparent text-sm font-bold text-gray-900 dark:text-white focus:outline-none appearance-none cursor-pointer">
-                            {BEIS_UNITS.map(u => <option key={u.code} value={u.code}>{u.code}</option>)}
+                          <select required value={regUnit} onChange={(e) => setRegUnit(e.target.value)} className="w-full bg-transparent text-sm font-bold text-gray-900 dark:text-white focus:outline-none appearance-none cursor-pointer">
+                            <option value="" disabled>Pilih Unit</option>
+                            {BEIS_UNITS.map(u => (
+                              <option key={u.code} value={u.code}>{u.code}</option>
+                            ))}
                           </select>
                         </div>
                       </div>
+
+                      {/* Role Tier */}
                       <div className="relative flex items-center border border-gray-200 dark:border-gray-700 rounded-2xl bg-white dark:bg-[#18181A] overflow-hidden focus-within:border-gray-400 transition-colors group shadow-sm">
                         <div className="flex-1 px-4 py-2 flex flex-col justify-center">
                           <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Role Tier</label>
-                          <select value={regRoleTier} onChange={(e) => setRegRoleTier(e.target.value as RoleTier)} className="w-full bg-transparent text-sm font-bold text-gray-900 dark:text-white focus:outline-none appearance-none cursor-pointer">
+                          <select required value={regRoleTier} onChange={(e) => setRegRoleTier(e.target.value as RoleTier)} className="w-full bg-transparent text-sm font-bold text-gray-900 dark:text-white focus:outline-none appearance-none cursor-pointer">
+                            <option value="" disabled>Pilih Tier</option>
                             <option value="LOW">LOW</option>
                             <option value="MID">MID</option>
                             <option value="HIGH">HIGH</option>
@@ -315,34 +389,30 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
             /* OTP Verification Step with Framer Motion */
             <div className="w-full flex flex-col h-[400px]">
               <OTPVerification 
-                email={identifier || regEmail || ''}
+                email={otpContext === 'login' ? loginEmail : regEmail}
                 onBack={() => setAuthStep('form')}
                 onVerify={async (code) => {
                   if (otpContext === 'login') {
-                    // For login, we currently use a simulated OTP or skip it.
-                    // If you want real 2FA for login, you need a similar send-otp flow.
-                    if (code === '123456' || code === '123123') {
-                      try {
-                        const res = await fetch('/api/auth/login', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ identifier: identifier.trim().toLowerCase(), password })
-                        });
-                        const data = await res.json();
-                        if (res.ok) {
-                          localStorage.setItem('auth_token', data.token);
-                          setPendingUser(data.user);
-                          return true;
-                        }
-                        setErrorMsg(data.error || 'Login gagal.');
-                        return false;
-                      } catch (e) {
-                        setErrorMsg('Gagal menghubungi server.');
+                    try {
+                      const res = await fetch('/api/auth/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ identifier: identifier.trim().toLowerCase(), password, otpCode: code })
+                      });
+                      
+                      const data = await res.json();
+                      if (!res.ok) {
+                        setErrorMsg(data.error || 'Login gagal');
                         return false;
                       }
+                      
+                      localStorage.setItem('auth_token', data.token);
+                      pendingUserRef.current = data.user;
+                      return true;
+                    } catch (error) {
+                      setErrorMsg('Terjadi kesalahan server');
+                      return false;
                     }
-                    setErrorMsg('Kode OTP tidak valid.');
-                    return false;
                   } else {
                     // Register: Send the OTP code to the server for real validation
                     try {

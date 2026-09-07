@@ -94,6 +94,49 @@ router.post('/register', async (req, res) => {
   }
 });
 
+// Login OTP Generation
+router.post('/login-otp', async (req, res) => {
+  try {
+    const { identifier, password } = req.body;
+    
+    if (!identifier || !password) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    const user = db.prepare('SELECT * FROM users WHERE username = ? OR email = ?').get(identifier, identifier) as any;
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password_hash);
+    if (!isMatch) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+
+    db.prepare(`
+      INSERT INTO otp_verifications (email, otp_code, expires_at)
+      VALUES (?, ?, ?)
+      ON CONFLICT(email) DO UPDATE SET otp_code = excluded.otp_code, expires_at = excluded.expires_at, created_at = CURRENT_TIMESTAMP
+    `).run(user.email, otpCode, expiresAt);
+
+    await sendOtpEmail(user.email, otpCode, user.name);
+
+    // Mask email for privacy (e.g. j***@gmail.com)
+    const emailParts = user.email.split('@');
+    const maskedEmail = emailParts[0].length > 3 
+      ? emailParts[0].substring(0, 3) + '***@' + emailParts[1]
+      : emailParts[0].substring(0, 1) + '***@' + emailParts[1];
+
+    res.json({ message: 'OTP sent successfully', maskedEmail, email: user.email });
+  } catch (error) {
+    console.error('Login OTP error:', error);
+    res.status(500).json({ error: 'Failed to send OTP' });
+  }
+});
+
 // Login
 router.post('/login', async (req, res) => {
   try {
@@ -114,6 +157,24 @@ router.post('/login', async (req, res) => {
     if (!isMatch) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
+
+    const { otpCode } = req.body;
+    if (!otpCode) {
+      return res.status(400).json({ error: 'OTP Code is required' });
+    }
+
+    // Verify OTP
+    const verification = db.prepare('SELECT * FROM otp_verifications WHERE email = ? AND otp_code = ?').get(user.email, otpCode) as any;
+    if (!verification) {
+      return res.status(400).json({ error: 'Kode OTP tidak valid' });
+    }
+
+    if (new Date() > new Date(verification.expires_at)) {
+      return res.status(400).json({ error: 'Kode OTP sudah kadaluarsa' });
+    }
+
+    // Delete OTP after successful use
+    db.prepare('DELETE FROM otp_verifications WHERE email = ?').run(user.email);
 
     // Create JWT
     const payload = {
