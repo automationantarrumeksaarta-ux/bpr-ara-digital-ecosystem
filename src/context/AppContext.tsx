@@ -308,7 +308,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const token = localStorage.getItem('auth_token');
     if (token) {
       try {
-        await fetch(`/api/auth/role-permissions/${encodeURIComponent(role)}`, {
+        const res = await fetch(`/api/auth/role-permissions/${encodeURIComponent(role)}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -316,10 +316,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           },
           body: JSON.stringify({ permissions: perms })
         });
+        if (!res.ok) {
+          console.error('API returned not ok', await res.text());
+          return false;
+        }
+        return true;
       } catch (e) {
         console.error('Failed to save role permissions to DB', e);
+        return false;
       }
     }
+    return false;
   };
 
   // Keyboard shortcut Cmd+K / Ctrl+K for Global Omnisearch

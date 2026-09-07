@@ -117,9 +117,14 @@ export const SuperAdminView: React.FC = () => {
     );
   };
 
-  const handleSavePermissions = () => {
+  const handleSavePermissions = async () => {
     if (editingRole) {
-      updateRolePermissions(editingRole, editingPermissions);
+      const success = await updateRolePermissions(editingRole, editingPermissions);
+      if (success) {
+        alert('Akses berhasil disimpan ke database!');
+      } else {
+        alert('Gagal menyimpan akses! Pastikan Anda sudah update backend VPS dan merestartnya.');
+      }
       setEditingRole(null);
     }
   };
