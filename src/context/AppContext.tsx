@@ -280,13 +280,25 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState(false);
   const [isAiAssistantOpen, setIsAiAssistantOpen] = useState(false);
 
-  const [rolePermissions, setRolePermissions] = useState<Record<string, string[]>>({});
+  const [rolePermissions, setRolePermissions] = useState<Record<string, string[]>>(() => {
+    try {
+      const saved = localStorage.getItem('bpr_ara_role_permissions');
+      return saved ? JSON.parse(saved) : {};
+    } catch (e) {
+      return {};
+    }
+  });
 
   const updateRolePermissions = (role: string, perms: string[]) => {
-    setRolePermissions(prev => ({
-      ...prev,
-      [role]: perms
-    }));
+    setRolePermissions(prev => {
+      const updated = { ...prev, [role]: perms };
+      try {
+        localStorage.setItem('bpr_ara_role_permissions', JSON.stringify(updated));
+      } catch (e) {
+        console.error('Failed to save permissions to local storage', e);
+      }
+      return updated;
+    });
   };
 
   // Keyboard shortcut Cmd+K / Ctrl+K for Global Omnisearch
