@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
+import compression from 'compression';
 import parserRoutes from './backend/parser.js';
 import { initDb } from './backend/db.js';
 
@@ -22,6 +23,7 @@ const _dirname = typeof __dirname !== 'undefined' ? __dirname : path.dirname(_fi
 const app = express();
 const PORT = Number(process.env.PORT) || 3535;
 
+app.use(compression());
 app.use(express.json());
 
 // Initialize Gemini SDK lazily / safely
@@ -129,7 +131,12 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
+    // Cache static assets for 1 year (they have content hashes in filenames)
+    app.use('/assets', express.static(path.join(distPath, 'assets'), {
+      maxAge: '1y',
+      immutable: true
+    }));
+    app.use(express.static(distPath, { maxAge: '1h' }));
     app.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
