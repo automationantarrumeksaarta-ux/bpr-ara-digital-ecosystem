@@ -280,25 +280,46 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState(false);
   const [isAiAssistantOpen, setIsAiAssistantOpen] = useState(false);
 
-  const [rolePermissions, setRolePermissions] = useState<Record<string, string[]>>(() => {
-    try {
-      const saved = localStorage.getItem('bpr_ara_role_permissions');
-      return saved ? JSON.parse(saved) : {};
-    } catch (e) {
-      return {};
-    }
-  });
+  const [rolePermissions, setRolePermissions] = useState<Record<string, string[]>>({});
 
-  const updateRolePermissions = (role: string, perms: string[]) => {
-    setRolePermissions(prev => {
-      const updated = { ...prev, [role]: perms };
+  useEffect(() => {
+    const fetchPerms = async () => {
+      const token = localStorage.getItem('auth_token');
+      if (!token) return;
       try {
-        localStorage.setItem('bpr_ara_role_permissions', JSON.stringify(updated));
+        const res = await fetch('/api/auth/role-permissions', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setRolePermissions(data.rolePermissions || {});
+        }
       } catch (e) {
-        console.error('Failed to save permissions to local storage', e);
+        console.error('Failed to fetch role permissions from DB', e);
       }
-      return updated;
-    });
+    };
+    fetchPerms();
+  }, [isAuthenticated]);
+
+  const updateRolePermissions = async (role: string, perms: string[]) => {
+    // Optimistic update
+    setRolePermissions(prev => ({ ...prev, [role]: perms }));
+
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+      try {
+        await fetch(`/api/auth/role-permissions/${encodeURIComponent(role)}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ permissions: perms })
+        });
+      } catch (e) {
+        console.error('Failed to save role permissions to DB', e);
+      }
+    }
   };
 
   // Keyboard shortcut Cmd+K / Ctrl+K for Global Omnisearch

@@ -304,4 +304,68 @@ router.put('/users/:id/role', async (req, res) => {
   }
 });
 
+// Get all role permissions
+router.get('/role-permissions', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const token = authHeader.split(' ')[1];
+    jwt.verify(token, JWT_SECRET); // just verify token exists
+    
+    const perms = db.prepare('SELECT * FROM role_permissions').all() as any[];
+    const formatted: Record<string, string[]> = {};
+    for (const p of perms) {
+      try {
+        formatted[p.role] = JSON.parse(p.permissions);
+      } catch(e) {}
+    }
+    res.json({ rolePermissions: formatted });
+  } catch (error) {
+    console.error('Get role permissions error:', error);
+    res.status(500).json({ error: 'Failed to fetch role permissions' });
+  }
+});
+
+// Update role permissions
+router.put('/role-permissions/:role', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const token = authHeader.split(' ')[1];
+    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    
+    const requestingUser = db.prepare('SELECT role, roleTier FROM users WHERE id = ?').get(decoded.id) as any;
+    if (!requestingUser || (requestingUser.role !== 'Super Admin' && requestingUser.role !== 'Master Admin' && requestingUser.roleTier !== 'Super Admin')) {
+      return res.status(403).json({ error: 'Forbidden: Admin access required' });
+    }
+
+    const { role } = req.params;
+    const { permissions } = req.body; // should be an array of strings
+
+    if (!role || !Array.isArray(permissions)) {
+      return res.status(400).json({ error: 'Invalid input' });
+    }
+
+    const jsonPerms = JSON.stringify(permissions);
+
+    // Upsert the permissions for this role
+    const info = db.prepare(`
+      INSERT INTO role_permissions (role, permissions, updated_at) 
+      VALUES (?, ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(role) DO UPDATE SET permissions = excluded.permissions, updated_at = CURRENT_TIMESTAMP
+    `).run(role, jsonPerms);
+    
+    res.json({ message: 'Role permissions updated successfully' });
+  } catch (error) {
+    console.error('Update role permissions error:', error);
+    res.status(500).json({ error: 'Failed to update role permissions' });
+  }
+});
+
 export default router;
