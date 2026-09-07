@@ -1,0 +1,132 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-dark: var(--primary-dark);
+  --color-primary-navy: var(--primary-navy);
+  --color-primary-light: var(--primary-light);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+  --color-muted: var(--muted);
+
+  /* Override Emerald (old primary) to new Blue theme to instantly redesign all hardcoded dashboard components */
+  --color-emerald-50: #EAF3FF;
+  --color-emerald-100: #D6E8FF;
+  --color-emerald-200: #B3D1FF;
+  --color-emerald-300: #85B4FF;
+  --color-emerald-400: #5793FF;
+  --color-emerald-500: #2F6EF2;
+  --color-emerald-600: #0756B8; 
+  --color-emerald-700: #064AA2;
+  --color-emerald-800: #063B82;
+  --color-emerald-900: #062E67;
+  --color-emerald-950: #041B42;
+}
+
+@layer base {
+  :root {
+    --background: #F7F9FC;
+    --foreground: #172033;
+    
+    --primary: #0756B8;
+    --primary-dark: #063B82;
+    --primary-navy: #062E67;
+    --primary-light: #EAF3FF;
+    --primary-foreground: #FFFFFF;
+    
+    --secondary: #FFFFFF;
+    --secondary-foreground: #0756B8;
+    
+    --success: #10B981;
+    --warning: #F59E0B;
+    --danger: #EF4444;
+    --info: #3B82F6;
+    
+    --surface: #FFFFFF;
+    --surface-muted: #F8FAFC;
+    
+    --border: #E5EAF1;
+    --ring: #0756B8;
+    
+    --muted: #94A3B8;
+    --text-secondary: #64748B;
+  }
+  
+  .dark {
+    /* For now keeping dark mode closely aligned with light mode to match the theme requested or mapping to dark equivalents */
+    --background: #0B1120;
+    --foreground: #F8FAFC;
+    
+    --primary: #0756B8;
+    --primary-dark: #063B82;
+    --primary-navy: #062E67;
+    --primary-light: #1E293B;
+    --primary-foreground: #FFFFFF;
+    
+    --secondary: #1E293B;
+    --secondary-foreground: #E2E8F0;
+    
+    --success: #10B981;
+    --warning: #F59E0B;
+    --danger: #EF4444;
+    --info: #3B82F6;
+    
+    --surface: #0F172A;
+    --surface-muted: #1E293B;
+    
+    --border: #1E293B;
+    --ring: #0756B8;
+    
+    --muted: #64748B;
+    --text-secondary: #94A3B8;
+  }
+
+  body {
+    font-family: 'Inter', 'Plus Jakarta Sans', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    scroll-behavior: smooth;
+    background-color: var(--background);
+    color: var(--foreground);
+  }
+}
+
+@layer utilities {
+  .app-bg-gradient {
+    @apply bg-background dark:bg-background;
+  }
+
+  .text-gradient {
+    @apply text-foreground dark:text-foreground;
+  }
+}
+
+/* Custom scrollbars for clean table and mobile view */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.5);
+}

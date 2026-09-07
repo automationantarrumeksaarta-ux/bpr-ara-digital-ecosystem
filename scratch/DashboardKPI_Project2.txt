@@ -1,0 +1,919 @@
+import React, { useState, useMemo, useEffect } from 'react';
+import { 
+  Target, TrendingUp, AlertTriangle, CheckCircle, 
+  Users, DollarSign, Activity, ChevronDown, 
+  LayoutDashboard, Plus, Trash2, Edit2, User,
+  Clock, CalendarCheck, UserMinus, ShieldCheck, ListTodo, Smartphone, Briefcase,
+  ChartBar, LineChart, TrendingDown, Award, Paperclip, FileUp,
+  FileText, XCircle, File, AlertCircle
+} from 'lucide-react';
+import { motion } from 'framer-motion';
+
+
+import { useDeleteKPI, useDeleteProject, useGetKPIs, useGetProjects } from '../hooks/useDashboardData';
+
+// --- MOCK DATABASE ---
+const CURRENT_MONTH = "April 2026";
+
+const INITIAL_DB = [
+  {
+    id: 'AO-001',
+    name: "Della Ananto Kusumo",
+    role: "Account Officer",
+    branch: "Cabang Utama Karanganyar",
+    kpis: [
+      { id: 'kpi-1', title: 'Outstanding Loan', target: 5000000000, actual: 4850000000, unit: 'Rp', type: 'higher_better', weight: 30, icon: DollarSign, attachment: 'Laporan_OS_April.pdf' },
+      { id: 'kpi-2', title: 'Nasabah Baru (Funding & Lending)', target: 20, actual: 22, unit: 'Orang', type: 'higher_better', weight: 20, icon: Users },
+      { id: 'kpi-3', title: 'Tingkat NPL (Non-Performing Loan)', target: 3.5, actual: 2.1, unit: '%', type: 'lower_better', weight: 25, icon: AlertTriangle, attachment: 'Data_NPL_Cabang.xlsx' },
+      { id: 'kpi-4', title: 'CASA Growth', target: 15, actual: 12, unit: '%', type: 'higher_better', weight: 15, icon: TrendingUp },
+      { id: 'kpi-5', title: 'Produktivitas AO (Approval)', target: 15, actual: 10, unit: 'Aplikasi', type: 'higher_better', weight: 10, icon: Activity }
+    ],
+    projects: [
+      { id: 'prj-1', title: 'Migrasi Nasabah ke Mobile Banking', target: 50, actual: 35, unit: 'Nasabah', type: 'higher_better', weight: 40, icon: Smartphone },
+      { id: 'prj-2', title: 'Penyelesaian NPL Khusus (Debitur X)', target: 100, actual: 80, unit: '%', type: 'higher_better', weight: 60, icon: Briefcase, attachment: 'Berita_Acara_DebiturX.pdf' }
+    ],
+    disiplin: [
+      { id: 'dsp-1', title: 'Akumulasi Menit Keterlambatan', target: 0, actual: 5, unit: 'Menit', type: 'lower_better', icon: Clock },
+      { id: 'dsp-2', title: 'Tingkat Kehadiran', target: 22, actual: 22, unit: 'Hari', type: 'higher_better', icon: CalendarCheck },
+      { id: 'dsp-3', title: 'Jumlah Izin / Sakit', target: 1, actual: 0, unit: 'Hari', type: 'lower_better', icon: UserMinus },
+      { id: 'dsp-4', title: 'Kepatuhan SOP (Sampling)', target: 100, actual: 100, unit: '%', type: 'higher_better', icon: ShieldCheck },
+      { id: 'dsp-5', title: 'Resolusi To Do List (Modul 5)', target: 90, actual: 75, unit: '%', type: 'higher_better', icon: ListTodo }
+    ],
+    trendKPI: [
+      { month: 'Jan', realisasi: 85, target: 100 }, { month: 'Feb', realisasi: 92, target: 100 },
+      { month: 'Mar', realisasi: 105, target: 100 }, { month: 'Apr', realisasi: 75, target: 100 },
+    ],
+    trendProject: [
+      { label: 'W1', realisasi: 20 }, { label: 'W2', realisasi: 45 },
+      { label: 'W3', realisasi: 70 }, { label: 'W4', realisasi: 0 },
+    ],
+    trendDisiplin: [
+      { label: 'Jan', realisasi: 80 }, { label: 'Feb', realisasi: 50 },
+      { label: 'Mar', realisasi: 20 }, { label: 'Apr', realisasi: 0 },
+    ]
+  },
+  {
+    id: 'AO-002',
+    name: "Andi Pratama",
+    role: "Account Officer",
+    branch: "Cabang Utama Karanganyar",
+    kpis: [
+      { id: 'kpi-1', title: 'Outstanding Loan', target: 4000000000, actual: 3500000000, unit: 'Rp', type: 'higher_better', weight: 50, icon: DollarSign },
+      { id: 'kpi-2', title: 'Nasabah Baru (Funding & Lending)', target: 15, actual: 10, unit: 'Orang', type: 'higher_better', weight: 20, icon: Users },
+      { id: 'kpi-3', title: 'Tingkat NPL (Non-Performing Loan)', target: 3.0, actual: 4.5, unit: '%', type: 'lower_better', weight: 30, icon: AlertTriangle },
+    ],
+    projects: [],
+    disiplin: [
+      { id: 'dsp-1', title: 'Akumulasi Menit Keterlambatan', target: 0, actual: 0, unit: 'Menit', type: 'lower_better', icon: Clock },
+      { id: 'dsp-2', title: 'Tingkat Kehadiran', target: 22, actual: 22, unit: 'Hari', type: 'higher_better', icon: CalendarCheck },
+      { id: 'dsp-3', title: 'Jumlah Izin / Sakit', target: 1, actual: 0, unit: 'Hari', type: 'lower_better', icon: UserMinus },
+      { id: 'dsp-4', title: 'Kepatuhan SOP (Sampling)', target: 100, actual: 100, unit: '%', type: 'higher_better', icon: ShieldCheck },
+      { id: 'dsp-5', title: 'Resolusi To Do List (Modul 5)', target: 90, actual: 75, unit: '%', type: 'higher_better', icon: ListTodo }
+    ],
+    trendKPI: [
+      { month: 'Jan', realisasi: 70, target: 100 }, { month: 'Feb', realisasi: 75, target: 100 },
+      { month: 'Mar', realisasi: 80, target: 100 }, { month: 'Apr', realisasi: 72, target: 100 },
+    ],
+    trendProject: [],
+    trendDisiplin: [
+      { label: 'Jan', realisasi: 15 }, { label: 'Feb', realisasi: 10 },
+      { label: 'Mar', realisasi: 0 }, { label: 'Apr', realisasi: 0 },
+    ]
+  }
+];
+
+// --- LOGIC HELPER ---
+const calculateStatus = (target, actual, type) => {
+  if (type === 'higher_better') {
+    const percentage = (actual / target) * 100;
+    if (percentage >= 100) return 'ON_TRACK';
+    if (percentage >= 80) return 'WARNING';
+    return 'OFF_TRACK';
+  } else {
+    if (target === 0) {
+      if (actual === 0) return 'ON_TRACK';
+      if (actual <= 2) return 'WARNING';
+      return 'OFF_TRACK';
+    }
+    if (actual <= target) return 'ON_TRACK';
+    if (actual <= target * 1.2) return 'WARNING';
+    return 'OFF_TRACK';
+  }
+};
+
+const getStatusColor = (status) => {
+  switch(status) {
+    case 'ON_TRACK': return { bg: 'bg-emerald-100', text: 'text-emerald-700 dark:text-emerald-400', bar: 'bg-emerald-500', label: 'On Track' };
+    case 'WARNING': return { bg: 'bg-amber-100', text: 'text-amber-700 dark:text-amber-400', bar: 'bg-amber-500', label: 'Warning' };
+    case 'OFF_TRACK': return { bg: 'bg-red-100', text: 'text-red-700', bar: 'bg-red-500', label: 'Off Track' };
+    default: return { bg: 'bg-slate-100 dark:bg-gray-800', text: 'text-slate-700 dark:text-gray-200', bar: 'bg-slate-400', label: 'Unknown' };
+  }
+};
+
+const formatValue = (val, unit) => {
+  if (unit === 'Rp') return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
+  return `${val} ${unit}`;
+};
+
+// --- COMPONENT ---
+import { UserProfile, TaskItem } from '../types';
+import { canViewTier } from '../utils/beisUtils';
+
+interface DashboardKPIProps {
+  currentUser: UserProfile;
+  users: UserProfile[];
+  tasks: TaskItem[];
+}
+
+export const DashboardKPI: React.FC<DashboardKPIProps> = ({ currentUser, users, tasks }) => {
+  const { data: kpis = [] } = useGetKPIs();
+  const { data: projects = [] } = useGetProjects();
+  const [selectedMonth, setSelectedMonth] = useState(CURRENT_MONTH);
+  const [selectedEmpId, setSelectedEmpId] = useState(currentUser.id);
+
+  // States untuk penampil dokumen (preview) & custom dialog konfirmasi
+  const [previewFile, setPreviewFile] = useState<any>(null);
+  const [confirmDialog, setConfirmDialog] = useState<any>({ isOpen: false, message: '', onConfirm: null });
+
+  // Map main app users to KPI database, calculating real task completion
+  const mergedUsers = useMemo(() => {
+    return users.map(appUser => {
+      // Find dummy KPI data if exists, otherwise create defaults
+      const dummyData = INITIAL_DB.find(d => d.name === appUser.name) || {
+        kpis: [],
+        projects: [],
+        disiplin: [
+          { id: 'dsp-1', title: 'Kehadiran', target: 22, actual: 22, unit: 'Hari', type: 'higher_better', icon: CalendarCheck }
+        ],
+        trendKPI: [], trendProject: [], trendDisiplin: []
+      };
+
+      const userKpis = kpis.filter(k => k.userId === appUser.id).map(k => ({
+        ...k,
+        type: 'higher_better', // simplified
+        icon: Target
+      }));
+      
+      const userProjects = projects.filter(p => p.manager === appUser.name).map(p => ({
+        ...p,
+        type: 'higher_better',
+        icon: Briefcase,
+        weight: 100 / (projects.filter(pr => pr.manager === appUser.name).length || 1)
+      }));
+
+      const finalKpis = userKpis.length > 0 ? userKpis : dummyData.kpis;
+      const finalProjects = userProjects.length > 0 ? userProjects : dummyData.projects;
+
+      // Calculate Real To-Do List Resolution from main app tasks!
+      const userTasks = tasks.filter(t => t.assignedTo === appUser.assignedMemberTab);
+      const totalUserTasks = userTasks.length;
+      const completedUserTasks = userTasks.filter(t => t.status === 'Validated Closed').length;
+      const resolutionRate = totalUserTasks > 0 ? Math.round((completedUserTasks / totalUserTasks) * 100) : 0;
+      
+      const disiplinWithRealTasks = [
+        ...dummyData.disiplin.filter(d => !d.title.includes('To Do List')),
+        { id: 'dsp-tasks', title: 'Resolusi To Do List (Otomatis)', target: 100, actual: resolutionRate, unit: '%', type: 'higher_better', icon: ListTodo }
+      ];
+
+      return {
+        id: appUser.id,
+        name: appUser.name,
+        role: appUser.role,
+        branch: appUser.unit || 'Pusat',
+        tier: appUser.roleTier,
+        kpis: finalKpis,
+        projects: finalProjects,
+        disiplin: disiplinWithRealTasks,
+        trendKPI: dummyData.trendKPI,
+        trendProject: dummyData.trendProject,
+        trendDisiplin: dummyData.trendDisiplin
+      };
+    });
+  }, [users, tasks]);
+
+  // Filter accessible users based on tier
+  const accessibleUsers = useMemo(() => {
+    return mergedUsers.filter(u => canViewTier(currentUser.roleTier || 'LOW', u.tier || 'LOW'));
+  }, [mergedUsers, currentUser]);
+
+  // Ensure selected user is accessible, fallback to self
+  useEffect(() => {
+    if (!accessibleUsers.find(u => u.id === selectedEmpId)) {
+      setSelectedEmpId(currentUser.id);
+    }
+  }, [accessibleUsers, currentUser, selectedEmpId]);
+
+  const currentEmp = useMemo(() => mergedUsers.find(emp => emp.id === selectedEmpId) || mergedUsers[0], [mergedUsers, selectedEmpId]);
+  
+  const [modalObj, setModalObj] = useState({ isOpen: false, mode: 'add', type: 'kpis', data: null as any });
+  const [formData, setFormData] = useState({ title: '', target: '', actual: '', unit: '', type: 'higher_better', weight: '20', attachment: '' });
+
+  // --- ACTIONS (MASTER ADMIN ONLY) ---
+  const isSuperAdmin = currentUser.roleTier === 'Super Admin';
+  const { mutate: deleteKPI } = useDeleteKPI();
+  const { mutate: deleteProject } = useDeleteProject();
+
+  const handleDeleteItem = (id: string, collectionType: string) => {
+    if (!isSuperAdmin) return;
+    setConfirmDialog({
+      isOpen: true,
+      message: 'Apakah Anda yakin ingin menghapus indikator kinerja ini dari sistem?',
+      onConfirm: () => {
+        if (collectionType === 'kpis') {
+           deleteKPI(id);
+        } else if (collectionType === 'projects') {
+           deleteProject(id);
+        }
+        setConfirmDialog({ isOpen: false, message: '', onConfirm: null });
+      }
+    });
+  };
+
+  const handleRemoveAttachment = (id, collectionType) => {
+    if (!isSuperAdmin) return;
+    setConfirmDialog({
+      isOpen: true,
+      message: 'Hapus file lampiran dari data ini? (File tidak akan bisa dikembalikan)',
+      onConfirm: () => {
+        // Implement attachment removal here if needed
+        setConfirmDialog({ isOpen: false, message: '', onConfirm: null });
+      }
+    });
+  };
+
+  const openAddModal = (collectionType) => {
+    setModalObj({ isOpen: true, mode: 'add', type: collectionType, data: null });
+    setFormData({ title: '', target: '', actual: '', unit: '', type: 'higher_better', weight: '20', attachment: '' });
+  };
+
+  const openEditModal = (item, collectionType) => {
+    setModalObj({ isOpen: true, mode: 'edit', type: collectionType, data: item.id });
+    setFormData({ 
+      title: item.title, target: item.target.toString(), actual: item.actual.toString(), 
+      unit: item.unit, type: item.type, weight: item.weight?.toString() || '0', attachment: item.attachment || ''
+    });
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!isSuperAdmin) return;
+
+    if (modalObj.type === 'kpis') {
+      if (modalObj.mode === 'add') {
+        // TODO: call API to create KPI
+        /* setKpis(prev => [...prev, {
+          id: `kpi-${Date.now()}`,
+          userId: selectedEmpId,
+          metric: formData.title,
+          target: parseFloat(formData.target),
+          actual: parseFloat(formData.actual),
+          unit: formData.unit,
+          weight: parseFloat(formData.weight) || 0
+        }]); */
+      } else {
+        // TODO: call API to update KPI
+        /* setKpis(prev => prev.map(k => k.id === modalObj.data ? {
+          ...k,
+          metric: formData.title,
+          target: parseFloat(formData.target),
+          actual: parseFloat(formData.actual),
+          unit: formData.unit,
+          weight: parseFloat(formData.weight) || 0
+        } : k)); */
+      }
+    }
+    setModalObj({ isOpen: false, mode: 'add', type: 'kpis', data: null });
+  };
+
+  // 1. Kalkulasi Skor KPI Operasional (Weighted Average)
+  const totalScore = useMemo(() => {
+    if (currentEmp.kpis.length === 0) return 0;
+    let totalWeight = 0;
+    const sum = currentEmp.kpis.reduce((acc, kpi) => {
+      let pct = 0;
+      if (kpi.target !== 0) {
+        if (kpi.type === 'higher_better') {
+          pct = Math.min((kpi.actual / kpi.target) * 100, 100);
+        } else {
+          pct = kpi.actual <= kpi.target ? 100 : Math.max(100 - (((kpi.actual - kpi.target) / kpi.target) * 100), 0);
+        }
+      } else {
+        pct = kpi.actual === 0 ? 100 : 0;
+      }
+      const weight = kpi.weight || 0;
+      totalWeight += weight;
+      return acc + (pct * weight);
+    }, 0);
+    return totalWeight > 0 ? Math.round(sum / totalWeight) : 0;
+  }, [currentEmp.kpis]);
+
+  // 2. Kalkulasi Skor Project Khusus (Weighted Average)
+  const totalProjectScore = useMemo(() => {
+    if (currentEmp.projects.length === 0) return 0;
+    let totalWeight = 0;
+    const sum = currentEmp.projects.reduce((acc, proj) => {
+      let pct = 0;
+      if (proj.target !== 0) {
+        if (proj.type === 'higher_better') {
+          pct = Math.min((proj.actual / proj.target) * 100, 100);
+        } else {
+          pct = proj.actual <= proj.target ? 100 : Math.max(100 - (((proj.actual - proj.target) / proj.target) * 100), 0);
+        }
+      } else {
+        pct = proj.actual === 0 ? 100 : 0;
+      }
+      const weight = proj.weight || 0;
+      totalWeight += weight;
+      return acc + (pct * weight);
+    }, 0);
+    return totalWeight > 0 ? Math.round(sum / totalWeight) : 0;
+  }, [currentEmp.projects]);
+
+  // 3. SINKRONISASI DATA GRAFIK (Trend KPI)
+  const dynamicTrendKPI = useMemo(() => {
+    const trend = [...currentEmp.trendKPI];
+    if (trend.length > 0) {
+      trend[trend.length - 1] = { ...trend[trend.length - 1], realisasi: totalScore };
+    }
+    return trend;
+  }, [currentEmp.trendKPI, totalScore]);
+
+  // 4. SINKRONISASI DATA GRAFIK (Trend Project)
+  const dynamicTrendProject = useMemo(() => {
+    const trend = [...currentEmp.trendProject];
+    if (trend.length > 0) {
+      trend[trend.length - 1] = { ...trend[trend.length - 1], realisasi: totalProjectScore };
+    }
+    return trend;
+  }, [currentEmp.trendProject, totalProjectScore]);
+
+  // 5. SINKRONISASI DATA GRAFIK (Trend Disiplin - Keterlambatan)
+  const dynamicTrendDisiplin = useMemo(() => {
+    const trend = [...currentEmp.trendDisiplin];
+    const delayTask = currentEmp.disiplin.find(d => d.title.includes('Keterlambatan'));
+    const delayVal = delayTask ? delayTask.actual : 0;
+    if (trend.length > 0) {
+      trend[trend.length - 1] = { ...trend[trend.length - 1], realisasi: delayVal };
+    }
+    return trend;
+  }, [currentEmp.trendDisiplin, currentEmp.disiplin]);
+
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: { staggerChildren: 0.1 }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } }
+  };
+
+
+  // Render Component for KPI & Project Cards (Minimalist Design)
+  const renderMetricCard = (item, collectionType) => {
+    const status = calculateStatus(item.target, item.actual, item.type);
+    const style = getStatusColor(status);
+    const Icon = item.icon || Target;
+    
+    let progressPct = item.target !== 0 ? (item.actual / item.target) * 100 : (item.actual === 0 ? 100 : 0);
+    if (item.type === 'lower_better' && item.target !== 0) progressPct = (item.target / item.actual) * 100; 
+    const clampPct = Math.min(Math.max(progressPct, 0), 100);
+
+    return (
+      <motion.div variants={itemVariants} whileHover={{ y: -5 }} key={item.id} className="glass-effect rounded-2xl p-5 relative group flex flex-col justify-between">
+        <div className={`absolute top-0 left-0 w-full h-1.5 ${style.bar} rounded-t-2xl`}></div>
+        
+        <div>
+          {/* Master Admin Controls */}
+          {isSuperAdmin && (
+            <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+              <button onClick={() => openEditModal(item, collectionType)} className="p-1.5 bg-slate-100 dark:bg-gray-800 text-blue-600 hover:bg-blue-600 hover:text-white rounded transition-colors">
+                <Edit2 size={14} />
+              </button>
+              {collectionType !== 'disiplin' && (
+                <button onClick={() => handleDeleteItem(item.id, collectionType)} className="p-1.5 bg-slate-100 dark:bg-gray-800 text-red-500 hover:bg-red-500 hover:text-white rounded transition-colors">
+                  <Trash2 size={14} />
+                </button>
+              )}
+            </div>
+          )}
+
+          <div className={`flex items-start mb-4 mt-1 ${isSuperAdmin ? 'pr-14' : ''}`}>
+            <div className={`p-2.5 rounded-lg ${style.bg} ${style.text} mr-3`}><Icon size={20} /></div>
+            <div>
+              <h4 className="font-semibold text-slate-800 dark:text-white text-base">{item.title}</h4>
+              {(item.weight !== undefined && collectionType !== 'disiplin') && (
+                 <span className="inline-block mt-1 text-[10px] font-medium text-slate-500 dark:text-gray-400 bg-slate-100 dark:bg-gray-800 px-2 py-0.5 rounded border border-slate-200 dark:border-gray-700">
+                   Bobot: {item.weight}%
+                 </span>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex justify-between items-center text-sm mb-1.5">
+              <span className="text-slate-500 dark:text-gray-400">Realisasi:</span>
+              <span className="font-bold text-slate-800 dark:text-white">{formatValue(item.actual, item.unit)}</span>
+            </div>
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-slate-500 dark:text-gray-400">Target:</span>
+              <span className="font-medium text-slate-600 dark:text-gray-300">{formatValue(item.target, item.unit)}</span>
+            </div>
+
+            <div className="pt-3">
+              <div className="w-full bg-slate-100 dark:bg-gray-800 rounded-full h-2 overflow-hidden mb-2">
+                <div className={`h-full rounded-full ${style.bar}`} style={{ width: `${clampPct}%` }}></div>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${style.bg} ${style.text}`}>{style.label}</span>
+                <span className="text-xs text-slate-500 dark:text-gray-400">
+                  {item.type === 'higher_better' ? `${Math.round(progressPct)}%` : ''}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Attachment Indicator rendering if attachment exists */}
+        {item.attachment && (
+          <div className="mt-4 pt-3 border-t border-slate-100 dark:border-gray-800 flex items-center justify-between">
+            <div 
+              onClick={() => setPreviewFile({ name: item.attachment, context: item.title })}
+              className="inline-flex items-center gap-1.5 text-[11px] font-medium text-indigo-600 bg-indigo-50 px-2.5 py-1.5 rounded border border-indigo-100 w-fit cursor-pointer hover:bg-indigo-100 transition-colors" 
+              title="Lihat Dokumen Lampiran"
+            >
+              <Paperclip size={12} className="text-gray-800 dark:text-gray-200" />
+              <span className="truncate max-w-[150px]">{item.attachment}</span>
+            </div>
+            {/* Tombol hapus lampiran khusus Master Admin */}
+            {isSuperAdmin && (
+              <button 
+                onClick={() => handleRemoveAttachment(item.id, collectionType)}
+                className="text-slate-400 dark:text-gray-500 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                title="Hapus Lampiran"
+              >
+                <XCircle size={16} />
+              </button>
+            )}
+          </div>
+        )}
+      </motion.div>
+    );
+  };
+
+  return (
+    <motion.div 
+      variants={containerVariants}
+      initial="hidden"
+      animate="show"
+      className="bg-transparent font-sans text-slate-800 dark:text-white pb-12 w-full h-full overflow-y-auto"
+    >
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        {/* Header Section */}
+        <motion.div variants={itemVariants} className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+          <div>
+            <h2 className="text-2xl font-bold flex items-center gap-2">
+              <span className="text-gradient">Evaluasi Kinerja & KPI</span>
+            </h2>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-sm text-slate-500 dark:text-gray-400">Data Performa:</span>
+                {/* EMPLOYEE SELECTOR */}
+                <div className="flex-1 w-full md:w-auto">
+                  <div className="relative">
+                    <select 
+                      value={selectedEmpId}
+                      onChange={(e) => setSelectedEmpId(e.target.value)}
+                      className="w-full appearance-none bg-white dark:bg-[#18181B] border border-slate-200 dark:border-gray-700 text-slate-700 dark:text-gray-200 py-1.5 pl-4 pr-10 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-semibold shadow-sm transition-all text-sm"
+                      disabled={accessibleUsers.length <= 1}
+                    >
+                      {accessibleUsers.map(emp => (
+                        <option key={emp.id} value={emp.id}>{emp.name} - {emp.role}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-gray-500 pointer-events-none" size={14} />
+                  </div>
+                </div>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-2 bg-white dark:bg-[#18181B] border border-slate-200 dark:border-gray-700 px-3 py-1.5 rounded shadow-sm">
+            <span className="text-xs font-medium text-slate-500 dark:text-gray-400 uppercase tracking-wider">Periode:</span>
+            <div className="flex items-center gap-1 text-sm font-bold text-slate-800 dark:text-white">
+              {selectedMonth} <ChevronDown size={14} className="text-slate-400 dark:text-gray-500" />
+            </div>
+          </div>
+        </motion.div>
+
+        {/* HERO: Skor Rata-Rata */}
+        <motion.div variants={itemVariants} className="glass-effect rounded-3xl p-6 mb-8 flex flex-col md:flex-row items-center gap-8">
+          <div className="flex-shrink-0 relative flex items-center justify-center w-32 h-32">
+            <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+              <path className="text-slate-100 dark:text-gray-800/50" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" />
+              <path
+                className={`${totalScore >= 90 ? 'text-emerald-500' : totalScore >= 75 ? 'text-amber-500' : 'text-red-500'} transition-all duration-1000 ease-out`}
+                strokeDasharray={`${totalScore}, 100`}
+                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                fill="none" stroke="currentColor" strokeWidth="3"
+              />
+            </svg>
+            <div className="absolute flex flex-col items-center">
+              <span className="text-3xl font-bold text-slate-800 dark:text-white">{totalScore}</span>
+              <span className="text-xs text-slate-500 dark:text-gray-400">/ 100</span>
+            </div>
+          </div>
+          
+          <div className="flex-grow">
+            <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2 mb-2">
+              <Award className="text-gray-800 dark:text-gray-200" size={20} /> Rata-rata Skor KPI Operasional
+            </h3>
+            <p className="text-slate-600 dark:text-gray-300 text-sm max-w-2xl leading-relaxed">
+              Skor rata-rata ini dihitung murni dari komponen <strong>KPI Operasional</strong>. Ketiga data di bawah (KPI, Project, dan Disiplin) akan dikonsolidasi bersama nilai OKR untuk membentuk Nilai Kinerja Akhir di <strong>Scoring Board</strong>.
+            </p>
+            {isSuperAdmin && (
+              <div className="mt-3">
+                <span className="text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900/50 px-2.5 py-1 rounded text-xs font-medium">
+                  Hak Akses: Master Admin (View, Add, Edit, Delete Data)
+                </span>
+              </div>
+            )}
+          </div>
+        </motion.div>
+
+        {/* SECTION 1: KPI OPERASIONAL */}
+        <motion.div variants={itemVariants} className="mb-10">
+          <div className="flex justify-between items-end mb-4 border-b border-slate-200/50 dark:border-gray-700/50 pb-2">
+            <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+              <Activity className="text-gray-800 dark:text-gray-200" size={20} /> Indikator Kinerja (KPI)
+              <span className="text-xs font-medium bg-slate-100/50 dark:bg-gray-800/50 text-slate-600 dark:text-gray-300 px-2 py-0.5 rounded border border-slate-200/50 dark:border-gray-700/50 ml-2">Bobot 40%</span>
+            </h3>
+            {isSuperAdmin && (
+              <button onClick={() => openAddModal('kpis')} className="flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-800">
+                <Plus size={16} /> Tambah KPI
+              </button>
+            )}
+          </div>
+          
+          {currentEmp.kpis.length === 0 ? (
+            <div className="bg-white dark:bg-[#18181B] border border-slate-200 dark:border-gray-700 rounded-xl p-8 text-center text-slate-500 dark:text-gray-400 text-sm">Belum ada data KPI.</div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+              {currentEmp.kpis.map(kpi => renderMetricCard(kpi, 'kpis'))}
+            </div>
+          )}
+
+          {/* Bar Chart (KPI Trend DYNAMIC) */}
+          <div className="bg-white dark:bg-[#18181B] rounded-xl border border-slate-200 dark:border-gray-700 shadow-sm p-6">
+            <div className="flex flex-col mb-6">
+              <h4 className="font-bold text-slate-800 dark:text-white text-base">Trend KPI Operasional (Rata-rata)</h4>
+              <p className="text-sm text-slate-500 dark:text-gray-400">Real-time Target vs Realisasi</p>
+            </div>
+            <div className="space-y-4">
+              {dynamicTrendKPI.map((data, idx) => {
+                const colorClass = data.realisasi >= 100 ? 'bg-emerald-500' : data.realisasi >= 80 ? 'bg-amber-500' : 'bg-red-500';
+                return (
+                  <div key={idx} className="flex items-center gap-4">
+                    <div className="w-12 text-sm font-medium text-slate-700 dark:text-gray-200">{data.month}</div>
+                    <div className="flex-1 bg-slate-100 dark:bg-gray-800 rounded h-8 relative flex items-center">
+                      <div className={`h-full rounded flex items-center justify-end px-3 text-xs font-bold text-white ${colorClass}`} style={{ width: `${Math.min((data.realisasi/120)*100, 100)}%`, transition: 'width 0.5s ease' }}>
+                        {data.realisasi}%
+                      </div>
+                      <div className="absolute left-[83.33%] top-0 bottom-0 w-0.5 bg-slate-400 border-r border-dashed border-slate-400/50 z-10" title="Target 100%"></div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </motion.div>
+
+        {/* SECTION 3: DISIPLIN KERJA (TABLE + CHART) */}
+        <motion.div variants={itemVariants} className="mb-10">
+          <div className="flex flex-wrap justify-between items-end mb-4 border-b border-slate-200/50 dark:border-gray-700/50 pb-2">
+            <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+              <CheckCircle className="text-gray-800 dark:text-gray-200" size={20} /> Disiplin Kerja
+              <span className="text-xs font-medium bg-slate-100/50 dark:bg-gray-800/50 text-slate-600 dark:text-gray-300 px-2 py-0.5 rounded border border-slate-200/50 dark:border-gray-700/50 ml-2">Bobot 10%</span>
+            </h3>
+          </div>
+          
+          <div className="overflow-hidden mb-6 border border-slate-200/50 dark:border-gray-800/50 rounded-2xl">
+             <div className="overflow-x-auto">
+               <table className="w-full text-left border-collapse bg-transparent">
+                 <thead className="bg-slate-50/50 dark:bg-gray-800/20 border-b border-slate-200/50 dark:border-gray-800/50">
+                   <tr>
+                     <th className="py-3 px-5 font-semibold text-xs text-slate-600 dark:text-gray-300 uppercase tracking-wider">Parameter Disiplin</th>
+                     <th className="py-3 px-5 font-semibold text-xs text-slate-600 dark:text-gray-300 uppercase tracking-wider">Target Threshold</th>
+                     <th className="py-3 px-5 font-semibold text-xs text-slate-600 dark:text-gray-300 uppercase tracking-wider">Aktual (Bulan Ini)</th>
+                     <th className="py-3 px-5 font-semibold text-xs text-slate-600 dark:text-gray-300 uppercase tracking-wider text-center">Status</th>
+                     {isSuperAdmin && <th className="py-3 px-5 font-semibold text-xs text-slate-600 dark:text-gray-300 uppercase tracking-wider text-center">Aksi</th>}
+                   </tr>
+                 </thead>
+                 <tbody className="divide-y divide-slate-100">
+                   {currentEmp.disiplin.map(dsp => {
+                      const status = calculateStatus(dsp.target, dsp.actual, dsp.type);
+                      const style = getStatusColor(status);
+                      const Icon = dsp.icon || Target;
+                      return (
+                        <tr key={dsp.id} className="hover:bg-slate-50 dark:hover:bg-gray-800 transition-colors group">
+                          <td className="py-3 px-5">
+                            <div className="flex items-center gap-3">
+                              <Icon size={16} className="text-slate-400 dark:text-gray-500" />
+                              <span className="text-sm font-medium text-slate-800 dark:text-white">{dsp.title}</span>
+                            </div>
+                          </td>
+                          <td className="py-3 px-5 text-sm text-slate-500 dark:text-gray-400">
+                            {dsp.type === 'lower_better' && dsp.target !== 0 ? 'Maks ' : ''}
+                            {dsp.target === 0 && dsp.type === 'lower_better' ? '0' : formatValue(dsp.target, '')} {dsp.unit}
+                          </td>
+                          <td className="py-3 px-5">
+                            <span className="text-sm font-bold text-slate-800 dark:text-white">{formatValue(dsp.actual, '')} {dsp.unit}</span>
+                          </td>
+                          <td className="py-3 px-5 text-center">
+                            <span className={`inline-block px-2.5 py-1 rounded text-xs font-semibold ${style.bg} ${style.text}`}>
+                              {style.label}
+                            </span>
+                          </td>
+                          {isSuperAdmin && (
+                            <td className="py-3 px-5 text-center">
+                               <button onClick={() => openEditModal(dsp, 'disiplin')} className="p-1.5 text-blue-600 hover:bg-blue-50 dark:bg-blue-900/20 rounded transition-colors opacity-0 group-hover:opacity-100">
+                                 <Edit2 size={14} />
+                               </button>
+                            </td>
+                          )}
+                        </tr>
+                      );
+                   })}
+                 </tbody>
+               </table>
+             </div>
+          </div>
+
+          {/* Area Chart (Inverted - Burn-down Disiplin/Keterlambatan) */}
+          <div className="bg-white dark:bg-[#18181B] rounded-xl border border-slate-200 dark:border-gray-700 shadow-sm p-6">
+            <div className="flex flex-col mb-6">
+              <h4 className="font-bold text-slate-800 dark:text-white text-base">Trend Penurunan Keterlambatan (Burn-down)</h4>
+              <p className="text-sm text-slate-500 dark:text-gray-400">Monitoring Kepatuhan Absensi</p>
+            </div>
+            
+            <div className="w-full h-64 flex mt-2">
+              <div className="w-10 relative shrink-0">
+                <span className="absolute text-[11px] font-medium text-slate-400 dark:text-gray-500 right-2 transform -translate-y-1/2" style={{ top: '83.33%' }}>0m</span>
+                <span className="absolute text-[11px] font-medium text-slate-400 dark:text-gray-500 right-2 transform -translate-y-1/2" style={{ top: '61%' }}>30m</span>
+                <span className="absolute text-[11px] font-medium text-slate-400 dark:text-gray-500 right-2 transform -translate-y-1/2" style={{ top: '38.66%' }}>60m</span>
+                <span className="absolute text-[11px] font-medium text-slate-400 dark:text-gray-500 right-2 transform -translate-y-1/2" style={{ top: '16.66%' }}>90m</span>
+              </div>
+              
+              <div className="flex-1 relative h-full">
+                <svg viewBox="0 0 1000 300" preserveAspectRatio="none" className="absolute inset-0 w-full h-full overflow-visible">
+                  <defs>
+                    <linearGradient id="discGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                      <stop offset="0%" stopColor="#10b981" stopOpacity="0.2" />
+                      <stop offset="100%" stopColor="#10b981" stopOpacity="0.01" />
+                    </linearGradient>
+                  </defs>
+                  {[50, 116, 183, 250].map((y, i) => (
+                    <line key={i} x1="50" y1={y} x2="950" y2={y} stroke="#e2e8f0" strokeWidth="1" strokeDasharray="4 4" />
+                  ))}
+                  
+                  {dynamicTrendDisiplin.length > 0 ? (() => {
+                    const xs = [50, 350, 650, 950];
+                    const points = dynamicTrendDisiplin.map((p, i) => {
+                       const y = 250 - (Math.min(p.realisasi, 90)/90)*200;
+                       return `${xs[i]},${y}`;
+                    });
+                    const pathD = `M 50 250 L ${points.join(' L ')} L ${xs[dynamicTrendDisiplin.length-1]} 250 Z`;
+                    
+                    return (
+                      <>
+                        <path d={pathD} fill="url(#discGrad)" style={{ transition: 'all 0.5s ease' }} />
+                        <polyline points={points.join(' ')} fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transition: 'all 0.5s ease' }} />
+                        {dynamicTrendDisiplin.map((p, i) => (
+                           <circle key={i} cx={xs[i]} cy={250 - (Math.min(p.realisasi, 90)/90)*200} r="4" fill="#ffffff" stroke="#059669" strokeWidth="2" style={{ transition: 'all 0.5s ease' }} />
+                        ))}
+                      </>
+                    );
+                  })() : null}
+                </svg>
+                
+                <div className="absolute bottom-0 left-0 right-0 h-6">
+                  {dynamicTrendDisiplin.length > 0 ? (
+                    dynamicTrendDisiplin.map((p, i) => (
+                      <span key={i} className="absolute bottom-0 text-[11px] font-medium text-slate-500 dark:text-gray-400 transform -translate-x-1/2" style={{ left: `${[5, 35, 65, 95][i]}%` }}>
+                        {p.label}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="absolute bottom-6 left-1/2 transform -translate-x-1/2 text-sm text-slate-400 dark:text-gray-500 italic">Data trend belum tersedia.</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+
+      </main>
+
+      {/* --- MODAL FORM (ADD & EDIT) --- */}
+      {modalObj.isOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-[#18181B] rounded-xl shadow-xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-5 border-b border-slate-200 dark:border-gray-700 flex justify-between items-center bg-slate-50 dark:bg-[#121214] shrink-0">
+              <h3 className="font-bold text-lg text-slate-800 dark:text-white">
+                {modalObj.mode === 'add' ? 'Tambah Data' : 'Edit Data'} 
+                <span className="text-blue-600 ml-1 font-medium text-sm">
+                  ({modalObj.type === 'kpis' ? 'KPI Operasional' : modalObj.type === 'projects' ? 'Project Khusus' : 'Disiplin Kerja'})
+                </span>
+              </h3>
+              <button onClick={() => setModalObj({...modalObj, isOpen: false})} className="text-slate-400 dark:text-gray-500 hover:text-slate-600 dark:text-gray-300">&times;</button>
+            </div>
+            
+            <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+              <div className="p-5 space-y-4 overflow-y-auto">
+                <div className="bg-blue-50 dark:bg-blue-900/20 text-blue-800 text-xs px-3 py-2 rounded mb-2 border border-blue-100 dark:border-blue-900/50 font-medium">
+                  Pembaruan disimpan untuk: <strong className="font-bold">{currentEmp.name}</strong>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-gray-200 mb-1">Nama Indikator</label>
+                    <input type="text" required value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} 
+                      className="w-full border border-slate-300 dark:border-gray-600 rounded-lg p-2.5 outline-none text-sm focus:ring-1 focus:ring-blue-500" 
+                      placeholder="Nama parameter..." 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-gray-200 mb-1">Bobot (%)</label>
+                    <input type="number" required value={formData.weight} onChange={(e) => setFormData({...formData, weight: e.target.value})} 
+                      className="w-full border border-slate-300 dark:border-gray-600 rounded-lg p-2.5 outline-none text-sm focus:ring-1 focus:ring-blue-500 disabled:bg-slate-100 dark:bg-gray-800 disabled:text-slate-400 dark:text-gray-500" 
+                      placeholder="Misal: 20" step="any" disabled={modalObj.type === 'disiplin'}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-gray-200 mb-1">Target</label>
+                    <input type="number" required value={formData.target} onChange={(e) => setFormData({...formData, target: e.target.value})} 
+                      className="w-full border border-slate-300 dark:border-gray-600 rounded-lg p-2.5 outline-none text-sm focus:ring-1 focus:ring-blue-500" 
+                      placeholder="Angka Target" step="any"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-gray-200 mb-1">Realisasi (Aktual)</label>
+                    <input type="number" required value={formData.actual} onChange={(e) => setFormData({...formData, actual: e.target.value})} 
+                      className="w-full border border-slate-300 dark:border-gray-600 rounded-lg p-2.5 outline-none text-sm focus:ring-1 focus:ring-blue-500" 
+                      placeholder="Angka Realisasi" step="any"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-gray-200 mb-1">Satuan</label>
+                    <select value={formData.unit} onChange={(e) => setFormData({...formData, unit: e.target.value})} 
+                      className="w-full border border-slate-300 dark:border-gray-600 rounded-lg p-2.5 outline-none text-sm focus:ring-1 focus:ring-blue-500 bg-white dark:bg-[#18181B]"
+                    >
+                      <option value="">(Pilih Satuan)</option>
+                      <option value="Rp">Rupiah (Rp)</option>
+                      <option value="%">Persen (%)</option>
+                      <option value="Orang">Orang / Nasabah</option>
+                      <option value="Hari">Hari</option>
+                      <option value="Menit">Menit</option>
+                      <option value="Aplikasi">Aplikasi</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-gray-200 mb-1">Tipe Evaluasi</label>
+                    <select value={formData.type} onChange={(e) => setFormData({...formData, type: e.target.value})} 
+                      className="w-full border border-slate-300 dark:border-gray-600 rounded-lg p-2.5 outline-none text-sm focus:ring-1 focus:ring-blue-500 bg-white dark:bg-[#18181B]"
+                    >
+                      <option value="higher_better">Makin Tinggi Baik</option>
+                      <option value="lower_better">Makin Rendah Baik</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* File Upload Field */}
+                <div className="mt-4 pt-4 border-t border-slate-100 dark:border-gray-800">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-gray-200 mb-2">Lampiran Bukti (Opsional)</label>
+                  <div className="border-2 border-dashed border-slate-300 dark:border-gray-600 rounded-lg p-4 text-center bg-slate-50 dark:bg-[#121214] relative hover:bg-blue-50/50 dark:bg-blue-900/40 transition-colors flex items-center justify-center min-h-[100px]">
+                    {formData.attachment ? (
+                      <div className="flex items-center gap-3 relative z-10">
+                        <div className="text-sm font-bold text-blue-700 dark:text-blue-400 flex items-center gap-2 bg-blue-100/50 px-3 py-1.5 rounded-md border border-blue-200">
+                          <CheckCircle size={16} /> <span className="truncate max-w-[200px]">{formData.attachment}</span>
+                        </div>
+                        <button 
+                          type="button" 
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setFormData({...formData, attachment: ''});
+                          }}
+                          className="p-1.5 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-500 hover:text-white rounded-md transition-colors shadow-sm"
+                          title="Hapus File Lampiran"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onChange={(e) => {
+                          if (e.target.files && e.target.files[0]) {
+                            setFormData({...formData, attachment: e.target.files[0].name});
+                          }
+                        }} />
+                        <div>
+                          <FileUp size={24} className="mx-auto mb-2 text-slate-400 dark:text-gray-500" />
+                          <p className="text-sm font-medium text-slate-600 dark:text-gray-300">Klik atau drag file bukti ke sini</p>
+                          <p className="text-xs text-slate-400 dark:text-gray-500 mt-1">Format PDF, JPG, atau PNG didukung</p>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+              </div>
+
+              <div className="p-4 flex justify-end gap-2 border-t border-slate-200 dark:border-gray-700 shrink-0 bg-white dark:bg-[#18181B] rounded-b-xl">
+                <button type="button" onClick={() => setModalObj({...modalObj, isOpen: false})} className="px-4 py-2 border border-slate-300 dark:border-gray-600 text-slate-700 dark:text-gray-200 rounded-lg hover:bg-slate-50 dark:hover:bg-gray-800 text-sm font-medium transition-colors">Batal</button>
+                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium flex items-center gap-2 shadow-sm transition-all">
+                  <CheckCircle size={16} /> Simpan Data
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- CUSTOM CONFIRMATION DIALOG --- */}
+      {confirmDialog.isOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
+          <div className="bg-white dark:bg-[#18181B] rounded-xl shadow-xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6 text-center">
+              <div className="w-16 h-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <AlertCircle size={32} />
+              </div>
+              <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-2">Konfirmasi Tindakan</h3>
+              <p className="text-sm text-slate-500 dark:text-gray-400">{confirmDialog.message}</p>
+            </div>
+            <div className="bg-slate-50 dark:bg-[#121214] px-6 py-4 flex justify-end gap-3 border-t border-slate-100 dark:border-gray-800">
+              <button 
+                onClick={() => setConfirmDialog({ isOpen: false, message: '', onConfirm: null })}
+                className="px-4 py-2 text-sm font-medium text-slate-700 dark:text-gray-200 hover:bg-slate-200 dark:bg-gray-700 rounded-lg transition-colors"
+              >
+                Batal
+              </button>
+              <button 
+                onClick={() => confirmDialog.onConfirm && confirmDialog.onConfirm()}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-500 hover:bg-red-600 rounded-lg transition-colors shadow-sm"
+              >
+                Ya, Hapus
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL IN-PLACE PREVIEW FILE --- */}
+      {previewFile && (
+        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 lg:p-12 z-[60]">
+          <div className="bg-white dark:bg-[#18181B] rounded-xl shadow-2xl w-full max-w-5xl h-full max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-300 dark:border-gray-600">
+            <div className="p-4 border-b border-slate-100 dark:border-gray-800 flex justify-between items-center bg-slate-50 dark:bg-[#121214] shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="bg-blue-100 p-2 rounded-lg text-blue-600">
+                  <FileText size={20} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-800 dark:text-white leading-none">{previewFile.name}</h3>
+                  <span className="text-xs text-slate-500 dark:text-gray-400">Bukti Lampiran dari: {previewFile.context}</span>
+                </div>
+              </div>
+              <button onClick={() => setPreviewFile(null)} className="text-slate-500 dark:text-gray-400 hover:text-red-600 dark:text-red-400 bg-slate-200 dark:bg-gray-700 hover:bg-red-100 rounded-full p-1.5 transition-colors">
+                <XCircle size={22} />
+              </button>
+            </div>
+            
+            <div className="flex-1 bg-slate-200 dark:bg-gray-700/50 flex items-center justify-center p-4 sm:p-8 overflow-y-auto">
+               <div className="bg-white dark:bg-[#18181B] w-full max-w-3xl min-h-[60vh] shadow-lg border border-slate-200 dark:border-gray-700 p-8 sm:p-16 flex flex-col items-center justify-center text-center rounded-lg">
+                  <File size={80} className="text-slate-200 mb-6" />
+                  <h2 className="text-xl font-bold text-slate-400 dark:text-gray-500 mb-2">Penampil Dokumen Terintegrasi</h2>
+                  <div className="bg-slate-50 dark:bg-[#121214] border border-slate-100 dark:border-gray-800 px-6 py-3 rounded-lg w-full max-w-md mt-4">
+                    <p className="font-mono text-sm text-slate-700 dark:text-gray-200 font-semibold break-words">{previewFile.name}</p>
+                  </div>
+                  <p className="text-sm text-slate-400 dark:text-gray-500 mt-8 max-w-md leading-relaxed">
+                    Ini adalah simulasi in-place preview. Di lingkungan produksi nyata, file laporan yang telah diunggah akan otomatis ditampilkan di dalam jendela ini sebagai bukti validasi skor.
+                  </p>
+                  <button onClick={() => setPreviewFile(null)} className="mt-8 bg-slate-800 text-white px-6 py-2 rounded-lg font-medium hover:bg-slate-700 transition-colors shadow-md">
+                    Tutup Preview
+                  </button>
+               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+    </motion.div>
+  );
+};

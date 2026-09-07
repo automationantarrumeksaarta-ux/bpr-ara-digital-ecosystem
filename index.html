@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head><script>window.onerror = function(msg, url, line, col, error) { fetch("http://localhost:3738", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: msg, stack: error ? error.stack : "" }) }); }; window.addEventListener("unhandledrejection", function(e) { fetch("http://localhost:3738", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: e.reason.message || e.reason, stack: e.reason.stack || "" }) }); });</script>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico?v=2" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BPR ARA Digital Ecosystem</title>
+    <meta name="description" content="Integrated enterprise digital operating system for BPR Antar Rumeksa Arta." />
+    <meta property="og:title" content="BPR ARA Digital Ecosystem" />
+    <meta property="og:description" content="Integrated enterprise digital operating system for BPR Antar Rumeksa Arta." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+

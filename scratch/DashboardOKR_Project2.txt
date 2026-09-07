@@ -1,0 +1,600 @@
+import React, { useState, useMemo } from 'react';
+import { 
+  Target, TrendingUp, AlertTriangle, Users, 
+  LayoutDashboard, CheckCircle, Clock, Plus,
+  ChevronRight, Layers, BarChart, Flag, MapPin,
+  Edit2, Trash2, ChevronDown
+} from 'lucide-react';
+import { motion } from 'framer-motion';
+
+import { UserProfile } from '../types';
+import { useGetOKRs } from '../hooks/useDashboardData';
+
+interface DashboardOKRProps {
+  currentUser: UserProfile;
+}
+
+
+const CURRENT_QUARTER = "Q2 2026 (April - Juni)";
+const USER_INFO = {
+  name: "Della Ananto Kusumo",
+  role: "Account Officer",
+  branch: "Cabang Utama Karanganyar"
+};
+
+// Data OKR (Objective & Key Results) berdasarkan Lokasi
+const INITIAL_OKR_DATABASE = {
+  'All': {
+    objective: "Pertumbuhan Kredit Berkualitas (Konsolidasi)",
+    keyResults: [
+      {
+        id: 'kr-1', title: 'Growth kredit mencapai 15%',
+        target: 15, actual: 12, unit: '%', type: 'higher_better',
+        mappedKPIs: ['Outstanding Loan', 'Loan Growth'], icon: TrendingUp
+      },
+      {
+        id: 'kr-2', title: 'Menjaga NPL di bawah 3%',
+        target: 3, actual: 2.1, unit: '%', type: 'lower_better', 
+        mappedKPIs: ['Tingkat NPL (Non-Performing Loan)'], icon: AlertTriangle
+      },
+      {
+        id: 'kr-3', title: 'Akuisisi 200 nasabah baru (Funding & Lending)',
+        target: 200, actual: 115, unit: 'Nasabah', type: 'higher_better',
+        mappedKPIs: ['Nasabah Baru (Funding & Lending)', 'CASA Growth'], icon: Users
+      }
+    ]
+  },
+  'Pusat': {
+    objective: "Ekspansi & Retensi Kualitas (Kantor Pusat)",
+    keyResults: [
+      {
+        id: 'kr-1', title: 'Growth kredit mencapai 15%',
+        target: 15, actual: 14.5, unit: '%', type: 'higher_better',
+        mappedKPIs: ['Outstanding Loan', 'Loan Growth'], icon: TrendingUp
+      },
+      {
+        id: 'kr-2', title: 'Menjaga NPL di bawah 3%',
+        target: 3, actual: 1.8, unit: '%', type: 'lower_better', 
+        mappedKPIs: ['Tingkat NPL (Non-Performing Loan)'], icon: AlertTriangle
+      },
+      {
+        id: 'kr-3', title: 'Akuisisi 80 nasabah baru',
+        target: 80, actual: 68, unit: 'Nasabah', type: 'higher_better',
+        mappedKPIs: ['Nasabah Baru (Funding & Lending)', 'CASA Growth'], icon: Users
+      }
+    ]
+  },
+  'Klodran': {
+    objective: "Pemulihan Kualitas Aset (Cabang Klodran)",
+    keyResults: [
+      {
+        id: 'kr-1', title: 'Growth kredit mencapai 15%',
+        target: 15, actual: 8, unit: '%', type: 'higher_better',
+        mappedKPIs: ['Outstanding Loan', 'Loan Growth'], icon: TrendingUp
+      },
+      {
+        id: 'kr-2', title: 'Menjaga NPL di bawah 3%',
+        target: 3, actual: 3.5, unit: '%', type: 'lower_better', 
+        mappedKPIs: ['Tingkat NPL (Non-Performing Loan)'], icon: AlertTriangle
+      },
+      {
+        id: 'kr-3', title: 'Akuisisi 40 nasabah baru',
+        target: 40, actual: 18, unit: 'Nasabah', type: 'higher_better',
+        mappedKPIs: ['Nasabah Baru (Funding & Lending)', 'CASA Growth'], icon: Users
+      }
+    ]
+  },
+  'Jumapolo': {
+    objective: "Penetrasi Pasar Baru (Cabang Jumapolo)",
+    keyResults: [
+      {
+        id: 'kr-1', title: 'Growth kredit mencapai 15%',
+        target: 15, actual: 11, unit: '%', type: 'higher_better',
+        mappedKPIs: ['Outstanding Loan', 'Loan Growth'], icon: TrendingUp
+      },
+      {
+        id: 'kr-2', title: 'Menjaga NPL di bawah 3%',
+        target: 3, actual: 2.8, unit: '%', type: 'lower_better', 
+        mappedKPIs: ['Tingkat NPL (Non-Performing Loan)'], icon: AlertTriangle
+      },
+      {
+        id: 'kr-3', title: 'Akuisisi 40 nasabah baru',
+        target: 40, actual: 25, unit: 'Nasabah', type: 'higher_better',
+        mappedKPIs: ['Nasabah Baru (Funding & Lending)', 'CASA Growth'], icon: Users
+      }
+    ]
+  },
+  'Matesih': {
+    objective: "Dominasi Wilayah (Cabang Matesih)",
+    keyResults: [
+      {
+        id: 'kr-1', title: 'Growth kredit mencapai 15%',
+        target: 15, actual: 16, unit: '%', type: 'higher_better',
+        mappedKPIs: ['Outstanding Loan', 'Loan Growth'], icon: TrendingUp
+      },
+      {
+        id: 'kr-2', title: 'Menjaga NPL di bawah 3%',
+        target: 3, actual: 1.2, unit: '%', type: 'lower_better', 
+        mappedKPIs: ['Tingkat NPL (Non-Performing Loan)'], icon: AlertTriangle
+      },
+      {
+        id: 'kr-3', title: 'Akuisisi 40 nasabah baru',
+        target: 40, actual: 38, unit: 'Nasabah', type: 'higher_better',
+        mappedKPIs: ['Nasabah Baru (Funding & Lending)', 'CASA Growth'], icon: Users
+      }
+    ]
+  }
+};
+
+// --- LOGIC HELPER ---
+const calculateKRProgress = (target, actual, type) => {
+  if (target === 0) return actual === 0 ? 100 : 0; 
+  if (type === 'higher_better') {
+    return Math.min(Math.round((actual / target) * 100), 100);
+  } else {
+    // Logic untuk NPL (Makin rendah makin bagus)
+    if (actual <= target) return 100;
+    const over = actual - target;
+    const penalty = (over / target) * 100;
+    return Math.max(Math.round(100 - penalty), 0);
+  }
+};
+
+const getTrafficLight = (progress) => {
+  if (progress >= 100) return { color: 'bg-emerald-500', bg: 'bg-emerald-100', text: 'text-emerald-700 dark:text-emerald-400', label: 'On Track' };
+  if (progress >= 70) return { color: 'bg-amber-500', bg: 'bg-amber-100', text: 'text-amber-700 dark:text-amber-400', label: 'Warning' };
+  return { color: 'bg-red-500', bg: 'bg-red-100', text: 'text-red-700', label: 'Off Track' };
+};
+
+// --- COMPONENT ---
+export const DashboardOKR: React.FC<DashboardOKRProps> = ({ currentUser }) => {
+  const { data: okrs = [] } = useGetOKRs();
+  const [selectedLocation, setSelectedLocation] = useState('All');
+
+  // Modal State
+  const [modalObj, setModalObj] = useState({ isOpen: false, mode: 'add', krId: null });
+  const [formData, setFormData] = useState({ title: '', target: '', actual: '', unit: '', type: 'higher_better' });
+
+  // Mengecek apakah role saat ini berhak input/edit/delete OKR
+  const canInputOKR = currentUser.roleTier === 'Super Admin' || currentUser.roleTier === 'TOP';
+
+  // Kalkulasi data OKR yang dipilih (termasuk overall progress dinamis)
+  const currentOkrData = useMemo(() => {
+    let data = okrs.find(o => o.department === selectedLocation);
+    if (!data) {
+       // fallback to initial mock db for demo if not found in context
+       const mock = INITIAL_OKR_DATABASE[selectedLocation];
+       if (mock) {
+          data = {
+            id: `mock-${selectedLocation}`,
+            department: selectedLocation,
+            objective: mock.objective,
+            keyResults: mock.keyResults.map(kr => ({ ...kr, description: kr.title }))
+          };
+       } else {
+         return { objective: "Data tidak ditemukan", keyResults: [], overallProgress: 0 };
+       }
+    }
+    
+    const krs = data.keyResults;
+    let overallProgress = 0;
+    
+    if (krs.length > 0) {
+      const totalProg = krs.reduce((acc, kr) => acc + calculateKRProgress(kr.target, kr.actual, (kr as any).type || 'higher_better'), 0);
+      overallProgress = Math.round(totalProg / krs.length);
+    }
+    
+    return { ...data, overallProgress, keyResults: data.keyResults.map(kr => ({...kr, title: kr.description})) };
+  }, [okrs, selectedLocation]);
+
+  // --- ACTIONS ---
+  const handleDeleteKR = (krId) => {
+    if (!canInputOKR) return;
+    if (confirm('Apakah Anda yakin ingin menghapus Key Result ini?')) {
+      /* setOkrs(prev => prev.map(o => {
+        if (o.department === selectedLocation) {
+          return { ...o, keyResults: o.keyResults.filter(kr => kr.id !== krId) };
+        }
+        return o;
+      })); */
+    }
+  };
+
+  const openAddModal = () => {
+    setModalObj({ isOpen: true, mode: 'add', krId: null });
+    setFormData({ title: '', target: '', actual: '', unit: '', type: 'higher_better' });
+  };
+
+  const openEditModal = (kr) => {
+    setModalObj({ isOpen: true, mode: 'edit', krId: kr.id });
+    setFormData({ 
+      title: kr.title, 
+      target: kr.target.toString(), 
+      actual: kr.actual.toString(), 
+      unit: kr.unit, 
+      type: kr.type 
+    });
+  };
+
+  const openEditObjectiveModal = () => {
+    setModalObj({ isOpen: true, mode: 'edit-obj', krId: null });
+    setFormData({ title: currentOkrData.objective, target: '', actual: '', unit: '', type: '' });
+  };
+
+  const handleOkrSubmit = (e) => {
+    e.preventDefault();
+    if (!canInputOKR) return;
+
+    /* setOkrs(prev => {
+      let locationData = prev.find(o => o.department === selectedLocation);
+      let isNew = false;
+      if (!locationData) {
+        locationData = { id: `okr-${Date.now()}`, department: selectedLocation, objective: currentOkrData.objective, keyResults: [] };
+        isNew = true;
+      }
+
+      // Handle Edit Objective
+      if (modalObj.mode === 'edit-obj') {
+        const updated = { ...locationData, objective: formData.title };
+        return isNew ? [...prev, updated] : prev.map(o => o.department === selectedLocation ? updated : o);
+      }
+
+      // Handle Add/Edit Key Results
+      let updatedKRs = [...locationData.keyResults];
+      if (modalObj.mode === 'add') {
+        updatedKRs.push({
+          id: `kr-${Date.now()}`,
+          description: formData.title,
+          target: parseFloat(formData.target) || 0,
+          actual: parseFloat(formData.actual) || 0,
+          unit: formData.unit,
+          type: formData.type,
+          mappedKPIs: ['Indikator Baru'],
+          icon: Target
+        } as any);
+      } else if (modalObj.mode === 'edit') {
+        updatedKRs = updatedKRs.map(kr => kr.id === modalObj.krId ? {
+          ...kr,
+          description: formData.title,
+          target: parseFloat(formData.target) || 0,
+          actual: parseFloat(formData.actual) || 0,
+          unit: formData.unit,
+          type: formData.type
+        } as any : kr);
+      }
+
+      const updated = { ...locationData, keyResults: updatedKRs };
+      return isNew ? [...prev, updated] : prev.map(o => o.department === selectedLocation ? updated : o);
+    }); */
+
+    setModalObj({ isOpen: false, mode: 'add', krId: null });
+  };
+
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: { staggerChildren: 0.1 }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } }
+  };
+
+  return (
+    <motion.div 
+      variants={containerVariants}
+      initial="hidden"
+      animate="show"
+      className="bg-transparent font-sans text-slate-800 dark:text-white pb-12 w-full h-full overflow-y-auto"
+    >
+      
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        {/* Header Section */}
+        <motion.div variants={itemVariants} className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+          <div>
+            <h2 className="text-2xl font-bold flex items-center gap-2"><span className="text-gradient">Objective & Key Results (OKR)</span></h2>
+            <div className="flex items-center gap-2 mt-2">
+              <span className="text-sm text-slate-500 dark:text-gray-400 bg-slate-100/50 dark:bg-gray-800/50 px-3 py-1 rounded-full border border-slate-200/50 dark:border-gray-700/50">Lokasi Penerapan:</span>
+              <div className="relative inline-flex items-center">
+                <MapPin size={14} className="absolute left-3 text-gray-800 dark:text-gray-200 pointer-events-none" />
+                <select 
+                  value={selectedLocation} onChange={(e) => setSelectedLocation(e.target.value)}
+                  className="pl-8 pr-8 py-1.5 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 text-blue-700 dark:text-blue-400 font-semibold text-sm rounded-full outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer appearance-none shadow-sm transition-all"
+                >
+                  <option value="All">Seluruh Kantor (Konsolidasi)</option>
+                  <option value="Pusat">Kantor Pusat</option>
+                  <option value="Klodran">Cabang Klodran</option>
+                  <option value="Jumapolo">Cabang Jumapolo</option>
+                  <option value="Matesih">Cabang Matesih</option>
+                </select>
+                <ChevronDown size={14} className="absolute right-3 text-gray-800 dark:text-gray-200 pointer-events-none" />
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="bg-white dark:bg-[#18181B] border border-slate-200 dark:border-gray-700 px-4 py-2 rounded-lg shadow-sm">
+              <span className="text-sm text-slate-500 dark:text-gray-400">Periode:</span>
+              <span className="text-sm font-semibold text-slate-800 dark:text-white ml-2">{CURRENT_QUARTER}</span>
+            </div>
+            
+            {/* Tombol Input OKR Baru (Hanya untuk Master Admin & Direktur) */}
+            {canInputOKR && (
+              <button 
+                onClick={openAddModal}
+                className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm text-sm"
+              >
+                <Plus size={16} />
+                Tambah KR Baru
+              </button>
+            )}
+          </div>
+        </motion.div>
+
+        {/* Objective Card (Minimalist Clean Header) */}
+        <motion.div variants={itemVariants} className="relative p-[1.5px] rounded-2xl bg-gradient-to-r from-indigo-200 via-purple-200 to-blue-200 dark:from-indigo-900/50 dark:via-purple-900/50 dark:to-blue-900/50 mb-8 shadow-sm">
+          <div className="bg-slate-50 dark:bg-[#18181B] rounded-2xl p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-8 h-full w-full">
+            <div className="flex-1">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs font-bold mb-5 uppercase tracking-wider">
+                <Flag size={14} className="text-blue-600 dark:text-blue-400 animate-bounce" /> Objective Utama
+              </div>
+              
+              <div className="flex items-center gap-3 mb-3">
+                <h2 className="text-2xl md:text-3xl font-bold text-slate-800 dark:text-white leading-tight">
+                  {currentOkrData.objective}
+                </h2>
+                {/* Tombol Edit Objective Khusus Master Admin/Direktur */}
+                {canInputOKR && (
+                  <button 
+                    onClick={openEditObjectiveModal}
+                    className="p-1.5 text-slate-500 dark:text-gray-400 bg-slate-200 dark:bg-gray-700 hover:bg-blue-600 hover:text-white rounded-lg transition-colors"
+                    title="Edit Objective Utama"
+                  >
+                    <Edit2 size={16} />
+                  </button>
+                )}
+              </div>
+
+              <p className="text-slate-500 dark:text-gray-400 text-sm md:text-base leading-relaxed max-w-2xl">
+                Fokus kuartal ini untuk lokasi <strong className="text-slate-700 dark:text-gray-200">{selectedLocation === 'All' ? 'Seluruh Kantor' : selectedLocation}</strong> adalah ekspansi portofolio kredit secara agresif namun tetap mempertahankan kualitas aset dan mitigasi risiko NPL.
+              </p>
+              
+              {canInputOKR && (
+                 <div className="mt-5 text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 inline-block px-3 py-1.5 rounded-md">
+                   Hak Akses Aktif: Add, Edit, Delete (Master/Direktur)
+                 </div>
+              )}
+            </div>
+
+            {/* Overall Progress Circle */}
+            <div className="flex-shrink-0 relative flex items-center justify-center w-36 h-36 md:mr-4">
+              <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                <path className="text-slate-200 dark:text-gray-700/50" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="4.5" />
+                <path
+                  className="text-slate-700 dark:text-blue-500 transition-all duration-1000 ease-out"
+                  strokeDasharray={`${currentOkrData.overallProgress}, 100`}
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  fill="none" stroke="currentColor" strokeWidth="4.5" strokeLinecap="round"
+                />
+              </svg>
+              <div className="absolute flex flex-col items-center">
+                <span className="text-4xl font-bold text-slate-800 dark:text-white">{currentOkrData.overallProgress}%</span>
+                <span className="text-[10px] text-slate-500 dark:text-gray-400 font-bold uppercase tracking-widest mt-1 text-center leading-tight">Average<br/>Progress</span>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Key Results List */}
+        <motion.div variants={itemVariants} className="flex items-center gap-2 mb-4 border-b border-slate-200/50 dark:border-gray-700/50 pb-2">
+          <Layers className="text-gray-800 dark:text-gray-200" size={20} />
+          <h3 className="text-lg font-bold text-slate-800 dark:text-white">Key Results (KR)</h3>
+        </motion.div>
+
+        {currentOkrData.keyResults.length === 0 ? (
+          <motion.div variants={itemVariants} className="glass-effect border-2 border-dashed border-slate-300/50 dark:border-gray-600/50 rounded-2xl p-12 text-center text-slate-500 dark:text-gray-400 text-sm">
+            Belum ada Key Result untuk lokasi ini.
+          </motion.div>
+        ) : (
+          <motion.div variants={itemVariants} className="space-y-4">
+            {currentOkrData.keyResults.map((kr, index) => {
+              const progress = calculateKRProgress(kr.target, kr.actual, kr.type);
+              const status = getTrafficLight(progress);
+              const Icon = kr.icon || Target;
+
+              return (
+                <motion.div variants={itemVariants} whileHover={{ scale: 1.01 }} key={kr.id} className="glass-effect rounded-2xl p-5 hover:shadow-md transition-all group relative">
+                  
+                  {/* Action Buttons (Master Admin & Direktur) */}
+                  {canInputOKR && (
+                    <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10 bg-white dark:bg-gray-800/80 backdrop-blur-sm p-1 rounded-lg">
+                      <button 
+                        onClick={() => openEditModal(kr)} 
+                        className="p-1.5 text-blue-600 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-600 hover:text-white rounded-md transition-colors"
+                        title="Edit KR"
+                      >
+                        <Edit2 size={14} />
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteKR(kr.id)} 
+                        className="p-1.5 text-red-500 bg-red-50 dark:bg-red-900/20 hover:bg-red-500 hover:text-white rounded-md transition-colors"
+                        title="Hapus KR"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="flex flex-col lg:flex-row gap-6">
+                    {/* Left: Info */}
+                    <div className="flex-1">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-start gap-3">
+                          <div className={`p-2 rounded-lg ${status.bg} ${status.text} transition-colors mt-0.5`}>
+                            <Icon size={20} />
+                          </div>
+                          <div>
+                            <span className="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest">Key Result {index + 1}</span>
+                            <h4 className="text-base font-semibold text-slate-800 dark:text-white leading-tight mt-1 pr-12 lg:pr-0">{kr.title}</h4>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Mapping KPI Badges */}
+                      <div className="mt-4 lg:ml-14">
+                        <span className="text-xs text-slate-500 dark:text-gray-400 font-medium mb-2 block uppercase tracking-wider">Mapping KPI Operasional:</span>
+                        <div className="flex flex-wrap gap-2">
+                          {kr.mappedKPIs?.map((kpi, i) => (
+                            <span key={i} className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 dark:bg-gray-800/50 border border-slate-200 dark:border-gray-700 text-slate-600 dark:text-gray-300 text-xs rounded-md">
+                              <BarChart size={12} className="text-gray-800 dark:text-gray-200" />
+                              {kpi}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right: Progress & Traffic Light */}
+                    <div className="lg:w-[40%] flex flex-col justify-center border-t lg:border-t-0 lg:border-l border-slate-100 dark:border-gray-800 pt-5 lg:pt-0 lg:pl-8">
+                      <div className="flex justify-between items-end mb-3">
+                        <div>
+                          <div className="text-xs text-slate-500 dark:text-gray-400 font-medium mb-1">Realisasi Saat Ini</div>
+                          <div className="text-xl font-bold text-slate-800 dark:text-white">
+                            {kr.actual} <span className="text-sm font-medium text-slate-500 dark:text-gray-400">{kr.unit}</span>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-xs text-slate-500 dark:text-gray-400 font-medium mb-1">Target Threshold</div>
+                          <div className="text-sm font-semibold text-slate-600 dark:text-gray-300">
+                            {kr.type === 'lower_better' ? 'Maks ' : ''}{kr.target} {kr.unit}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Progress Bar */}
+                      <div className="relative pt-1">
+                        <div className="overflow-hidden h-2.5 mb-3 text-xs flex rounded-full bg-slate-100 dark:bg-gray-800">
+                          <div 
+                            style={{ width: `${progress}%` }} 
+                            className={`shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center transition-all duration-1000 ease-out ${status.color}`}
+                          ></div>
+                        </div>
+                        <div className="flex justify-between items-center">
+                           <span className={`text-[10px] font-bold px-2 py-0.5 uppercase tracking-wider rounded border border-opacity-50 ${status.text} ${status.bg} border-${status.text.split('-')[1]}-200`}>
+                             {status.label}
+                           </span>
+                           <span className={`text-xs font-semibold ${status.text}`}>{progress}% Tercapai</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </motion.div>
+        )}
+
+      </main>
+
+      {/* --- MODAL FORM (ADD/EDIT KR & EDIT OBJECTIVE) --- */}
+      {modalObj.isOpen && canInputOKR && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-[#18181B] rounded-xl shadow-xl w-full max-w-md overflow-hidden">
+            <div className="p-5 border-b border-slate-100 dark:border-gray-800 flex justify-between items-center bg-slate-50 dark:bg-[#121214]">
+              <h3 className="font-bold text-lg text-slate-800 dark:text-white">
+                {modalObj.mode === 'add' ? 'Tambah Key Result Baru' : modalObj.mode === 'edit' ? 'Edit Key Result' : 'Edit Objective Utama'}
+              </h3>
+              <button onClick={() => setModalObj({...modalObj, isOpen: false})} className="text-slate-400 dark:text-gray-500 hover:text-slate-600 dark:text-gray-300 bg-slate-100 dark:bg-gray-800 hover:bg-slate-200 dark:bg-gray-700 p-1.5 rounded-full transition-colors">&times;</button>
+            </div>
+            
+            <form onSubmit={handleOkrSubmit} className="p-5 space-y-4">
+              <div className="bg-blue-50 dark:bg-blue-900/20 text-blue-800 text-xs px-3 py-2 rounded-lg border border-blue-100 dark:border-blue-900/50 font-medium">
+                Pembaruan untuk lokasi: <strong className="font-bold">{selectedLocation === 'All' ? 'Seluruh Kantor' : selectedLocation}</strong>
+              </div>
+              
+              {/* Form Tampilan Berbeda Berdasarkan Mode */}
+              {modalObj.mode === 'edit-obj' ? (
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 dark:text-gray-200 mb-1.5">Teks Objective Utama</label>
+                  <textarea 
+                    rows="3" required value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} 
+                    className="w-full border border-slate-300 dark:border-gray-600 rounded-lg p-2.5 outline-none text-sm focus:ring-2 focus:ring-blue-500" 
+                    placeholder="Masukkan tujuan utama kuartal ini..." 
+                  />
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 dark:text-gray-200 mb-1.5">Deskripsi Key Result</label>
+                    <input 
+                      type="text" required value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} 
+                      className="w-full border border-slate-300 dark:border-gray-600 rounded-lg p-2.5 outline-none text-sm focus:ring-2 focus:ring-blue-500" 
+                      placeholder="Contoh: Growth kredit mencapai 15%..." 
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 dark:text-gray-200 mb-1.5">Target</label>
+                      <input 
+                        type="number" required value={formData.target} onChange={(e) => setFormData({...formData, target: e.target.value})} 
+                        className="w-full border border-slate-300 dark:border-gray-600 rounded-lg p-2.5 outline-none text-sm focus:ring-2 focus:ring-blue-500" 
+                        placeholder="Angka Target" step="any"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 dark:text-gray-200 mb-1.5">Realisasi (Aktual)</label>
+                      <input 
+                        type="number" required value={formData.actual} onChange={(e) => setFormData({...formData, actual: e.target.value})} 
+                        className="w-full border border-slate-300 dark:border-gray-600 rounded-lg p-2.5 outline-none text-sm focus:ring-2 focus:ring-blue-500" 
+                        placeholder="Angka Aktual" step="any"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 dark:text-gray-200 mb-1.5">Satuan</label>
+                      <select 
+                        value={formData.unit} onChange={(e) => setFormData({...formData, unit: e.target.value})} 
+                        className="w-full border border-slate-300 dark:border-gray-600 rounded-lg p-2.5 outline-none text-sm focus:ring-2 focus:ring-blue-500 bg-white dark:bg-[#18181B]"
+                      >
+                        <option value="">(Pilih Satuan)</option>
+                        <option value="%">Persen (%)</option>
+                        <option value="Rp">Rupiah (Rp)</option>
+                        <option value="Nasabah">Nasabah</option>
+                        <option value="Dokumen">Dokumen</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 dark:text-gray-200 mb-1.5">Tipe Evaluasi</label>
+                      <select 
+                        value={formData.type} onChange={(e) => setFormData({...formData, type: e.target.value})} 
+                        className="w-full border border-slate-300 dark:border-gray-600 rounded-lg p-2.5 outline-none text-sm focus:ring-2 focus:ring-blue-500 bg-white dark:bg-[#18181B]"
+                      >
+                        <option value="higher_better">Makin Tinggi Baik</option>
+                        <option value="lower_better">Makin Rendah Baik</option>
+                      </select>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              <div className="pt-4 flex justify-end gap-2 border-t border-slate-100 dark:border-gray-800 mt-4">
+                <button type="button" onClick={() => setModalObj({...modalObj, isOpen: false})} className="px-4 py-2 border border-slate-300 dark:border-gray-600 text-slate-700 dark:text-gray-200 rounded-lg hover:bg-slate-50 dark:hover:bg-gray-800 text-sm font-semibold">Batal</button>
+                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-semibold flex items-center gap-2 shadow-sm">
+                  <CheckCircle size={16} /> Simpan
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+    </motion.div>
+  );
+};

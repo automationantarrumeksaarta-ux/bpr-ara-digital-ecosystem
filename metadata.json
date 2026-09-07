@@ -1,0 +1,6 @@
+{
+  "name": "BPR ARA Digital Ecosystem",
+  "description": "Integrated enterprise digital operating system for BPR Antar Rumeksa Arta covering CRM, Funding, LOS, OTS Survey, Credit Analysis, Approvals, Legal, Collection, Restructuring, FlowTask, HR, EWS, Anti-Fraud, and AI Assistant.",
+  "requestFramePermissions": ["camera", "geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
