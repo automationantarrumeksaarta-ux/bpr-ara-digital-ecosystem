@@ -113,6 +113,32 @@ router.post('/login-otp', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
+    // Bypass OTP for admin or Super Admin
+    if (user.username === 'admin' || user.roleTier === 'Super Admin' || user.role === 'Super Admin') {
+      const payload = {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        roleTier: user.roleTier,
+      };
+      const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
+      return res.json({ 
+        message: 'Login successful', 
+        bypassed: true, 
+        token, 
+        user: {
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          roleTier: user.roleTier,
+          unit: user.unit,
+          status: user.status
+        }
+      });
+    }
+
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
 
