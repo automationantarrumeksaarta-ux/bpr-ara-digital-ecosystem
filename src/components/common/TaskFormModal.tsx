@@ -61,6 +61,22 @@ const SUBCATEGORY_MAPPING: Record<Category, Subcategory[]> = {
   'Lainnya': ['Lainnya']
 };
 
+// Mapping kode unit (saat registrasi) → Fungsi/Jabatan default
+const UNIT_TO_CATEGORY: Record<string, Category> = {
+  'DIR': 'Lainnya',
+  'BIS': 'Bisnis',
+  'KPT': 'Kepatuhan',
+  'AUD': 'Audit',
+  'PMO': 'Staff/Operasional',
+  'OPS': 'Staff/Operasional',
+  'COL': 'Collection',
+  'FND': 'Senior Account Officer Funding',
+  'HCM': 'Staff/Operasional',
+  'ITD': 'Staff/Operasional',
+  'LGL': 'Staff/Operasional',
+  'KOM': 'Lainnya'
+};
+
 interface TaskFormModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -186,8 +202,12 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
       setUnit(currentUserUnit || 'BIS');
       setOutputDoD('');
       setOutcome('');
-      setCategory('Bisnis');
-      setSubcategory('Aktivitas Umum, AM dan Bisnis');
+      // Auto-set Fungsi/Jabatan based on user's unit code
+      const userUnit = currentUserUnit || currentUser?.unit || 'BIS';
+      const autoCategory = UNIT_TO_CATEGORY[userUnit] || 'Lainnya';
+      setCategory(autoCategory);
+      const autoSubcategory = SUBCATEGORY_MAPPING[autoCategory]?.[0] || 'Lainnya';
+      setSubcategory(autoSubcategory as Subcategory);
       setValidatorTags([]);
       setValidatorInput('');
     }
