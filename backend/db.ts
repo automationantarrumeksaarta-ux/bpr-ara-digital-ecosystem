@@ -27,6 +27,13 @@ export function initDb() {
       status TEXT DEFAULT 'ACTIVE',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
+
+    CREATE TABLE IF NOT EXISTS otp_verifications (
+      email TEXT PRIMARY KEY,
+      otp_code TEXT NOT NULL,
+      expires_at DATETIME NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
   `);
   
   // Seed initial admin user if table is empty

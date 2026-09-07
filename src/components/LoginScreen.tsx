@@ -78,7 +78,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
     setAuthStep('otp');
   };
 
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
 
@@ -87,9 +87,29 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
       return;
     }
 
-    setOtpContext('register');
-    setOtpCode('');
-    setAuthStep('otp');
+    try {
+      const res = await fetch('/api/auth/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: regEmail.trim(),
+          name: regName.trim(),
+          username: regUsername.trim().toLowerCase().replace(/\s+/g, '')
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setErrorMsg(data.error || 'Gagal mengirim OTP');
+        return;
+      }
+
+      setOtpContext('register');
+      setOtpCode('');
+      setAuthStep('otp');
+    } catch (error) {
+      setErrorMsg('Gagal terhubung ke server');
+    }
   };
 
   const handleQuickDemo = (user: UserProfile) => {
@@ -298,9 +318,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                 email={identifier || regEmail || ''}
                 onBack={() => setAuthStep('form')}
                 onVerify={async (code) => {
-                  await new Promise(r => setTimeout(r, 1000)); // Simulate network
-                  if (code === '123456' || code === '123123') {
-                    if (otpContext === 'login') {
+                  if (otpContext === 'login') {
+                    // For login, we currently use a simulated OTP or skip it.
+                    // If you want real 2FA for login, you need a similar send-otp flow.
+                    if (code === '123456' || code === '123123') {
                       try {
                         const res = await fetch('/api/auth/login', {
                           method: 'POST',
@@ -319,46 +340,47 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                         setErrorMsg('Gagal menghubungi server.');
                         return false;
                       }
-                    } else {
-                      // Register
-                      try {
-                        const res = await fetch('/api/auth/register', {
+                    }
+                    setErrorMsg('Kode OTP tidak valid.');
+                    return false;
+                  } else {
+                    // Register: Send the OTP code to the server for real validation
+                    try {
+                      const res = await fetch('/api/auth/register', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          name: regName.trim(), 
+                          username: regUsername.trim().toLowerCase().replace(/\s+/g, ''), 
+                          email: regEmail.trim(), 
+                          password: regPassword || '123', 
+                          roleTier: regRoleTier, 
+                          unit: regUnit,
+                          otpCode: code // Send the code entered by the user
+                        })
+                      });
+                      const regData = await res.json();
+                      if (res.ok) {
+                        // Immediately login after register
+                        const loginRes = await fetch('/api/auth/login', {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            name: regName.trim(), 
-                            username: regUsername.trim().toLowerCase().replace(/\s+/g, ''), 
-                            email: regEmail.trim(), 
-                            password: regPassword || '123', 
-                            roleTier: regRoleTier, 
-                            unit: regUnit
-                          })
+                          body: JSON.stringify({ identifier: regUsername.trim().toLowerCase(), password: regPassword || '123' })
                         });
-                        const regData = await res.json();
-                        if (res.ok) {
-                          // Immediately login after register
-                          const loginRes = await fetch('/api/auth/login', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ identifier: regUsername.trim().toLowerCase(), password: regPassword || '123' })
-                          });
-                          const loginData = await loginRes.json();
-                          if (loginRes.ok) {
-                            localStorage.setItem('auth_token', loginData.token);
-                            setPendingUser(loginData.user);
-                            return true;
-                          }
+                        const loginData = await loginRes.json();
+                        if (loginRes.ok) {
+                          localStorage.setItem('auth_token', loginData.token);
+                          setPendingUser(loginData.user);
+                          return true;
                         }
-                        setErrorMsg(regData.error || 'Registrasi gagal.');
-                        return false;
-                      } catch (e) {
-                        setErrorMsg('Gagal menghubungi server.');
-                        return false;
                       }
+                      setErrorMsg(regData.error || 'Registrasi gagal.');
+                      return false;
+                    } catch (e) {
+                      setErrorMsg('Gagal menghubungi server.');
+                      return false;
                     }
                   }
-                  setErrorMsg('Kode OTP tidak valid.');
-                  return false;
                 }}
                 onSuccessComplete={() => {
                   if (pendingUser) {

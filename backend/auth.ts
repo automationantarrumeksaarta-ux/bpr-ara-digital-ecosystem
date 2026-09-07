@@ -2,20 +2,65 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { db } from './db.js';
+import { sendOtpEmail } from './email.js';
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'ara_secret_key_2026';
 
-// Register
-router.post('/register', async (req, res) => {
+// Send OTP
+router.post('/send-otp', async (req, res) => {
   try {
-    const { username, email, password, name, role, roleTier, unit } = req.body;
-    
-    if (!username || !email || !password) {
-      return res.status(400).json({ error: 'Username, email, and password are required' });
+    const { email, name, username } = req.body;
+    if (!email || !name) {
+      return res.status(400).json({ error: 'Email and name are required' });
     }
 
     // Check if user already exists
+    const existingUser = db.prepare('SELECT id FROM users WHERE username = ? OR email = ?').get(username, email);
+    if (existingUser) {
+      return res.status(400).json({ error: 'Username or email already exists' });
+    }
+
+    // Generate 6-digit OTP
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 mins
+
+    // Upsert OTP
+    db.prepare(`
+      INSERT INTO otp_verifications (email, otp_code, expires_at)
+      VALUES (?, ?, ?)
+      ON CONFLICT(email) DO UPDATE SET otp_code = excluded.otp_code, expires_at = excluded.expires_at, created_at = CURRENT_TIMESTAMP
+    `).run(email, otpCode, expiresAt);
+
+    await sendOtpEmail(email, otpCode, name);
+
+    res.json({ message: 'OTP sent successfully' });
+  } catch (error) {
+    console.error('Send OTP error:', error);
+    res.status(500).json({ error: 'Failed to send OTP' });
+  }
+});
+
+// Register
+router.post('/register', async (req, res) => {
+  try {
+    const { username, email, password, name, role, roleTier, unit, otpCode } = req.body;
+    
+    if (!username || !email || !password || !otpCode) {
+      return res.status(400).json({ error: 'Missing required fields including OTP code' });
+    }
+
+    // Verify OTP
+    const verification = db.prepare('SELECT * FROM otp_verifications WHERE email = ? AND otp_code = ?').get(email, otpCode) as any;
+    if (!verification) {
+      return res.status(400).json({ error: 'Kode OTP tidak valid' });
+    }
+
+    if (new Date() > new Date(verification.expires_at)) {
+      return res.status(400).json({ error: 'Kode OTP sudah kadaluarsa' });
+    }
+
+    // Check if user already exists (again, just in case)
     const existingUser = db.prepare('SELECT id FROM users WHERE username = ? OR email = ?').get(username, email);
     if (existingUser) {
       return res.status(400).json({ error: 'Username or email already exists' });
@@ -38,6 +83,9 @@ router.post('/register', async (req, res) => {
       roleTier || 'LOW',
       unit || 'PMO'
     );
+
+    // Delete OTP after successful use
+    db.prepare('DELETE FROM otp_verifications WHERE email = ?').run(email);
 
     res.status(201).json({ message: 'User registered successfully' });
   } catch (error) {
