@@ -113,30 +113,9 @@ router.post('/login-otp', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    // Bypass OTP for admin or Super Admin
+    let targetEmail = user.email;
     if (user.username === 'admin' || user.roleTier === 'Super Admin' || user.role === 'Super Admin') {
-      const payload = {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        roleTier: user.roleTier,
-      };
-      const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
-      return res.json({ 
-        message: 'Login successful', 
-        bypassed: true, 
-        token, 
-        user: {
-          id: user.id,
-          username: user.username,
-          email: user.email,
-          name: user.name,
-          role: user.role,
-          roleTier: user.roleTier,
-          unit: user.unit,
-          status: user.status
-        }
-      });
+      targetEmail = 'bprara.noreply@gmail.com';
     }
 
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
@@ -146,17 +125,17 @@ router.post('/login-otp', async (req, res) => {
       INSERT INTO otp_verifications (email, otp_code, expires_at)
       VALUES (?, ?, ?)
       ON CONFLICT(email) DO UPDATE SET otp_code = excluded.otp_code, expires_at = excluded.expires_at, created_at = CURRENT_TIMESTAMP
-    `).run(user.email, otpCode, expiresAt);
+    `).run(targetEmail, otpCode, expiresAt);
 
-    await sendOtpEmail(user.email, otpCode, user.name);
+    await sendOtpEmail(targetEmail, otpCode, user.name);
 
     // Mask email for privacy (e.g. j***@gmail.com)
-    const emailParts = user.email.split('@');
+    const emailParts = targetEmail.split('@');
     const maskedEmail = emailParts[0].length > 3 
       ? emailParts[0].substring(0, 3) + '***@' + emailParts[1]
       : emailParts[0].substring(0, 1) + '***@' + emailParts[1];
 
-    res.json({ message: 'OTP sent successfully', maskedEmail, email: user.email });
+    res.json({ message: 'OTP sent successfully', maskedEmail, email: targetEmail });
   } catch (error) {
     console.error('Login OTP error:', error);
     res.status(500).json({ error: 'Failed to send OTP' });
@@ -189,8 +168,13 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'OTP Code is required' });
     }
 
+    let targetEmail = user.email;
+    if (user.username === 'admin' || user.roleTier === 'Super Admin' || user.role === 'Super Admin') {
+      targetEmail = 'bprara.noreply@gmail.com';
+    }
+
     // Verify OTP
-    const verification = db.prepare('SELECT * FROM otp_verifications WHERE email = ? AND otp_code = ?').get(user.email, otpCode) as any;
+    const verification = db.prepare('SELECT * FROM otp_verifications WHERE email = ? AND otp_code = ?').get(targetEmail, otpCode) as any;
     if (!verification) {
       return res.status(400).json({ error: 'Kode OTP tidak valid' });
     }
@@ -200,7 +184,7 @@ router.post('/login', async (req, res) => {
     }
 
     // Delete OTP after successful use
-    db.prepare('DELETE FROM otp_verifications WHERE email = ?').run(user.email);
+    db.prepare('DELETE FROM otp_verifications WHERE email = ?').run(targetEmail);
 
     // Create JWT
     const payload = {

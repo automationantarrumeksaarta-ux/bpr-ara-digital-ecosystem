@@ -87,13 +87,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
         return;
       }
 
-      // Bypass OTP for admin accounts
-      if (data.bypassed) {
-        localStorage.setItem('auth_token', data.token);
-        onLoginSuccess(data.user);
-        return;
-      }
-
       setLoginEmail(data.maskedEmail || data.email);
       setOtpContext('login');
       setOtpCode('');
