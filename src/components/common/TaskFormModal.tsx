@@ -61,20 +61,44 @@ const SUBCATEGORY_MAPPING: Record<Category, Subcategory[]> = {
   'Lainnya': ['Lainnya']
 };
 
-// Mapping kode unit (saat registrasi) → Fungsi/Jabatan default
-const UNIT_TO_CATEGORY: Record<string, Category> = {
-  'DIR': 'Lainnya',
-  'BIS': 'Bisnis',
-  'KPT': 'Kepatuhan',
-  'AUD': 'Audit',
-  'PMO': 'Staff/Operasional',
-  'OPS': 'Staff/Operasional',
-  'COL': 'Collection',
-  'FND': 'Senior Account Officer Funding',
-  'HCM': 'Staff/Operasional',
-  'ITD': 'Staff/Operasional',
-  'LGL': 'Staff/Operasional',
-  'KOM': 'Lainnya'
+// Mapping Role (yang di-set admin) → Fungsi/Jabatan default
+const ROLE_TO_CATEGORY: Record<string, Category> = {
+  // Direksi & Komisaris
+  'Komisaris Utama': 'Lainnya',
+  'Komisaris': 'Lainnya',
+  'Direktur Utama': 'Lainnya',
+  'Direktur YMFK': 'Lainnya',
+  // PE / Pejabat Eksekutif
+  'PE Audit Intern & Strategi Anti Fraud': 'Audit',
+  'PE Kepatuhan, Manrisk, APU PPT': 'Kepatuhan',
+  'PE Literasi & Edukasi, PE Bisnis & Collection': 'Bisnis',
+  // IT & Digital
+  'TEKNOLOGI INFORMASI (TI)': 'Staff/Operasional',
+  'CRM & DIGITALISASI': 'Staff/Operasional',
+  // Admin, SDM, Legal
+  'ADMIN - SDM - LEGAL': 'Staff/Operasional',
+  'PENGEMBANGAN SDM': 'Staff/Operasional',
+  // Keuangan & Kredit
+  'ACCOUNTING': 'Staff/Operasional',
+  'ANALIS KREDIT': 'Bisnis',
+  // Operasional
+  'BAGIAN UMUM': 'Staff/Operasional',
+  'CUSTOMER SERVICE': 'Staff/Operasional',
+  'Teller': 'Staff/Operasional',
+  // Bisnis
+  'Marketing Dana': 'Senior Account Officer Funding',
+  'Kepala Kas': 'Kepala Kantor Kas',
+  'Account Officer': 'Account Officer',
+  'Kepala Cabang': 'Bisnis',
+  'Surveyor': 'Staff/Operasional',
+  // Collection
+  'KOORDINATOR COLLECTION': 'Collection',
+  'STAFF COLLECTION': 'Collection',
+  // Admin
+  'Master Admin': 'Lainnya',
+  'Super Admin': 'Lainnya',
+  // Default
+  'User': 'Lainnya',
 };
 
 interface TaskFormModalProps {
@@ -202,9 +226,9 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
       setUnit(currentUserUnit || 'BIS');
       setOutputDoD('');
       setOutcome('');
-      // Auto-set Fungsi/Jabatan based on user's unit code
-      const userUnit = currentUserUnit || currentUser?.unit || 'BIS';
-      const autoCategory = UNIT_TO_CATEGORY[userUnit] || 'Lainnya';
+      // Auto-set Fungsi/Jabatan based on user's role (set by admin)
+      const userRole = currentUser?.role || '';
+      const autoCategory = ROLE_TO_CATEGORY[userRole] || 'Lainnya';
       setCategory(autoCategory);
       const autoSubcategory = SUBCATEGORY_MAPPING[autoCategory]?.[0] || 'Lainnya';
       setSubcategory(autoSubcategory as Subcategory);
