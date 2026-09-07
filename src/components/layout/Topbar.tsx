@@ -119,6 +119,19 @@ export const Topbar: React.FC<TopbarProps> = ({ onMobileMenuToggle }) => {
         {/* Notifications */}
         <NotificationInboxPopover />
 
+        {/* Logout Button */}
+        <button
+          onClick={() => {
+            localStorage.removeItem('auth_token');
+            setIsAuthenticated(false);
+            window.location.reload();
+          }}
+          className="hidden sm:flex relative items-center justify-center h-10 px-3 gap-2 text-red-600 dark:text-red-400 bg-white dark:bg-[#18181B] border border-red-200 dark:border-red-900/50 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors shadow-sm"
+          title="Logout"
+        >
+          <LogOut className="w-4 h-4" strokeWidth={2} />
+        </button>
+
       </div>
       
       <StrukturManajemenModal 

@@ -94,8 +94,11 @@ export type AppModuleId =
   | 'DATA_CENTER_CBS';
 
 interface AppContextType {
-  currentUser: User;
-  setCurrentUser: (user: User) => void;
+  currentUser: User | null;
+  setCurrentUser: (user: User | null) => void;
+  isAuthenticated: boolean;
+  setIsAuthenticated: (val: boolean) => void;
+  isAuthLoading: boolean;
   switchUserByRole: (role: UserRole) => void;
   rolePermissions: Record<string, string[]>;
   updateRolePermissions: (role: string, perms: string[]) => void;
@@ -185,12 +188,41 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [currentUser, setCurrentUser] = useState<User>(INITIAL_USERS[0]); // Default to Dirut
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [macroMetrics, setMacroMetrics] = useState(INITIAL_MACRO_METRICS);
 
   const [selectedBranchId, setSelectedBranchId] = useState<BranchId | 'ALL'>('ALL');
   const [activeModule, setActiveModule] = useState<AppModuleId>('EXECUTIVE_DASHBOARD');
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
+
+  // Initialize auth from token
+  useEffect(() => {
+    const initAuth = async () => {
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        setIsAuthLoading(false);
+        return;
+      }
+      try {
+        const res = await fetch('/api/auth/me', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setCurrentUser(data.user);
+          setIsAuthenticated(true);
+        } else {
+          localStorage.removeItem('auth_token');
+        }
+      } catch (e) {
+        console.error('Auth verification failed', e);
+      } finally {
+        setIsAuthLoading(false);
+      }
+    };
+    initAuth();
+  }, []);
 
   // Sync URL to activeModule
   useEffect(() => {
@@ -1267,6 +1299,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setActiveModule: handleSetActiveModule,
         isAuthenticated,
         setIsAuthenticated,
+        isAuthLoading,
         macroMetrics,
         setMacroMetrics,
         syncDailyBprData,

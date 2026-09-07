@@ -11,12 +11,45 @@ if (!fs.existsSync(dbDir)) {
   fs.mkdirSync(dbDir, { recursive: true });
 }
 
-const db = new Database(path.join(dbDir, 'bpr_ara.sqlite'));
+export const db = new Database(path.join(dbDir, 'bpr_ara.sqlite'));
 
 export function initDb() {
   db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      username TEXT UNIQUE,
+      email TEXT UNIQUE,
+      password_hash TEXT,
+      name TEXT,
+      role TEXT,
+      roleTier TEXT,
+      unit TEXT,
+      status TEXT DEFAULT 'ACTIVE',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+  
+  // Seed initial admin user if table is empty
+  const userCount = db.prepare('SELECT count(*) as count FROM users').get() as { count: number };
+  if (userCount.count === 0) {
+    // $2a$10$C82oR8B/8J10hE4Z1l3IieFw6aA/D4Y7zLp7QZ.qK2uK.fF3G.7e2 is bcrypt hash of 'password123'
+    db.prepare(`
+      INSERT INTO users (id, username, email, password_hash, name, role, roleTier, unit)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      'usr-admin-01',
+      'admin',
+      'admin@bprara.co.id',
+      '$2a$10$C82oR8B/8J10hE4Z1l3IieFw6aA/D4Y7zLp7QZ.qK2uK.fF3G.7e2',
+      'Administrator',
+      'Super Admin',
+      'Super Admin',
+      'PMO'
+    );
+  }
+
+  db.exec(`
     CREATE TABLE IF NOT EXISTS macro_financials (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
       period_date TEXT UNIQUE,
       total_assets REAL,
       total_liabilities REAL,

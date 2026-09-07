@@ -65,7 +65,11 @@ const PlaceholderView = ({ title }: { title: string }) => (
 );
 
 export const AppRouter: React.FC = () => {
-  const { isAuthenticated, setIsAuthenticated, setCurrentUser, flowTasks, currentUser } = useApp();
+  const { isAuthenticated, setIsAuthenticated, setCurrentUser, flowTasks, currentUser, isAuthLoading } = useApp();
+
+  if (isAuthLoading) {
+    return <FallbackLoading />;
+  }
 
   if (!isAuthenticated) {
     return (

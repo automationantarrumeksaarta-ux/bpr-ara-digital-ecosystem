@@ -50,6 +50,8 @@ app.get('/api/health', (req, res) => {
 });
 
 // API Routes
+import authRoutes from './backend/auth.js';
+app.use('/api/auth', authRoutes);
 app.use('/api', parserRoutes);
 
 // AI Assistant endpoint

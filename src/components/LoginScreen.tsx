@@ -68,25 +68,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
     setErrorMsg('');
 
     const query = identifier.trim().toLowerCase();
-    if (!query) {
-      setErrorMsg('Harap masukkan Username atau Email.');
+    if (!query || !password) {
+      setErrorMsg('Harap masukkan Username/Email dan Password.');
       return;
     }
 
-    const allUsers = getStoredUsers();
-    const foundUser = allUsers.find(
-      (u) => (u.username?.toLowerCase() === query || u.email?.toLowerCase() === query) && (u.password === password || password === '123')
-    );
-
-    if (foundUser) {
-      setPendingUser(foundUser);
-      setPendingToken('mock-token-' + foundUser.id);
-      setOtpContext('login');
-      setOtpCode('');
-      setAuthStep('otp');
-    } else {
-      setErrorMsg('Login gagal. Periksa username dan password.');
-    }
+    setOtpContext('login');
+    setOtpCode('');
+    setAuthStep('otp');
   };
 
   const handleRegister = (e: React.FormEvent) => {
@@ -98,51 +87,18 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
       return;
     }
 
-    const cleanUsername = regUsername.trim().toLowerCase().replace(/\s+/g, '');
-    const allUsers = getStoredUsers();
-    
-    if (allUsers.some(u => u.username?.toLowerCase() === cleanUsername)) {
-      setErrorMsg('Username ini sudah terdaftar! Pilih username lain.');
-      return;
-    }
-
-    const tabName = regName.split(' ')[0].toUpperCase().replace(/[^A-Z0-9]/g, '');
-
-    let mappedRole: UserRole = 'Staff / Member';
-    if (regRoleTier === 'Super Admin') mappedRole = 'Super Admin';
-    else if (regRoleTier === 'TOP' || regRoleTier === 'HIGH' || regRoleTier === 'MID') mappedRole = 'Atasan / Manager';
-    
-    const newUser = {
-      id: `user-${Date.now()}`,
-      name: regName.trim(),
-      email: regEmail.trim(),
-      username: cleanUsername,
-      password: regPassword || '123',
-      role: mappedRole,
-      roleTier: regRoleTier,
-      unit: regUnit,
-      assignedMemberTab: tabName,
-      avatar: `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80`,
-      pinCode: '1234',
-      twoFactorEnabled: false,
-      emailNotifications: true,
-      calendarConnected: false
-    } as UserProfile;
-
-    setPendingUser(newUser);
     setOtpContext('register');
     setOtpCode('');
     setAuthStep('otp');
   };
 
   const handleQuickDemo = (user: UserProfile) => {
-    setIdentifier(user.username || user.email);
-    setPassword(user.password || '123');
+    setIdentifier(user.username || user.email || 'admin');
+    setPassword(user.password || 'password123');
     setActiveTab('login');
     setAuthStep('form');
   };
 
-  const allUsersList = getStoredUsers();
 
   return (
     <div className="min-h-screen w-full flex bg-[#FAF9F6] dark:bg-[#121214]">
@@ -333,56 +289,75 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                 </form>
               )}
 
-              {/* Or Continue With Divider */}
-              <div className="relative flex items-center py-2">
-                <div className="flex-grow border-t border-gray-200 dark:border-gray-800"></div>
-                <span className="flex-shrink-0 mx-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Atau Coba Akun Demo</span>
-                <div className="flex-grow border-t border-gray-200 dark:border-gray-800"></div>
-              </div>
 
-              {/* Demo Accounts List */}
-              <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-                {allUsersList.filter(u => ['usr-dirut', 'usr-kacab', 'usr-ao', 'usr-kolektor', 'usr-analis'].includes(u.id)).map((user) => (
-                  <button
-                    key={user.id}
-                    onClick={() => handleQuickDemo(user)}
-                    className="flex-shrink-0 flex items-center gap-2.5 p-2 pr-4 bg-white dark:bg-[#18181A] border border-gray-200 dark:border-gray-800 rounded-full hover:border-gray-400 dark:hover:border-gray-600 transition-colors group shadow-xs"
-                  >
-                    <img src={user.avatar} alt={user.name} className="w-8 h-8 rounded-full object-cover" />
-                    <div className="text-left">
-                      <span className="block text-[11px] font-bold text-gray-900 dark:text-white group-hover:text-black leading-tight">
-                        {user.name.split(' ')[0]}
-                      </span>
-                      <span className="block text-[9px] text-gray-500 font-medium leading-tight uppercase tracking-wider">
-                        {user.role}
-                      </span>
-                    </div>
-                  </button>
-                ))}
-              </div>
             </>
           ) : (
             /* OTP Verification Step with Framer Motion */
             <div className="w-full flex flex-col h-[400px]">
               <OTPVerification 
-                email={pendingUser?.email || pendingUser?.username || ''}
+                email={identifier || regEmail || ''}
                 onBack={() => setAuthStep('form')}
                 onVerify={async (code) => {
-                  await new Promise(r => setTimeout(r, 1500)); // Simulate network
+                  await new Promise(r => setTimeout(r, 1000)); // Simulate network
                   if (code === '123456' || code === '123123') {
-                    if (otpContext === 'register' && pendingUser) {
+                    if (otpContext === 'login') {
                       try {
-                        const saved = localStorage.getItem('flowtask_users_v2');
-                        let custom = saved ? JSON.parse(saved) : INITIAL_USERS;
-                        localStorage.setItem('flowtask_users_v2', JSON.stringify([...custom, pendingUser]));
+                        const res = await fetch('/api/auth/login', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ identifier: identifier.trim().toLowerCase(), password })
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                          localStorage.setItem('auth_token', data.token);
+                          setPendingUser(data.user);
+                          return true;
+                        }
+                        setErrorMsg(data.error || 'Login gagal.');
+                        return false;
                       } catch (e) {
-                        console.error('Failed saving user to storage:', e);
+                        setErrorMsg('Gagal menghubungi server.');
+                        return false;
                       }
                     } else {
-                      if (pendingToken) localStorage.setItem('auth_token', pendingToken);
+                      // Register
+                      try {
+                        const res = await fetch('/api/auth/register', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            name: regName.trim(), 
+                            username: regUsername.trim().toLowerCase().replace(/\s+/g, ''), 
+                            email: regEmail.trim(), 
+                            password: regPassword || '123', 
+                            roleTier: regRoleTier, 
+                            unit: regUnit
+                          })
+                        });
+                        const regData = await res.json();
+                        if (res.ok) {
+                          // Immediately login after register
+                          const loginRes = await fetch('/api/auth/login', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ identifier: regUsername.trim().toLowerCase(), password: regPassword || '123' })
+                          });
+                          const loginData = await loginRes.json();
+                          if (loginRes.ok) {
+                            localStorage.setItem('auth_token', loginData.token);
+                            setPendingUser(loginData.user);
+                            return true;
+                          }
+                        }
+                        setErrorMsg(regData.error || 'Registrasi gagal.');
+                        return false;
+                      } catch (e) {
+                        setErrorMsg('Gagal menghubungi server.');
+                        return false;
+                      }
                     }
-                    return true;
                   }
+                  setErrorMsg('Kode OTP tidak valid.');
                   return false;
                 }}
                 onSuccessComplete={() => {
