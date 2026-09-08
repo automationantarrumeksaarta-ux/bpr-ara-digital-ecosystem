@@ -273,7 +273,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
       taskId: finalTaskId,
       parentCaseId: autoCaseId,
       unit,
-      pic: autoAssignedTo,
+      pic: currentUser?.name || 'User',
       assignedTo: autoAssignedTo,
       tanggal,
       deskripsiTugas,
