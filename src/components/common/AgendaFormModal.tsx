@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Calendar, Users, MapPin, Check } from 'lucide-react';
 import { TaskItem, UserRole } from '../../types';
+import { useApp } from '../../context/AppContext';
 
 interface AgendaFormModalProps {
   isOpen: boolean;
@@ -31,6 +32,7 @@ export const AgendaFormModal: React.FC<AgendaFormModalProps> = ({
   onSave,
   editingTask,
 }) => {
+  const { allUsers } = useApp();
   const [judul, setJudul] = useState('');
   const [tanggal, setTanggal] = useState('');
   const [lokasi, setLokasi] = useState('');
@@ -201,7 +203,11 @@ export const AgendaFormModal: React.FC<AgendaFormModalProps> = ({
               <div className="absolute z-10 w-full mt-1 bg-white dark:bg-[#18181B] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl overflow-hidden animate-in slide-in-from-top-2">
                 <div className="max-h-56 overflow-y-auto p-1.5">
                   {(() => {
-                    const allOptions = [...ROLE_OPTIONS, { role: 'all', label: 'Semua Divisi / Orang' }];
+                    const userOptions = allUsers.map(u => ({
+                      role: u.username || u.id,
+                      label: u.name
+                    }));
+                    const allOptions = [...ROLE_OPTIONS, ...userOptions, { role: 'all', label: 'Semua Divisi / Orang' }];
                     const filtered = allOptions.filter(r => 
                       r.role.toLowerCase().includes(suggestionQuery) || 
                       r.label.toLowerCase().includes(suggestionQuery)
