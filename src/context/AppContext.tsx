@@ -1541,7 +1541,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         updateRolePermissions,
         taskRoutes,
         updateTaskRoute,
-        documents: INITIAL_DOCUMENTS,
         allUsers,
         branches: INITIAL_BRANCHES,
         selectedBranchId,
