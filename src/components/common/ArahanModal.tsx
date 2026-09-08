@@ -33,12 +33,20 @@ export const ArahanModal: React.FC<ArahanModalProps> = ({ isOpen, onClose, task,
     onClose();
   };
 
-  const isSuperAdmin = userRole === 'Super Admin';
+  const isSuperAdmin = userRole === 'Super Admin' || userRole === 'Master Admin';
+  const userNameLower = currentUser?.name?.toLowerCase() || '';
+  const userTabLower = currentUser?.assignedMemberTab?.toLowerCase() || '';
+
   const isValidator = currentUser && task?.validator 
-    ? task.validator.split(',').some((v: string) => v.trim().toLowerCase() === currentUser.name.toLowerCase()) 
+    ? task.validator.split(',').some((v: string) => v.trim().toLowerCase() === userNameLower) 
+    : false;
+
+  const isPic = currentUser && task 
+    ? (task.pic && task.pic.split(',').some((p: string) => p.trim().toLowerCase() === userNameLower || p.trim().toLowerCase() === userTabLower)) ||
+      (task.assignedTo && task.assignedTo.split(',').some((p: string) => p.trim().toLowerCase() === userNameLower || p.trim().toLowerCase() === userTabLower))
     : false;
   
-  const canEdit = isSuperAdmin || isValidator;
+  const canEdit = isSuperAdmin || isValidator || isPic;
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
