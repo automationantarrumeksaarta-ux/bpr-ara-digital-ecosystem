@@ -1,5 +1,5 @@
 import React, { Suspense } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { navigationConfig } from '../config/navigationConfig';
 
@@ -86,6 +86,38 @@ const getFirstAccessibleRoute = (userRole: string, rolePermissions: Record<strin
   return '/dashboard'; // Safe ultimate fallback
 };
 
+const isPathAccessible = (path: string, userRole: string, rolePermissions: Record<string, string[]>) => {
+  if (userRole === 'Super Admin' || userRole === 'Master Admin') return true;
+  
+  const dynamicPerms = rolePermissions?.[userRole];
+  const hasDynamicPerms = dynamicPerms && dynamicPerms.length > 0;
+
+  for (const group of navigationConfig) {
+    for (const item of group.items) {
+      if (item.path && path.startsWith(item.path)) {
+        if (hasDynamicPerms) {
+          return dynamicPerms.includes(item.title);
+        } else {
+          return !item.allowedRoles || (item.allowedRoles as string[]).includes(userRole);
+        }
+      }
+    }
+  }
+  return true; // If not in navigationConfig, allow by default (or we could deny)
+};
+
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const { currentUser, rolePermissions } = useApp();
+  const location = useLocation();
+  const defaultRoute = getFirstAccessibleRoute(currentUser?.role || 'User', rolePermissions);
+
+  if (!currentUser) return <Navigate to="/" replace />;
+  if (!isPathAccessible(location.pathname, currentUser.role, rolePermissions)) {
+    return <Navigate to={defaultRoute} replace />;
+  }
+  return <>{children}</>;
+};
+
 export const AppRouter: React.FC = () => {
   const { isAuthenticated, setIsAuthenticated, setCurrentUser, rolePermissions, currentUser, isAuthLoading, flowTasks } = useApp();
 
@@ -111,7 +143,7 @@ export const AppRouter: React.FC = () => {
   return (
     <Suspense fallback={<FallbackLoading />}>
       <Routes>
-        <Route element={<AppShell />}>
+        <Route element={<ProtectedRoute><AppShell /></ProtectedRoute>}>
           {/* Default Redirect */}
           <Route path="/" element={<Navigate to={defaultRoute} replace />} />
           
