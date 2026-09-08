@@ -317,7 +317,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
 
     const finalTaskId = editingTask?.taskId || previewTaskId;
 
-    onSave({
+    const taskData = {
       id: editingTask ? editingTask.id : undefined,
       taskId: finalTaskId,
       parentCaseId: autoCaseId,
