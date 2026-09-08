@@ -330,7 +330,7 @@ export const SuperAdminView: React.FC = () => {
                           onChange={(e) => handleRouteUpdate(user.id, e.target.value)}
                         >
                           <option value="">-- Pilih Atasan / Penerima Task Default --</option>
-                          {users
+                          {allUsers
                             .filter((u: any) => u.id !== user.id) // Cannot assign to self
                             .map((supervisor: any) => (
                             <option key={supervisor.id} value={supervisor.id}>
