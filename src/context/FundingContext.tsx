@@ -161,13 +161,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [userOffice, setUserOffice] = useState<string>('Matesih');
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
 
+  // Dark mode disabled - always use light mode
   useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [isDarkMode]);
+    document.documentElement.classList.remove('dark');
+  }, []);
 
   // Translate UI names to IDs for calculation service
   const selectedKasOfficeId = useMemo(() => {
