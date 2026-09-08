@@ -243,7 +243,7 @@ export const TaskTableView: React.FC<TaskTableViewProps> = ({
   };
 
   const getFileIcon = (type: string) => {
-    if (type.startsWith('image/')) return <ImageIcon className="w-3.5 h-3.5 text-gray-800 dark:text-gray-200" />;
+    if (type?.startsWith('image/')) return <ImageIcon className="w-3.5 h-3.5 text-gray-800 dark:text-gray-200" />;
     return <FileText className="w-3.5 h-3.5 text-amber-500" />;
   };
 
@@ -663,7 +663,7 @@ export const TaskTableView: React.FC<TaskTableViewProps> = ({
                                 {t.penyelesaian}
                               </span>
                               <a
-                                href={t.penyelesaian.startsWith('http') ? t.penyelesaian : `https://${t.penyelesaian}`}
+                                href={t.penyelesaian?.startsWith('http') ? t.penyelesaian : `https://${t.penyelesaian}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="p-0.5 text-emerald-600 hover:text-emerald-700 bg-emerald-50 dark:bg-emerald-950 rounded shrink-0"
@@ -679,7 +679,7 @@ export const TaskTableView: React.FC<TaskTableViewProps> = ({
                                 {t.evidenceLink}
                               </span>
                               <a
-                                href={t.evidenceLink.startsWith('http') ? t.evidenceLink : `https://${t.evidenceLink}`}
+                                href={t.evidenceLink?.startsWith('http') ? t.evidenceLink : `https://${t.evidenceLink}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="p-0.5 text-blue-600 hover:text-blue-700 bg-blue-50 dark:bg-blue-950 rounded shrink-0"
@@ -698,7 +698,7 @@ export const TaskTableView: React.FC<TaskTableViewProps> = ({
                             <div className="flex flex-col gap-1.5 mt-2">
                               {t.evidenceFiles.map(f => (
                                 <div key={f.id} className="flex items-center gap-1.5 group/file bg-gray-50 dark:bg-gray-800/40 p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors cursor-pointer" onClick={() => setPreviewFile(f)}>
-                                  {f.type.startsWith('image/') ? (
+                                  {f.type?.startsWith('image/') ? (
                                     <ImageIcon className="w-3.5 h-3.5 text-gray-800 dark:text-gray-200 shrink-0" />
                                   ) : (
                                     <FileText className="w-3.5 h-3.5 text-amber-500 shrink-0" />
@@ -1016,7 +1016,7 @@ export const TaskTableView: React.FC<TaskTableViewProps> = ({
                         <p className="text-[10px] font-semibold text-gray-700 dark:text-gray-300 truncate">{f.name}</p>
                         <p className="text-[9px] text-gray-400">{formatFileSize(f.size)}</p>
                       </div>
-                      {f.type.startsWith('image/') && (
+                      {f.type?.startsWith('image/') && (
                         <EvidenceThumbnail file={f} />
                       )}
                       <button
