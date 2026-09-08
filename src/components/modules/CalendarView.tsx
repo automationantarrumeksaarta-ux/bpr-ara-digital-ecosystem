@@ -29,7 +29,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   onAddTask,
   onSyncCalendar
 }) => {
-  const { currentUser, createFlowTask, updateTaskStatus, deleteFlowTask } = useApp();
+  const { currentUser, createFlowTask, updateTaskStatus, deleteFlowTask, taskRoutes } = useApp();
   const [currentDate, setCurrentDate] = useState(new Date());
   
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
@@ -88,13 +88,44 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     setCurrentDate(new Date(year, month + 1, 1));
   };
 
+  // Filter tasks based on mentions, PIC, creator, or supervisor
+  const visibleTasks = tasks.filter(t => {
+    if (!currentUser) return true; // fallback if no user
+    const isCreator = t.createdBy === currentUser.id || t.createdBy === currentUser.username;
+    const isMentioned = t.mentions?.some(m => m === currentUser.id || m === currentUser.role || m === currentUser.username || m === 'all');
+    const isPic = t.assignedTo === currentUser.id || t.assignedTo === currentUser.username || t.assignedTo === currentUser.name || t.pic === currentUser.name || t.assignedTo === currentUser.role;
+    const isSupervisor = t.createdBy && taskRoutes[t.createdBy] === currentUser.id;
+    return isCreator || isMentioned || isPic || isSupervisor;
+  });
+
   // Helper to find tasks for day
   const getTasksForDay = (day: number) => {
     const formattedMonth = String(month + 1).padStart(2, '0');
     const formattedDay = String(day).padStart(2, '0');
     const dateKey = `${year}-${formattedMonth}-${formattedDay}`;
 
-    return tasks.filter(t => t.tanggal === dateKey || t.tanggalFU === dateKey);
+    return visibleTasks.filter(t => t.tanggal === dateKey || t.tanggalFU === dateKey);
+  };
+
+  // Color generator for users
+  const getUserColor = (username: string) => {
+    const colors = [
+      'bg-blue-50/80 dark:bg-blue-950/50 text-blue-900 dark:text-blue-200 border-blue-200/60 hover:bg-blue-100',
+      'bg-purple-50/80 dark:bg-purple-950/50 text-purple-900 dark:text-purple-200 border-purple-200/60 hover:bg-purple-100',
+      'bg-amber-50/80 dark:bg-amber-950/50 text-amber-900 dark:text-amber-200 border-amber-200/60 hover:bg-amber-100',
+      'bg-emerald-50/80 dark:bg-emerald-950/50 text-emerald-900 dark:text-emerald-200 border-emerald-200/60 hover:bg-emerald-100',
+      'bg-rose-50/80 dark:bg-rose-950/50 text-rose-900 dark:text-rose-200 border-rose-200/60 hover:bg-rose-100',
+      'bg-indigo-50/80 dark:bg-indigo-950/50 text-indigo-900 dark:text-indigo-200 border-indigo-200/60 hover:bg-indigo-100',
+      'bg-cyan-50/80 dark:bg-cyan-950/50 text-cyan-900 dark:text-cyan-200 border-cyan-200/60 hover:bg-cyan-100',
+      'bg-fuchsia-50/80 dark:bg-fuchsia-950/50 text-fuchsia-900 dark:text-fuchsia-200 border-fuchsia-200/60 hover:bg-fuchsia-100'
+    ];
+    // simple hash
+    let hash = 0;
+    const nameStr = username || 'unknown';
+    for (let i = 0; i < nameStr.length; i++) {
+      hash = nameStr.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return colors[Math.abs(hash) % colors.length];
   };
 
   return (
@@ -202,10 +233,10 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                           e.stopPropagation();
                           handleEditTaskClick(t);
                         }}
-                      className={`text-[10px] leading-tight px-1.5 py-1 mb-1 rounded-md border truncate cursor-pointer transition-colors shadow-xs font-medium truncate
+                      className={`text-[10px] leading-tight px-1.5 py-1 mb-1 rounded-md border cursor-pointer transition-colors shadow-xs font-medium truncate
                         ${isSelesai
                           ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border-emerald-200/50 line-through opacity-80'
-                          : 'bg-blue-50/80 dark:bg-blue-950/50 text-blue-900 dark:text-blue-200 border-blue-200/60 dark:border-blue-800/40 hover:bg-blue-100'
+                          : getUserColor(t.assignedTo)
                         }
                       `}
                       title={`${t.deskripsiTugas} (${t.assignedTo})`}

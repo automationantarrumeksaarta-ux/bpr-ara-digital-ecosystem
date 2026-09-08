@@ -1297,7 +1297,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       mentions: taskData.mentions,
       syncedToCalendar: taskData.syncedToCalendar,
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
+      createdBy: taskData.createdBy || currentUser?.id || currentUser?.username || 'SYSTEM'
     };
 
     setFlowTasks((prev) => [newTask, ...prev]);
@@ -1313,7 +1314,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           userId: roleId,
           title: 'Undangan / Mention Agenda Baru',
           message: `Divisi ${roleId} telah di-mention sebagai peserta dalam agenda: "${taskData.deskripsiTugas || taskData.title}"`,
-          module: 'SYSTEM' as const,
+          module: (taskData.module as any) || 'SYSTEM',
           read: false,
           priority: 'NORMAL' as const
         };

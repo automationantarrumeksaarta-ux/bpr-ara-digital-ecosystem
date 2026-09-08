@@ -121,9 +121,10 @@ export function NotificationInboxPopover() {
                     onClick={() => {
                       markNotificationAsRead(n.id);
                       if (n.module === 'EWS') setActiveModule('EWS_RISK');
-                      if (n.module === 'APPROVAL') setActiveModule('CREDIT_APPROVAL');
-                      if (n.module === 'COLLECTION') setActiveModule('PTP_TRACKER');
-                      if (n.module === 'SYSTEM') setActiveModule('CALENDAR');
+                      else if (n.module === 'APPROVAL') setActiveModule('CREDIT_APPROVAL');
+                      else if (n.module === 'COLLECTION') setActiveModule('PTP_TRACKER');
+                      else if (n.module === 'SYSTEM') setActiveModule('CALENDAR');
+                      else setActiveModule(n.module as any);
                       setIsOpen(false);
                     }}
                     className={`flex w-full items-start gap-3 border-b border-slate-100 dark:border-slate-800/40 px-4 py-4 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/30 ${!n.read ? 'bg-blue-50/30 dark:bg-blue-900/10' : ''}`}

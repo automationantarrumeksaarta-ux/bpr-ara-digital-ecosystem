@@ -156,6 +156,7 @@ export interface TaskItem {
   tanggalFU: string; // Follow up date YYYY-MM-DD
   createdAt: string;
   updatedAt: string;
+  createdBy?: string;
   syncedToCalendar?: boolean;
   calendarEventId?: string;
   commentsCount?: number;

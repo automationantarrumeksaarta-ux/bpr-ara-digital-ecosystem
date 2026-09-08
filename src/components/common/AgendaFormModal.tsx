@@ -34,7 +34,7 @@ export const AgendaFormModal: React.FC<AgendaFormModalProps> = ({
   onDelete,
   editingTask,
 }) => {
-  const { allUsers } = useApp();
+  const { allUsers, currentUser } = useApp();
   const [judul, setJudul] = useState('');
   const [tanggal, setTanggal] = useState('');
   const [lokasi, setLokasi] = useState('');
@@ -237,7 +237,7 @@ export const AgendaFormModal: React.FC<AgendaFormModalProps> = ({
           </div>
 
           <div className="pt-4 mt-2 border-t border-slate-100 dark:border-slate-800/60 flex justify-between gap-3 items-center">
-            {editingTask && onDelete ? (
+            {editingTask && onDelete && (editingTask.createdBy === currentUser?.id || editingTask.createdBy === currentUser?.username) ? (
               <button
                 type="button"
                 onClick={() => onDelete(editingTask.id)}
