@@ -64,8 +64,29 @@ const PlaceholderView = ({ title }: { title: string }) => (
   </div>
 );
 
+const getFirstAccessibleRoute = (userRole: string, rolePermissions: Record<string, string[]>) => {
+  if (userRole === 'Super Admin' || userRole === 'Master Admin') return '/super-admin';
+  
+  const dynamicPerms = rolePermissions?.[userRole];
+  const hasDynamicPerms = dynamicPerms && dynamicPerms.length > 0;
+
+  for (const group of navigationConfig) {
+    for (const item of group.items) {
+      if (hasDynamicPerms) {
+        if (dynamicPerms.includes(item.title) && item.path) return item.path;
+      } else {
+        if (userRole === 'User') continue;
+        if (!item.allowedRoles || (item.allowedRoles as string[]).includes(userRole)) {
+          if (item.path) return item.path;
+        }
+      }
+    }
+  }
+  return '/dashboard'; // Safe ultimate fallback
+};
+
 export const AppRouter: React.FC = () => {
-  const { isAuthenticated, setIsAuthenticated, setCurrentUser, flowTasks, currentUser, isAuthLoading } = useApp();
+  const { isAuthenticated, setIsAuthenticated, setCurrentUser, rolePermissions, currentUser, isAuthLoading } = useApp();
 
   if (isAuthLoading) {
     return <FallbackLoading />;
@@ -77,26 +98,21 @@ export const AppRouter: React.FC = () => {
         <Route path="*" element={<LoginScreen onLoginSuccess={(user) => {
           setCurrentUser(user);
           setIsAuthenticated(true);
-          // Auto-navigate based on role
-          if (user.role === 'Super Admin' || user.role === 'Master Admin' || user.roleTier === 'Super Admin') {
-            window.location.href = '/super-admin';
-          } else {
-            window.location.href = '/dashboard';
-          }
+          // Auto-navigate based on first accessible route
+          window.location.href = getFirstAccessibleRoute(user.role || 'User', rolePermissions);
         }} />} />
       </Routes>
     );
   }
 
-  // Determine default route based on role if needed, but for now /dashboard is safe.
-  // We can just rely on the AppShell to render.
+  const defaultRoute = getFirstAccessibleRoute(currentUser?.role || 'User', rolePermissions);
 
   return (
     <Suspense fallback={<FallbackLoading />}>
       <Routes>
         <Route element={<AppShell />}>
           {/* Default Redirect */}
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/" element={<Navigate to={defaultRoute} replace />} />
           
           {/* Super Admin Route */}
           <Route path="/super-admin" element={<SuperAdminView />} />

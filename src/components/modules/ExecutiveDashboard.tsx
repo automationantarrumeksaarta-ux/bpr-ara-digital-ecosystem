@@ -120,7 +120,13 @@ export const ExecutiveDashboard: React.FC = () => {
       <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-6 animate-in fade-in">
         <div>
           <h1 className="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
-            Good morning, {currentUser.name} <span className="text-xl">👋</span>
+            {(() => {
+              const hour = new Date().getHours();
+              if (hour < 11) return 'Selamat pagi';
+              if (hour < 15) return 'Selamat siang';
+              if (hour < 18) return 'Selamat sore';
+              return 'Selamat malam';
+            })()}, {currentUser.name} <span className="text-xl">👋</span>
           </h1>
           <p className="text-sm text-slate-500 font-medium mt-1">{currentDate}</p>
         </div>

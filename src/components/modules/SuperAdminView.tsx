@@ -238,7 +238,7 @@ export const SuperAdminView: React.FC = () => {
                           onClick={() => handleEditAccessClick(user.role)}
                           disabled={user.role === 'Master Admin'}
                         >
-                          Atur Akses
+                          Edit Akses Role
                         </Button>
                       </td>
                       <td className="px-6 py-4">
@@ -361,9 +361,15 @@ export const SuperAdminView: React.FC = () => {
         size="lg"
       >
         <div className="p-1 max-h-[60vh] overflow-y-auto">
-          <p className="text-sm text-slate-500 mb-4">
-            Centang menu yang boleh diakses oleh pegawai dengan jabatan <strong>{editingRole}</strong>.
-          </p>
+          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3 mb-4 flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+            <div>
+              <p className="text-sm font-bold text-amber-900 dark:text-amber-300">Perhatian: Akses ini berlaku untuk seluruh Role (Jabatan)</p>
+              <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
+                Perubahan yang Anda lakukan di sini akan berlaku untuk <strong>semua pegawai</strong> yang memiliki jabatan <strong>{editingRole}</strong>. Pengaturan akses bersifat per-jabatan, bukan per-individu.
+              </p>
+            </div>
+          </div>
           <div className="space-y-6">
             {navigationConfig.map(group => (
               <div key={group.id} className="border border-slate-200 dark:border-slate-700 rounded-lg p-4">
