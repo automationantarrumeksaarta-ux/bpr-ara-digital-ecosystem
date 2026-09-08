@@ -434,26 +434,19 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                           password: regPassword || '123', 
                           roleTier: regRoleTier, 
                           unit: regUnit,
-                          otpCode: code // Send the code entered by the user
+                        otpCode: code // Send the code entered by the user
                         })
                       });
                       const regData = await res.json();
                       if (res.ok) {
-                        // Immediately login after register
-                        const loginRes = await fetch('/api/auth/login', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ identifier: regUsername.trim().toLowerCase(), password: regPassword || '123' })
-                        });
-                        const loginData = await loginRes.json();
-                        if (loginRes.ok) {
-                          localStorage.setItem('auth_token', loginData.token);
-                          pendingUserRef.current = loginData.user;
-                          return true;
-                        }
+                        // Immediately login after register using the returned token
+                        localStorage.setItem('auth_token', regData.token);
+                        pendingUserRef.current = regData.user;
+                        return true;
+                      } else {
+                        setErrorMsg(regData.error || 'Pendaftaran gagal');
+                        return false;
                       }
-                      setErrorMsg(regData.error || 'Registrasi gagal.');
-                      return false;
                     } catch (e) {
                       setErrorMsg('Gagal menghubungi server.');
                       return false;

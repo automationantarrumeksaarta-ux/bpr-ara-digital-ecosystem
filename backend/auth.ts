@@ -87,7 +87,29 @@ router.post('/register', async (req, res) => {
     // Delete OTP after successful use
     db.prepare('DELETE FROM otp_verifications WHERE email = ?').run(email);
 
-    res.status(201).json({ message: 'User registered successfully' });
+    // Create JWT
+    const payload = {
+      id: userId,
+      username,
+      email,
+      roleTier: roleTier || 'LOW',
+    };
+    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
+
+    res.status(201).json({ 
+      message: 'User registered successfully',
+      token,
+      user: {
+        id: userId,
+        username,
+        email,
+        name: name || username,
+        role: role || 'User',
+        roleTier: roleTier || 'LOW',
+        unit: unit || 'PMO',
+        status: 'ACTIVE'
+      }
+    });
   } catch (error) {
     console.error('Register error:', error);
     res.status(500).json({ error: 'Failed to register user' });
