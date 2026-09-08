@@ -29,7 +29,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   onAddTask,
   onSyncCalendar
 }) => {
-  const { currentUser, createFlowTask, updateTaskStatus } = useApp();
+  const { currentUser, createFlowTask, updateTaskStatus, deleteFlowTask } = useApp();
   const [currentDate, setCurrentDate] = useState(new Date());
   
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
@@ -225,6 +225,10 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           isOpen={isTaskModalOpen}
           onClose={() => setIsTaskModalOpen(false)}
           onSave={handleSaveTask}
+          onDelete={(id) => {
+            deleteFlowTask(id);
+            setIsTaskModalOpen(false);
+          }}
           editingTask={editingTask}
         />
       )}

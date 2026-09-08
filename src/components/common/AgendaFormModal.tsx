@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, Users, MapPin, Check } from 'lucide-react';
+import { X, Calendar, Users, MapPin, Check, Trash2 } from 'lucide-react';
 import { TaskItem, UserRole } from '../../types';
 import { useApp } from '../../context/AppContext';
 
@@ -7,6 +7,7 @@ interface AgendaFormModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (taskData: Partial<TaskItem>) => void;
+  onDelete?: (taskId: string) => void;
   editingTask?: TaskItem | null;
 }
 
@@ -30,6 +31,7 @@ export const AgendaFormModal: React.FC<AgendaFormModalProps> = ({
   isOpen,
   onClose,
   onSave,
+  onDelete,
   editingTask,
 }) => {
   const { allUsers } = useApp();
@@ -234,21 +236,35 @@ export const AgendaFormModal: React.FC<AgendaFormModalProps> = ({
             )}
           </div>
 
-          <div className="pt-4 mt-2 border-t border-slate-100 dark:border-slate-800/60 flex justify-end gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-5 py-2.5 rounded-xl text-[13px] font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-            >
-              Batal
-            </button>
-            <button
-              type="submit"
-              className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[13px] font-bold shadow-lg shadow-blue-500/20 transition-colors flex items-center gap-2"
-            >
-              <Check className="w-4 h-4" />
-              Simpan Agenda
-            </button>
+          <div className="pt-4 mt-2 border-t border-slate-100 dark:border-slate-800/60 flex justify-between gap-3 items-center">
+            {editingTask && onDelete ? (
+              <button
+                type="button"
+                onClick={() => onDelete(editingTask.id)}
+                className="px-4 py-2.5 rounded-xl text-[13px] font-bold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors flex items-center gap-2"
+              >
+                <Trash2 className="w-4 h-4" />
+                Hapus
+              </button>
+            ) : (
+              <div></div>
+            )}
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-5 py-2.5 rounded-xl text-[13px] font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                type="submit"
+                className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[13px] font-bold shadow-lg shadow-blue-500/20 transition-colors flex items-center gap-2"
+              >
+                <Check className="w-4 h-4" />
+                Simpan Agenda
+              </button>
+            </div>
           </div>
         </form>
       </div>
