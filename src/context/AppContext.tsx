@@ -177,6 +177,7 @@ interface AppContextType {
   updatePtpStatus: (ptpId: string, status: PromiseToPayRecord['status'], brokenReason?: string) => void;
   createFlowTask: (taskData: Partial<TaskItem> & Partial<FlowTaskLegacy>) => void;
   updateTaskStatus: (taskId: string, status: any, progress?: number, evidenceNote?: string) => void;
+  deleteFlowTask: (taskId: string) => void;
   resolveEwsAlert: (alertId: string, actionNote: string) => void;
   addEwsAlerts: (alerts: EwsAlert[]) => void;
   runEwsEngine: () => void;
@@ -1281,6 +1282,36 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       })
     );
   };
+
+  const deleteFlowTask = async (taskId: string) => {
+    if (!window.confirm('Apakah Anda yakin ingin menghapus aktivitas ini?')) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/auth/tasks/${encodeURIComponent(taskId)}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+        }
+      });
+      if (!res.ok) throw new Error('Failed to delete task from DB');
+      
+      setFlowTasks((prev) => prev.filter(t => t.id !== taskId));
+      
+      recordAuditLog(
+        'SYSTEM',
+        'SYSTEM',
+        '-',
+        'DELETE',
+        `Hapus Tugas dengan ID: ${taskId}`
+      );
+    } catch (e) {
+      console.error('[Tasks] Failed to delete task', e);
+      alert('Gagal menghapus aktivitas.');
+    }
+  };
+
   const runEwsEngine = () => {
     const newAlerts: EwsAlert[] = [];
     const nowStr = new Date().toISOString().split('T')[0] + ' 10:00 WIB';
@@ -1527,6 +1558,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         updatePtpStatus,
         createFlowTask,
         updateTaskStatus,
+        deleteFlowTask,
         resolveEwsAlert,
         addEwsAlerts,
         runEwsEngine,

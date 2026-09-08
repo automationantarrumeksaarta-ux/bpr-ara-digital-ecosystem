@@ -5,7 +5,7 @@ import { TaskFormModal } from '../common/TaskFormModal';
 import { TaskItem, FlowTaskLegacy } from '../../types';
 
 export const FlowTasksView: React.FC = () => {
-  const { flowTasks, currentUser, updateTaskStatus, createFlowTask } = useApp();
+  const { flowTasks, currentUser, updateTaskStatus, createFlowTask, deleteFlowTask } = useApp();
   
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<TaskItem | null>(null);
@@ -57,7 +57,7 @@ export const FlowTasksView: React.FC = () => {
         currentUser={currentUser as any}
         currentUserUnit={currentUser.unit || 'BIS'}
         onUpdateTask={handleUpdateTask}
-        onDeleteTask={(id) => console.log('Delete', id)}
+        onDeleteTask={deleteFlowTask}
         onEditTask={handleEditTask}
         onAddTask={handleAddTask}
         onSyncCalendar={(task) => console.log('Sync', task)}
