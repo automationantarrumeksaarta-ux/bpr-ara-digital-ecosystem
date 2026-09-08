@@ -292,6 +292,30 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   }, [isAuthenticated]);
 
+  // Fetch notifications from database on auth
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      const token = localStorage.getItem('auth_token');
+      if (!token || !currentUser) return;
+      try {
+        const res = await fetch(`/api/notifications?userId=${currentUser.id}&username=${currentUser.username}&role=${currentUser.role}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.notifications) {
+            setNotifications(data.notifications);
+          }
+        }
+      } catch (e) {
+        console.error('Failed to fetch notifications', e);
+      }
+    };
+    if (isAuthenticated && currentUser) {
+      fetchNotifications();
+    }
+  }, [isAuthenticated, currentUser]);
+
   // Fetch tasks from database on auth
   useEffect(() => {
     const fetchTasks = async () => {
@@ -367,6 +391,24 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [attendances, setAttendances] = useState<HrAttendanceRecord[]>(INITIAL_ATTENDANCE);
   const [employeeScores, setEmployeeScores] = useState<EmployeePerformanceScore[]>(INITIAL_EMPLOYEE_SCORES);
   const [notifications, setNotifications] = useState<NotificationItem[]>(INITIAL_NOTIFICATIONS);
+
+  // Helper to sync single notification to DB
+  const syncNotificationToDb = async (notif: NotificationItem) => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      if (!token) return;
+      await fetch('/api/notifications', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(notif)
+      });
+    } catch (e) {
+      console.error('Failed to sync notification', e);
+    }
+  };
   const [settings, setSettings] = useState<SystemSettings>(INITIAL_SETTINGS);
   
   const [targetBungaData, setTargetBungaData] = useState<AOPendapatanBunga[]>(INITIAL_TARGET_BUNGA_DATA);
@@ -1264,16 +1306,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     syncTaskToDb(newTask, 'POST');
 
     if (taskData.mentions && taskData.mentions.length > 0) {
-      const newNotifs = taskData.mentions.map((roleId, index) => ({
-        id: `notif-mention-${Date.now()}-${index}`,
-        timestamp: new Date().toISOString(),
-        userId: roleId,
-        title: 'Undangan / Mention Agenda Baru',
-        message: `Divisi ${roleId} telah di-mention sebagai peserta dalam agenda: "${taskData.deskripsiTugas || taskData.title}"`,
-        module: 'SYSTEM' as const,
-        read: false,
-        priority: 'NORMAL' as const
-      }));
+      const newNotifs = taskData.mentions.map((roleId, index) => {
+        const notif = {
+          id: `notif-mention-${Date.now()}-${index}`,
+          timestamp: new Date().toISOString(),
+          userId: roleId,
+          title: 'Undangan / Mention Agenda Baru',
+          message: `Divisi ${roleId} telah di-mention sebagai peserta dalam agenda: "${taskData.deskripsiTugas || taskData.title}"`,
+          module: 'SYSTEM' as const,
+          read: false,
+          priority: 'NORMAL' as const
+        };
+        syncNotificationToDb(notif);
+        return notif;
+      });
       setNotifications(prev => [...newNotifs, ...prev]);
     }
 
@@ -1527,8 +1573,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     });
   };
 
-  const markNotificationAsRead = (notificationId: string) => {
+  const markNotificationAsRead = async (notificationId: string) => {
     setNotifications((prev) => prev.map((n) => (n.id === notificationId ? { ...n, read: true } : n)));
+    try {
+      const token = localStorage.getItem('auth_token');
+      if (token) {
+        await fetch(`/api/notifications/${notificationId}/read`, {
+          method: 'PUT',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+      }
+    } catch (e) {
+      console.error('Failed to sync notification read status', e);
+    }
   };
 
   return (
