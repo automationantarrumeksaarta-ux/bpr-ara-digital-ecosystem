@@ -12,8 +12,17 @@ export const useGetTaskEvidence = (fileId?: string) => {
 export const useUploadTaskEvidence = () => {
   return {
     mutateAsync: async (data: any) => {
-      console.log('Mock upload evidence', data);
-      return { success: true, data: { id: 'mock-id' } };
+      const file = data.file;
+      return { 
+        success: true, 
+        data: { 
+          id: `ev-${Date.now()}`,
+          name: file ? file.name : 'Unknown File',
+          size: file ? file.size : 0,
+          type: file ? file.type : 'application/octet-stream',
+          url: file ? URL.createObjectURL(file) : undefined
+        } 
+      };
     },
     isPending: false,
   };
