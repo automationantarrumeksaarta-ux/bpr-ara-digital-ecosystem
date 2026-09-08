@@ -87,7 +87,7 @@ const getFirstAccessibleRoute = (userRole: string, rolePermissions: Record<strin
 };
 
 export const AppRouter: React.FC = () => {
-  const { isAuthenticated, setIsAuthenticated, setCurrentUser, rolePermissions, currentUser, isAuthLoading } = useApp();
+  const { isAuthenticated, setIsAuthenticated, setCurrentUser, rolePermissions, currentUser, isAuthLoading, flowTasks } = useApp();
 
   if (isAuthLoading) {
     return <FallbackLoading />;
