@@ -55,7 +55,7 @@ export const FlowTasksView: React.FC = () => {
         tasks={flowTasks}
         userRole={currentUser.role as any}
         currentUser={currentUser as any}
-        currentUserUnit="BIS"
+        currentUserUnit={currentUser.unit || 'BIS'}
         onUpdateTask={handleUpdateTask}
         onDeleteTask={(id) => console.log('Delete', id)}
         onEditTask={handleEditTask}
@@ -72,7 +72,7 @@ export const FlowTasksView: React.FC = () => {
         defaultMemberTab={selectedTab}
         userRole={currentUser.role as any}
         currentUser={currentUser as any}
-        currentUserUnit="BIS"
+        currentUserUnit={currentUser.unit || 'BIS'}
       />
     </div>
   );
