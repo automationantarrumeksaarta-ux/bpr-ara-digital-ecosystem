@@ -722,7 +722,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                   className="flex-1 min-w-[120px] bg-transparent text-xs font-medium text-gray-900 dark:text-white focus:outline-none"
                 />
                 <datalist id="validator-options">
-                  {INITIAL_USERS.map((u) => (
+                  {allUsers.map((u) => (
                     <option key={u.id} value={u.name}>{u.role}</option>
                   ))}
                 </datalist>
