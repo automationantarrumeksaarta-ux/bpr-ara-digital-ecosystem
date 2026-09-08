@@ -42,7 +42,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
 
   const sidebarContent = (
-    <aside className="fixed lg:static top-0 bottom-0 left-0 z-50 w-[260px] bg-primary-navy border-r border-primary-navy flex flex-col h-full select-none shrink-0 transition-transform duration-300 ease-in-out shadow-lg lg:shadow-none">
+    <aside className="w-[260px] bg-primary-navy border-r border-primary-navy flex flex-col h-full select-none shrink-0 shadow-lg lg:shadow-none">
       {/* Header Branding */}
       <div className="flex items-center mb-6 mt-8 px-6 justify-between">
         <h1 className="text-2xl font-bold font-sans text-white tracking-tight">
