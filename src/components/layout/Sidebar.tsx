@@ -68,6 +68,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 return dynamicPerms.includes(item.title);
               }
               // Fallback to static allowedRoles
+              if (userRole === 'User') return false; // Newly registered users get NO modules
               return !item.allowedRoles || item.allowedRoles.includes(userRole as any);
             }
           );

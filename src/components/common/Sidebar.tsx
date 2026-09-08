@@ -51,12 +51,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenCalendarSync }) => {
   const { activeModule, setActiveModule, ewsAlerts, creditApplications, ptpRecords, flowTasks, currentUser, rolePermissions } = useApp();
 
   const isMenuAllowed = (item: any) => {
-    // If dynamic permissions exist for this role, respect them
+    // If dynamic permissions exist for this role, use them (Master Admin is NOT exempt - must be configured via Edit Akses)
     if (rolePermissions && rolePermissions[currentUser.role] && rolePermissions[currentUser.role].length > 0) {
-      if (currentUser.role === 'Master Admin') return true;
       return rolePermissions[currentUser.role].includes(item.title);
     }
     // Fallback to static config
+    if (currentUser.role === 'User') return false; // Newly registered users get NO modules until Super Admin assigns a role/access
     return !item.allowedRoles || item.allowedRoles.includes(currentUser.role);
   };
 
