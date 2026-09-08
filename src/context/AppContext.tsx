@@ -292,8 +292,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   }, [isAuthenticated]);
 
-  // Fetch notifications from database on auth
+  // Fetch notifications from database on auth and poll for real-time updates
   useEffect(() => {
+    let intervalId: any;
     const fetchNotifications = async () => {
       const token = localStorage.getItem('auth_token');
       if (!token || !currentUser) return;
@@ -304,7 +305,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         if (res.ok) {
           const data = await res.json();
           if (data.notifications) {
-            setNotifications(data.notifications);
+            // Update state only if changed to avoid unnecessary re-renders
+            setNotifications(prev => {
+              if (JSON.stringify(prev) !== JSON.stringify(data.notifications)) {
+                return data.notifications;
+              }
+              return prev;
+            });
           }
         }
       } catch (e) {
@@ -313,7 +320,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     };
     if (isAuthenticated && currentUser) {
       fetchNotifications();
+      // Poll every 5 seconds
+      intervalId = setInterval(fetchNotifications, 5000);
     }
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
   }, [isAuthenticated, currentUser]);
 
   // Fetch tasks from database on auth
@@ -370,10 +382,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               };
             });
             console.log('[Tasks] Loaded', mapped.length, 'tasks from DB');
-            setFlowTasks(mapped);
+            setFlowTasks(prev => {
+              if (JSON.stringify(prev) !== JSON.stringify(mapped)) {
+                return mapped;
+              }
+              return prev;
+            });
           } else {
             console.log('[Tasks] DB empty, using initial tasks');
-            setFlowTasks(INITIAL_TASKS);
+            setFlowTasks(prev => prev.length === 0 ? prev : INITIAL_TASKS);
           }
         } else {
           setFlowTasks(INITIAL_TASKS);
@@ -383,7 +400,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setFlowTasks(INITIAL_TASKS);
       }
     };
-    fetchTasks();
+    
+    let intervalId: any;
+    if (isAuthenticated) {
+      fetchTasks();
+      intervalId = setInterval(fetchTasks, 5000); // 5 seconds polling
+    }
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
   }, [isAuthenticated]);
   const [ewsAlerts, setEwsAlerts] = useState<EwsAlert[]>(INITIAL_EWS_ALERTS);
   const [antiFraudFlags, setAntiFraudFlags] = useState<AntiFraudRedFlag[]>(INITIAL_ANTI_FRAUD_FLAGS);
