@@ -68,7 +68,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 return dynamicPerms.includes(item.title);
               }
               // Fallback to static allowedRoles
-              if (userRole === 'User') return false; // Newly registered users get NO modules
+              // Master Admin without explicit permissions: only allow menus that explicitly list 'Master Admin'
+              if (userRole === 'Master Admin') {
+                return item.allowedRoles?.includes('Master Admin' as any) ?? false;
+              }
+              if (userRole === 'User') return false;
               return !item.allowedRoles || item.allowedRoles.includes(userRole as any);
             }
           );
