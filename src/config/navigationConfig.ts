@@ -181,7 +181,7 @@ export const navigationConfig: NavGroup[] = [
         icon: CheckSquare,
         badgeType: 'APPROVALS',
         badgeColor: 'bg-amber-500 text-slate-900 font-bold',
-        allowedRoles: ['Direktur Utama', 'Direktur YMFK', 'PE Kepatuhan, Manrisk, APU PPT', 'Kepala Kas'],
+        allowedRoles: ['Direktur Utama', 'Direktur YMFK', 'PE Kepatuhan, Manrisk, APU PPT', 'Master Admin', 'Kepala Kas'],
       },
       {
         id: 'LEGAL_DOCUMENTS',
