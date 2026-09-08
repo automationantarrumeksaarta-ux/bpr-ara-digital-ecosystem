@@ -29,17 +29,9 @@ export const FlowTasksView: React.FC = () => {
   };
 
   const handleSaveTask = (taskData: Partial<TaskItem>) => {
-    if (editingTask) {
-      // It's an edit - since BPR ARA's context only supports creating or updating status easily,
-      // we can simulate an edit by just changing status, or if we want full edit we'd need to add `updateFlowTask` to AppContext.
-      // For now, let's just do update status since the user just wants to "input activity".
-      // Wait, BPR ARA AppContext doesn't have a generic `updateTask` function!
-      // But the spreadsheet allows full editing. 
-      // I'll call updateTaskStatus if status changed, and for full data I might need to add `updateFlowTask` in the future.
-      console.log('Update task not fully supported in AppContext yet. Data:', taskData);
-      updateTaskStatus(editingTask.id, taskData.status || editingTask.status, 100, taskData.penyelesaian || editingTask.penyelesaian);
+    if (editingTask && taskData.id) {
+      updateTaskStatus(taskData.id, taskData.status || editingTask.status, 100, taskData.penyelesaian || editingTask.penyelesaian, { evidenceFiles: taskData.evidenceFiles });
     } else {
-      // It's a new task
       createFlowTask(taskData);
     }
   };

@@ -13,16 +13,21 @@ export const useUploadTaskEvidence = () => {
   return {
     mutateAsync: async (data: any) => {
       const file = data.file;
-      return { 
-        success: true, 
-        data: { 
-          id: `ev-${Date.now()}`,
-          name: file ? file.name : 'Unknown File',
-          size: file ? file.size : 0,
-          type: file ? file.type : 'application/octet-stream',
-          url: file ? URL.createObjectURL(file) : undefined
-        } 
-      };
+      if (!file) throw new Error('No file provided');
+      
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!res.ok) {
+        throw new Error('Failed to upload file');
+      }
+      
+      return await res.json();
     },
     isPending: false,
   };

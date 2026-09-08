@@ -181,11 +181,25 @@ export function initDb() {
       subcategory TEXT,
       arahan TEXT,
       synced_to_calendar INTEGER DEFAULT 0,
+      evidence_files TEXT DEFAULT '[]',
       created_by TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
   `);
+
+  // Add evidence_files column if it doesn't exist
+  try {
+    const tableInfo = db.prepare("PRAGMA table_info(beis_tasks)").all() as any[];
+    const hasEvidenceFiles = tableInfo.some(col => col.name === 'evidence_files');
+    if (!hasEvidenceFiles) {
+      db.exec("ALTER TABLE beis_tasks ADD COLUMN evidence_files TEXT DEFAULT '[]'");
+      console.log('Added evidence_files column to beis_tasks table.');
+    }
+  } catch (e) {
+    console.error('Error adding evidence_files column:', e);
+  }
+
   console.log('Database initialized successfully.');
 }
 

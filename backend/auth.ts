@@ -465,8 +465,8 @@ router.post('/tasks', (req, res) => {
       (id, tanggal, deskripsi_tugas, jenis_teknis, timeline, prioritas, status,
        tanggal_fu, penyelesaian, pic, assigned_to, validator, beis_domain, beis_level,
        beis_category, unit, output_dod, output_dod2, outcome, category, subcategory,
-       arahan, synced_to_calendar, created_by, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+       arahan, synced_to_calendar, evidence_files, created_by, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
     `).run(
       t.id, t.tanggal || '', t.deskripsiTugas || '', t.jenisTeknis || '',
       t.timeline || '', t.prioritas || '', t.status || 'In Progress',
@@ -474,7 +474,9 @@ router.post('/tasks', (req, res) => {
       t.validator || '', t.beisDomain || '', t.beisLevel || '',
       t.beisCategory || '', t.unit || '', t.outputDoD || '', t.outputDoD2 || '',
       t.outcome || '', t.category || '', t.subcategory || '',
-      t.arahan || '', t.syncedToCalendar ? 1 : 0, decoded.id || ''
+      t.arahan || '', t.syncedToCalendar ? 1 : 0, 
+      t.evidenceFiles ? JSON.stringify(t.evidenceFiles) : '[]',
+      decoded.id || ''
     );
 
     res.status(201).json({ message: 'Task created', id: t.id });
@@ -509,13 +511,19 @@ router.put('/tasks/:taskId', (req, res) => {
       beisLevel: 'beis_level', beisCategory: 'beis_category', unit: 'unit',
       outputDoD: 'output_dod', outputDoD2: 'output_dod2', outcome: 'outcome',
       category: 'category', subcategory: 'subcategory', arahan: 'arahan',
-      syncedToCalendar: 'synced_to_calendar'
+      syncedToCalendar: 'synced_to_calendar', evidenceFiles: 'evidence_files'
     };
 
     for (const [jsKey, dbCol] of Object.entries(fieldMap)) {
       if (t[jsKey] !== undefined) {
         fields.push(`${dbCol} = ?`);
-        values.push(jsKey === 'syncedToCalendar' ? (t[jsKey] ? 1 : 0) : t[jsKey]);
+        if (jsKey === 'syncedToCalendar') {
+          values.push(t[jsKey] ? 1 : 0);
+        } else if (jsKey === 'evidenceFiles') {
+          values.push(JSON.stringify(t[jsKey]));
+        } else {
+          values.push(t[jsKey]);
+        }
       }
     }
 

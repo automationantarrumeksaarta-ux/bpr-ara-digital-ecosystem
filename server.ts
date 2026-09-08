@@ -5,6 +5,8 @@ import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
 import compression from 'compression';
+import fs from 'fs';
+import multer from 'multer';
 import parserRoutes from './backend/parser.js';
 import { initDb } from './backend/db.js';
 
@@ -25,6 +27,39 @@ const PORT = Number(process.env.PORT) || 3535;
 
 app.use(compression());
 app.use(express.json());
+
+// Set up uploads directory and multer
+const uploadDir = path.join(_dirname, 'uploads');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadDir),
+  filename: (req, file, cb) => cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(file.originalname)}`)
+});
+const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } }); // 10MB
+
+// Serve uploaded files statically
+app.use('/uploads', express.static(uploadDir));
+
+// Upload endpoint
+app.post('/api/upload', upload.single('file'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No file uploaded' });
+  }
+  
+  const fileUrl = `/uploads/${req.file.filename}`;
+  res.json({
+    success: true,
+    data: {
+      id: req.file.filename,
+      name: req.file.originalname,
+      size: req.file.size,
+      type: req.file.mimetype,
+      url: fileUrl
+    }
+  });
+});
 
 // Initialize Gemini SDK lazily / safely
 let aiClient: GoogleGenAI | null = null;

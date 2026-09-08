@@ -36,8 +36,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   const [editingTask, setEditingTask] = useState<TaskItem | null>(null);
 
   const handleSaveTask = (taskData: Partial<TaskItem>) => {
-    if (editingTask) {
-      updateTaskStatus(editingTask.id, taskData.status || editingTask.status, 100, taskData.penyelesaian || editingTask.penyelesaian);
+    if (editingTask && taskData.id) {
+      updateTaskStatus(taskData.id, taskData.status || editingTask.status, 100, taskData.penyelesaian || editingTask.penyelesaian, { evidenceFiles: taskData.evidenceFiles });
     } else {
       createFlowTask(taskData);
     }

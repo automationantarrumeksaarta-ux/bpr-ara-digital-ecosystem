@@ -176,7 +176,7 @@ interface AppContextType {
   recordPromiseToPay: (ptpData: Partial<PromiseToPayRecord>) => void;
   updatePtpStatus: (ptpId: string, status: PromiseToPayRecord['status'], brokenReason?: string) => void;
   createFlowTask: (taskData: Partial<TaskItem> & Partial<FlowTaskLegacy>) => void;
-  updateTaskStatus: (taskId: string, status: any, progress?: number, evidenceNote?: string) => void;
+  updateTaskStatus: (taskId: string, status: any, progress?: number, evidenceNote?: string, options?: { evidenceFiles?: any[] }) => void;
   deleteFlowTask: (taskId: string) => void;
   resolveEwsAlert: (alertId: string, actionNote: string) => void;
   addEwsAlerts: (alerts: EwsAlert[]) => void;
@@ -283,36 +283,43 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           const data = await res.json();
           if (data.tasks && data.tasks.length > 0) {
             // Map DB column names to JS property names
-            const mapped = data.tasks.map((t: any) => ({
-              id: t.id,
-              taskId: t.id,
-              parentCaseId: 'CASE-DB',
-              unit: t.unit || 'BIS',
-              pic: t.pic || '',
-              assignedTo: t.assigned_to || t.pic || '',
-              tanggal: t.tanggal || '',
-              deskripsiTugas: t.deskripsi_tugas || '',
-              jenisTeknis: t.jenis_teknis || 'Rutinitas Harian',
-              timeline: t.timeline || 'Harian',
-              arahanAtasan: t.arahan || '-',
-              arahanAtasanUtama: '',
-              prioritas: t.prioritas || 'P1',
-              status: t.status || 'In Progress',
-              penyelesaian: t.penyelesaian || '',
-              tanggalFU: t.tanggal_fu || '',
-              validator: t.validator || '',
-              outputDoD: t.output_dod || '',
-              outputDoD2: t.output_dod2 || '',
-              outcome: t.outcome || '',
-              category: t.category || '',
-              subcategory: t.subcategory || '',
-              beisLevel: t.beis_level || '',
-              beisDomain: t.beis_domain || '',
-              beisCategory: t.beis_category || '',
-              syncedToCalendar: !!t.synced_to_calendar,
-              createdAt: t.created_at || new Date().toISOString(),
-              updatedAt: t.updated_at || new Date().toISOString()
-            }));
+            const mapped = data.tasks.map((t: any) => {
+              let parsedEvidence = [];
+              try {
+                if (t.evidence_files) parsedEvidence = JSON.parse(t.evidence_files);
+              } catch(e) {}
+              return {
+                id: t.id,
+                taskId: t.id,
+                parentCaseId: 'CASE-DB',
+                unit: t.unit || 'BIS',
+                pic: t.pic || '',
+                assignedTo: t.assigned_to || t.pic || '',
+                tanggal: t.tanggal || '',
+                deskripsiTugas: t.deskripsi_tugas || '',
+                jenisTeknis: t.jenis_teknis || 'Rutinitas Harian',
+                timeline: t.timeline || 'Harian',
+                arahanAtasan: t.arahan || '-',
+                arahanAtasanUtama: '',
+                prioritas: t.prioritas || 'P1',
+                status: t.status || 'In Progress',
+                penyelesaian: t.penyelesaian || '',
+                tanggalFU: t.tanggal_fu || '',
+                validator: t.validator || '',
+                outputDoD: t.output_dod || '',
+                outputDoD2: t.output_dod2 || '',
+                outcome: t.outcome || '',
+                category: t.category || '',
+                subcategory: t.subcategory || '',
+                beisLevel: t.beis_level || '',
+                beisDomain: t.beis_domain || '',
+                beisCategory: t.beis_category || '',
+                syncedToCalendar: !!t.synced_to_calendar,
+                evidenceFiles: parsedEvidence,
+                createdAt: t.created_at || new Date().toISOString(),
+                updatedAt: t.updated_at || new Date().toISOString()
+              };
+            });
             console.log('[Tasks] Loaded', mapped.length, 'tasks from DB');
             setFlowTasks(mapped);
           } else {
@@ -1254,7 +1261,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     );
   };
 
-  const updateTaskStatus = (taskId: string, status: any, progress?: number, evidenceNote?: string) => {
+  const updateTaskStatus = (taskId: string, status: any, progress?: number, evidenceNote?: string, options?: { evidenceFiles?: any[] }) => {
     setFlowTasks((prev) =>
       prev.map((t) => {
         if (t.id === taskId) {
@@ -1262,11 +1269,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             ...t,
             status,
             penyelesaian: evidenceNote || t.penyelesaian,
+            evidenceFiles: options?.evidenceFiles !== undefined ? options.evidenceFiles : t.evidenceFiles,
             updatedAt: new Date().toISOString()
           };
 
           // Sync update to database
-          syncTaskToDb({ id: taskId, status, penyelesaian: evidenceNote || t.penyelesaian }, 'PUT');
+          syncTaskToDb({ id: taskId, status, penyelesaian: evidenceNote || t.penyelesaian, evidenceFiles: updated.evidenceFiles }, 'PUT');
 
           recordAuditLog(
             'SYSTEM',
