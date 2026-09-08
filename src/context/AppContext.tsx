@@ -266,6 +266,31 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [ptpRecords, setPtpRecords] = useState<PromiseToPayRecord[]>(INITIAL_PROMISE_TO_PAY);
   const [restructurings, setRestructurings] = useState<RestructuringRecord[]>(INITIAL_RESTRUCTURING);
   const [flowTasks, setFlowTasks] = useState<TaskItem[]>([]);
+  const [allUsers, setAllUsers] = useState<User[]>(INITIAL_USERS);
+
+  // Fetch users from database on auth
+  useEffect(() => {
+    const fetchUsers = async () => {
+      const token = localStorage.getItem('auth_token');
+      if (!token) return;
+      try {
+        const res = await fetch('/api/auth/users', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.users && data.users.length > 0) {
+            setAllUsers(data.users);
+          }
+        }
+      } catch (e) {
+        console.error('Failed to fetch users', e);
+      }
+    };
+    if (isAuthenticated) {
+      fetchUsers();
+    }
+  }, [isAuthenticated]);
 
   // Fetch tasks from database on auth
   useEffect(() => {
@@ -1516,7 +1541,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         updateRolePermissions,
         taskRoutes,
         updateTaskRoute,
-        allUsers: INITIAL_USERS,
+        documents: INITIAL_DOCUMENTS,
+        allUsers,
         branches: INITIAL_BRANCHES,
         selectedBranchId,
         setSelectedBranchId,

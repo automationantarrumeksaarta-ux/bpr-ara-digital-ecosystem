@@ -40,6 +40,7 @@ import { generateGoogleCalendarUrl } from '../../utils/exportUtils';
 import { BEIS_STATUSES, BEIS_UNITS, BEIS_DOMAINS, getBeisBadgeClass, getBeisCategoriesForDomain, generateBeisTaskId, generateEvidenceId, runDataQualityEngine, calculateAging } from '../../utils/beisUtils';
 import { BEISDomainCode } from '../../types';
 import { useGetTaskEvidence, useUploadTaskEvidence } from '../../hooks/useTasks';
+import { useApp } from '../../context/AppContext';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const EvidenceThumbnail: React.FC<{ file: EvidenceFile }> = ({ file }) => {
@@ -101,6 +102,14 @@ export const TaskTableView: React.FC<TaskTableViewProps> = ({
   isCutoffPassed = false,
   isLoading = false
 }) => {
+  const { allUsers } = useApp();
+
+  const resolveUserName = (userIdOrName: string) => {
+    if (!userIdOrName) return '-';
+    const user = allUsers?.find(u => u.id === userIdOrName);
+    return user ? user.name : userIdOrName;
+  };
+
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
   const [filterJenis, setFilterJenis] = useState<string>('ALL');
   const [filterPrioritas, setFilterPrioritas] = useState<string>('ALL');
@@ -515,7 +524,7 @@ export const TaskTableView: React.FC<TaskTableViewProps> = ({
                       {selectedTab === 'REKAP PUSAT' && (
                         <td className="py-3.5 px-3 font-bold text-gray-900 dark:text-white">
                           <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-800 rounded-md text-[10px]">
-                            {t.assignedTo}
+                            {resolveUserName(t.assignedTo)}
                           </span>
                         </td>
                       )}
@@ -786,10 +795,13 @@ export const TaskTableView: React.FC<TaskTableViewProps> = ({
             <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1 text-xs">
               <div className="p-3 bg-gray-50 dark:bg-gray-800/60 rounded-xl space-y-1">
                 <p className="font-bold text-gray-900 dark:text-white">{auditModalTask.deskripsiTugas}</p>
+                <div className="flex items-center gap-2 text-xs font-semibold text-gray-700 dark:text-gray-300">
+                  <UserCircle2 className="w-4 h-4 text-gray-400" />
+                  <span>PIC: {resolveUserName(auditModalTask.assignedTo)}</span>
+                </div>
                 <div className="flex flex-wrap gap-2 text-[10px] text-gray-500 font-mono pt-1">
                   <span>Unit: {auditModalTask.unit}</span>
                   <span>Domain: {auditModalTask.beisDomain}</span>
-                  <span>PIC: {auditModalTask.assignedTo}</span>
                   <span>Validator: {auditModalTask.validator}</span>
                 </div>
               </div>
@@ -815,7 +827,7 @@ export const TaskTableView: React.FC<TaskTableViewProps> = ({
                   </div>
                 ) : (
                   <div className="text-center py-4 text-gray-400 text-[11px]">
-                    Record dibuat otomatis pada {auditModalTask.tanggal} oleh {auditModalTask.assignedTo}. Status: {auditModalTask.status}.
+                    Record dibuat otomatis pada {auditModalTask.tanggal} oleh {resolveUserName(auditModalTask.assignedTo)}. Status: {auditModalTask.status}.
                   </div>
                 )}
               </div>
@@ -857,9 +869,9 @@ export const TaskTableView: React.FC<TaskTableViewProps> = ({
             </div>
 
             {/* Task Info */}
-            <div className="bg-slate-50 dark:bg-gray-800/50 rounded-xl p-3">
-              <p className="text-xs font-semibold text-gray-900 dark:text-white">{evidenceModalTask.deskripsiTugas}</p>
-              <p className="text-[10px] text-gray-500 mt-1">PIC: {evidenceModalTask.assignedTo} • Deadline: {evidenceModalTask.deadline || '-'}</p>
+            <div className="flex-1 mt-4 sm:mt-0">
+              <h3 className="text-sm font-bold text-gray-900 dark:text-white leading-snug">{evidenceModalTask.deskripsiTugas}</h3>
+              <p className="text-[10px] text-gray-500 mt-1">PIC: {resolveUserName(evidenceModalTask.assignedTo)} • Deadline: {evidenceModalTask.deadline || '-'}</p>
             </div>
 
             {/* Domain BEIS */}
