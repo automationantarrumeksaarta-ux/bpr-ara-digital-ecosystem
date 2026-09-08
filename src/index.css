@@ -110,11 +110,11 @@
 
 @layer utilities {
   .app-bg-gradient {
-    @apply bg-background dark:bg-background;
+    @apply bg-background;
   }
 
   .text-gradient {
-    @apply text-foreground dark:text-foreground;
+    @apply text-foreground;
   }
 }
 
