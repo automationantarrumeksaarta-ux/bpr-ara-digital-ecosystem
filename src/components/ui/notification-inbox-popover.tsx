@@ -123,7 +123,7 @@ export function NotificationInboxPopover() {
                       if (n.module === 'EWS') setActiveModule('EWS_RISK');
                       else if (n.module === 'APPROVAL') setActiveModule('CREDIT_APPROVAL');
                       else if (n.module === 'COLLECTION') setActiveModule('PTP_TRACKER');
-                      else if (n.module === 'SYSTEM') setActiveModule('CALENDAR');
+                      else if (n.module === 'SYSTEM') setActiveModule('CALENDAR_VIEW' as any);
                       else setActiveModule(n.module as any);
                       setIsOpen(false);
                     }}

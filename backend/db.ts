@@ -182,6 +182,7 @@ export function initDb() {
       arahan TEXT,
       synced_to_calendar INTEGER DEFAULT 0,
       evidence_files TEXT DEFAULT '[]',
+      mentions TEXT DEFAULT '[]',
       created_by TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -207,8 +208,18 @@ export function initDb() {
       db.exec("ALTER TABLE beis_tasks ADD COLUMN evidence_files TEXT DEFAULT '[]'");
       console.log('Added evidence_files column to beis_tasks table.');
     }
+    const hasMentions = tableInfo.some(col => col.name === 'mentions');
+    if (!hasMentions) {
+      db.exec("ALTER TABLE beis_tasks ADD COLUMN mentions TEXT DEFAULT '[]'");
+      console.log('Added mentions column to beis_tasks table.');
+    }
+    const hasCreatedBy = tableInfo.some(col => col.name === 'created_by');
+    if (!hasCreatedBy) {
+      db.exec("ALTER TABLE beis_tasks ADD COLUMN created_by TEXT");
+      console.log('Added created_by column to beis_tasks table.');
+    }
   } catch (e) {
-    console.error('Error adding evidence_files column:', e);
+    console.error('Error adding columns:', e);
   }
 
   console.log('Database initialized successfully.');

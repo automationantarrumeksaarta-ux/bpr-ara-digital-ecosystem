@@ -346,8 +346,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             // Map DB column names to JS property names
             const mapped = data.tasks.map((t: any) => {
               let parsedEvidence = [];
+              let parsedMentions: string[] = [];
               try {
                 if (t.evidence_files) parsedEvidence = JSON.parse(t.evidence_files);
+              } catch(e) {}
+              try {
+                if (t.mentions) parsedMentions = JSON.parse(t.mentions);
               } catch(e) {}
               return {
                 id: t.id,
@@ -377,8 +381,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 beisCategory: t.beis_category || '',
                 syncedToCalendar: !!t.synced_to_calendar,
                 evidenceFiles: parsedEvidence,
+                mentions: parsedMentions,
                 createdAt: t.created_at || new Date().toISOString(),
-                updatedAt: t.updated_at || new Date().toISOString()
+                updatedAt: t.updated_at || new Date().toISOString(),
+                createdBy: t.created_by || ''
               };
             });
             console.log('[Tasks] Loaded', mapped.length, 'tasks from DB');

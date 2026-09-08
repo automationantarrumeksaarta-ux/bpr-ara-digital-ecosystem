@@ -483,8 +483,8 @@ router.post('/tasks', (req, res) => {
       (id, tanggal, deskripsi_tugas, jenis_teknis, timeline, prioritas, status,
        tanggal_fu, penyelesaian, pic, assigned_to, validator, beis_domain, beis_level,
        beis_category, unit, output_dod, output_dod2, outcome, category, subcategory,
-       arahan, synced_to_calendar, evidence_files, created_by, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+       arahan, synced_to_calendar, evidence_files, mentions, created_by, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
     `).run(
       t.id, t.tanggal || '', t.deskripsiTugas || '', t.jenisTeknis || '',
       t.timeline || '', t.prioritas || '', t.status || 'In Progress',
@@ -494,6 +494,7 @@ router.post('/tasks', (req, res) => {
       t.outcome || '', t.category || '', t.subcategory || '',
       t.arahan || '', t.syncedToCalendar ? 1 : 0, 
       t.evidenceFiles ? JSON.stringify(t.evidenceFiles) : '[]',
+      t.mentions ? JSON.stringify(t.mentions) : '[]',
       decoded.id || ''
     );
 
