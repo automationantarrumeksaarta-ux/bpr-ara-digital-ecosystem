@@ -181,37 +181,86 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
       setCategory(editingTask.category || 'Bisnis');
       setSubcategory(editingTask.subcategory || 'Aktivitas Umum, AM dan Bisnis');
       setValidatorTags(editingTask.validator ? editingTask.validator.split(',').map(s => s.trim()) : []);
-    } else {
-      setTanggal(new Date().toISOString().split('T')[0]);
-      setDeskripsiTugas('');
-      setJenisTeknis('Rutinitas Harian');
-      setTimeline('Harian');
-      setPrioritas('P1');
-      setStatus('In Progress');
-      setTanggalFU('');
-      setPenyelesaian('');
-      setOutputDoD('');
-      setOutputDoD2('');
-      setOutcome('');
-      setSyncCalendar(true);
+      let loadedFromDraft = false;
+      try {
+        const draftStr = localStorage.getItem('task_form_draft');
+        if (draftStr && isOpen) {
+          const draft = JSON.parse(draftStr);
+          if (draft.deskripsiTugas || draft.outputDoD || draft.penyelesaian) {
+            setTanggal(draft.tanggal || new Date().toISOString().split('T')[0]);
+            setDeskripsiTugas(draft.deskripsiTugas || '');
+            setJenisTeknis(draft.jenisTeknis || 'Rutinitas Harian');
+            setTimeline(draft.timeline || 'Harian');
+            setPrioritas(draft.prioritas || 'P1');
+            setStatus(draft.status || 'In Progress');
+            setTanggalFU(draft.tanggalFU || '');
+            setPenyelesaian(draft.penyelesaian || '');
+            setOutputDoD(draft.outputDoD || '');
+            setOutputDoD2(draft.outputDoD2 || '');
+            setOutcome(draft.outcome || '');
+            setSyncCalendar(draft.syncCalendar ?? true);
+            setBeisDomain(draft.beisDomain || 'CRD');
+            setBeisLevel(draft.beisLevel || 'L03');
+            setBeisCategory(draft.beisCategory || 'AKR');
+            setUnit(draft.unit || currentUserUnit || 'BIS');
+            setCategory(draft.category || 'Bisnis');
+            setSubcategory(draft.subcategory || 'Lainnya');
+            setValidatorTags(draft.validatorTags || []);
+            loadedFromDraft = true;
+          }
+        }
+      } catch (e) {
+        console.warn('Could not load draft');
+      }
 
-      // BEIS Defaults
-      setBeisDomain('CRD');
-      setBeisLevel('L03');
-      setBeisCategory('AKR');
-      setUnit(currentUserUnit || 'BIS');
-      setOutputDoD('');
-      setOutcome('');
-      // Auto-set Fungsi/Jabatan based on user's unit code from registration
-      const userUnit = currentUserUnit || currentUser?.unit || 'BIS';
-      const autoCategory = UNIT_TO_CATEGORY[userUnit] || 'Lainnya';
-      setCategory(autoCategory);
-      const autoSubcategory = SUBCATEGORY_MAPPING[autoCategory]?.[0] || 'Lainnya';
-      setSubcategory(autoSubcategory as Subcategory);
-      setValidatorTags([]);
-      setValidatorInput('');
+      if (!loadedFromDraft) {
+        setTanggal(new Date().toISOString().split('T')[0]);
+        setDeskripsiTugas('');
+        setJenisTeknis('Rutinitas Harian');
+        setTimeline('Harian');
+        setPrioritas('P1');
+        setStatus('In Progress');
+        setTanggalFU('');
+        setPenyelesaian('');
+        setOutputDoD('');
+        setOutputDoD2('');
+        setOutcome('');
+        setSyncCalendar(true);
+
+        // BEIS Defaults
+        setBeisDomain('CRD');
+        setBeisLevel('L03');
+        setBeisCategory('AKR');
+        setUnit(currentUserUnit || 'BIS');
+        setOutputDoD('');
+        setOutcome('');
+        // Auto-set Fungsi/Jabatan based on user's unit code from registration
+        const userUnit = currentUserUnit || currentUser?.unit || 'BIS';
+        const autoCategory = UNIT_TO_CATEGORY[userUnit] || 'Lainnya';
+        setCategory(autoCategory);
+        const autoSubcategory = SUBCATEGORY_MAPPING[autoCategory]?.[0] || 'Lainnya';
+        setSubcategory(autoSubcategory as Subcategory);
+        setValidatorTags([]);
+        setValidatorInput('');
+      }
     }
-  }, [editingTask, defaultMemberTab, isOpen, autoAssignedTo]);
+  }, [editingTask, defaultMemberTab, isOpen, autoAssignedTo, currentUserUnit, currentUser]);
+
+  // Save draft to localStorage for new tasks
+  useEffect(() => {
+    if (isOpen && isNewTask) {
+      const draft = {
+        tanggal, deskripsiTugas, jenisTeknis, timeline, prioritas, status,
+        tanggalFU, penyelesaian, syncCalendar, beisDomain, beisLevel, beisCategory,
+        unit, outputDoD, outputDoD2, outcome, category, subcategory, validatorTags
+      };
+      if (deskripsiTugas || outputDoD || penyelesaian || outcome) {
+        localStorage.setItem('task_form_draft', JSON.stringify(draft));
+      } else {
+        localStorage.removeItem('task_form_draft');
+      }
+    }
+  }, [isOpen, isNewTask, tanggal, deskripsiTugas, jenisTeknis, timeline, prioritas, status, tanggalFU, penyelesaian, syncCalendar, beisDomain, beisLevel, beisCategory, unit, outputDoD, outputDoD2, outcome, category, subcategory, validatorTags]);
 
   // When domain changes, auto update level & default category
   const handleDomainChange = (domainCode: BEISDomainCode) => {
@@ -296,8 +345,13 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
       beisDomain,
       beisCategory,
       syncedToCalendar: syncCalendar
-    });
+    };
 
+    if (isNewTask) {
+      localStorage.removeItem('task_form_draft');
+    }
+    
+    onSave(taskData);
     onClose();
   };
 
