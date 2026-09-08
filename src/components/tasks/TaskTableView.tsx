@@ -715,7 +715,7 @@ export const TaskTableView: React.FC<TaskTableViewProps> = ({
 
                       {/* Validator */}
                       <td className="py-3.5 px-3 font-medium text-gray-500 dark:text-gray-400 text-[11px] whitespace-nowrap">
-                        {t.validator || 'Pak Taka'}
+                        {t.validator || '-'}
                       </td>
 
                       {/* Actions */}

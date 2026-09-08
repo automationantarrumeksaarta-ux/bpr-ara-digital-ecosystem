@@ -286,7 +286,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
       penyelesaian: penyelesaian,
       evidenceId: penyelesaian.trim() ? (editingTask?.evidenceId || generateEvidenceId(finalTaskId, 1)) : editingTask?.evidenceId,
       tanggalFU,
-      validator: validatorTags.join(', '),
+      validator: [...validatorTags, ...(validatorInput.trim() ? [validatorInput.trim()] : [])].join(', '),
       outputDoD,
       outputDoD2,
       outcome,
