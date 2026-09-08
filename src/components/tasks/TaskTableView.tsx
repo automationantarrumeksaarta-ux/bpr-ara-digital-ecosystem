@@ -263,14 +263,14 @@ export const TaskTableView: React.FC<TaskTableViewProps> = ({
   const filteredTasks = tasks.filter(t => {
     const isSuperAdmin = currentUser?.role === 'Super Admin' || currentUser?.roleTier === 'Super Admin' || currentUser?.roleTier === 'TOP' || currentUser?.role === 'Master Admin';
     if (!isSuperAdmin && currentUser) {
-      const userNameLower = currentUser.name?.toLowerCase() || '';
-      const userTabLower = currentUser.assignedMemberTab?.toLowerCase() || '';
+      const userNameLower = currentUser.name?.trim().toLowerCase() || '';
+      const userTabLower = currentUser.assignedMemberTab?.trim().toLowerCase() || '';
 
       const isPic = 
-        (t.assignedTo && userTabLower && t.assignedTo.toLowerCase() === userTabLower) ||
-        (t.pic && userTabLower && t.pic.toLowerCase() === userTabLower) ||
-        (t.assignedTo && userNameLower && t.assignedTo.toLowerCase() === userNameLower) ||
-        (t.pic && userNameLower && t.pic.toLowerCase() === userNameLower);
+        (t.assignedTo && userTabLower && t.assignedTo.trim().toLowerCase() === userTabLower) ||
+        (t.pic && userTabLower && t.pic.trim().toLowerCase() === userTabLower) ||
+        (t.assignedTo && userNameLower && t.assignedTo.trim().toLowerCase() === userNameLower) ||
+        (t.pic && userNameLower && t.pic.trim().toLowerCase() === userNameLower);
       const isValidator = t.validator && t.validator.split(',').some((v: string) => v.trim().toLowerCase() === userNameLower);
       
       if (!isPic && !isValidator) return false;
