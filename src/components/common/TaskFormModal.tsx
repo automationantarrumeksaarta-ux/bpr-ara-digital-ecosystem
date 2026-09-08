@@ -106,6 +106,12 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
 
   // Get taskRoutes from context to determine PIC based on admin routing
   const { taskRoutes, allUsers } = useApp();
+
+  const resolveUserName = (userIdOrName: string) => {
+    if (!userIdOrName) return '-';
+    const user = [...allUsers, ...INITIAL_USERS].find(u => u.id === userIdOrName);
+    return user ? user.name : userIdOrName;
+  };
   
   // Resolve PIC: use routing from admin if available, otherwise use current user's tab
   const getRoutedPIC = () => {
@@ -374,7 +380,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                 </span>
               </div>
               <p className="text-xs text-gray-500 dark:text-gray-400 font-mono mt-0.5">
-                ID: <strong>{previewTaskId}</strong> · PIC: <strong>{autoAssignedTo}</strong>
+                ID: <strong>{previewTaskId}</strong> · PIC: <strong>{resolveUserName(autoAssignedTo)}</strong>
               </p>
             </div>
           </div>
