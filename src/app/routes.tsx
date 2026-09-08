@@ -1,6 +1,7 @@
 import React, { Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import { navigationConfig } from '../config/navigationConfig';
 
 // Import all views
 import { ExecutiveDashboard } from '../components/modules/ExecutiveDashboard';
