@@ -49,16 +49,27 @@ const formatTime = (isoString: string) => {
 };
 
 export function NotificationInboxPopover() {
-  const { notifications, markNotificationAsRead, setActiveModule } = useApp();
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  const { notifications, markNotificationAsRead, setActiveModule, currentUser } = useApp();
+  
+  const myNotifications = notifications.filter(n => 
+    !n.userId || 
+    n.userId === 'all' || 
+    n.userId === currentUser?.id || 
+    n.userId === currentUser?.username || 
+    n.userId === currentUser?.role
+  );
+
+  const unreadCount = myNotifications.filter((n) => !n.read).length;
   const [tab, setTab] = useState("all");
   const [isOpen, setIsOpen] = useState(false);
 
-  const filtered = tab === "unread" ? notifications.filter((n) => !n.read) : notifications;
+  const filtered = tab === "unread" ? myNotifications.filter((n) => !n.read) : myNotifications;
 
   const markAllAsRead = () => {
-    notifications.forEach(n => {
-      if (!n.read) markNotificationAsRead(n.id);
+    myNotifications.forEach(n => {
+      if (!n.read) {
+        markNotificationAsRead(n.id);
+      }
     });
   };
 
