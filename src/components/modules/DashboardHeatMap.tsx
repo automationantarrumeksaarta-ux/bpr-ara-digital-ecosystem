@@ -46,54 +46,54 @@ const TUJUAN_COLORS = {
 const SurakartaMap = ({ colors }: { colors: Record<string, string> }) => {
   return (
     <div className="relative w-full aspect-[4/3] flex items-center justify-center bg-gray-50/50 dark:bg-gray-800/30 rounded-xl overflow-hidden group">
-      <svg viewBox="20 60 340 250" className="w-full h-full drop-shadow-xl p-2 transition-transform duration-500 group-hover:scale-105">
-        <g stroke="#ffffff" strokeWidth="2.5" strokeLinejoin="round">
+      <svg viewBox="0 0 110 110" className="w-full h-full drop-shadow-xl p-2 transition-transform duration-500 group-hover:scale-105">
+        <g stroke="#ffffff" strokeWidth="0.5" strokeLinejoin="round">
           {/* Boyolali (Top Left) */}
           <g className="hover:brightness-110 cursor-pointer transition-all hover:drop-shadow-lg">
-            <path d="M 50 150 L 80 80 L 160 90 L 180 140 L 120 180 Z" fill={colors['Boyolali']} />
-            <text x="110" y="130" fill="#fff" fontSize="12" fontWeight="bold" textAnchor="middle" style={{textShadow: '0 1px 3px rgba(0,0,0,0.6)'}} pointerEvents="none">Boyolali</text>
+            <path d="M 10 20 L 35 10 L 60 25 L 55 40 L 45 40 L 45 50 L 25 50 Z" fill={colors['Boyolali']} />
+            <text x="32" y="32" fill="#fff" fontSize="4" fontWeight="bold" textAnchor="middle" style={{textShadow: '0 0.5px 1px rgba(0,0,0,0.6)'}} pointerEvents="none">Boyolali</text>
             <title>Boyolali</title>
           </g>
           
           {/* Klaten (Bottom Left) */}
           <g className="hover:brightness-110 cursor-pointer transition-all hover:drop-shadow-lg">
-            <path d="M 50 150 L 120 180 L 140 240 L 80 260 L 40 200 Z" fill={colors['Klaten']} />
-            <text x="90" y="215" fill="#fff" fontSize="12" fontWeight="bold" textAnchor="middle" style={{textShadow: '0 1px 3px rgba(0,0,0,0.6)'}} pointerEvents="none">Klaten</text>
+            <path d="M 25 50 L 45 50 L 40 60 L 35 75 L 20 80 L 15 60 Z" fill={colors['Klaten']} />
+            <text x="28" y="65" fill="#fff" fontSize="4" fontWeight="bold" textAnchor="middle" style={{textShadow: '0 0.5px 1px rgba(0,0,0,0.6)'}} pointerEvents="none">Klaten</text>
             <title>Klaten</title>
           </g>
           
           {/* Sragen (Top Right) */}
           <g className="hover:brightness-110 cursor-pointer transition-all hover:drop-shadow-lg">
-            <path d="M 160 90 L 250 70 L 320 100 L 280 160 L 210 130 Z" fill={colors['Sragen']} />
-            <text x="240" y="115" fill="#fff" fontSize="12" fontWeight="bold" textAnchor="middle" style={{textShadow: '0 1px 3px rgba(0,0,0,0.6)'}} pointerEvents="none">Sragen</text>
+            <path d="M 60 25 L 90 15 L 95 35 L 65 35 L 55 40 Z" fill={colors['Sragen']} />
+            <text x="75" y="27" fill="#fff" fontSize="4" fontWeight="bold" textAnchor="middle" style={{textShadow: '0 0.5px 1px rgba(0,0,0,0.6)'}} pointerEvents="none">Sragen</text>
             <title>Sragen</title>
           </g>
           
           {/* Surakarta (Center) */}
           <g className="hover:brightness-110 cursor-pointer transition-all hover:drop-shadow-lg z-10 relative">
-            <circle cx="195" cy="155" r="25" fill={colors['Surakarta']} strokeWidth="3" />
-            <text x="195" y="159" fill="#fff" fontSize="11" fontWeight="900" textAnchor="middle" style={{textShadow: '0 1px 3px rgba(0,0,0,0.8)'}} pointerEvents="none">Surakarta</text>
+            <path d="M 45 40 L 55 40 L 55 50 L 45 50 Z" fill={colors['Surakarta']} strokeWidth="0.8" />
+            <text x="50" y="46.5" fill="#fff" fontSize="2.5" fontWeight="900" textAnchor="middle" style={{textShadow: '0 0.5px 1px rgba(0,0,0,0.8)'}} pointerEvents="none">Solo</text>
             <title>Surakarta</title>
           </g>
           
           {/* Sukoharjo (Bottom Center) */}
           <g className="hover:brightness-110 cursor-pointer transition-all hover:drop-shadow-lg">
-            <path d="M 175 175 L 215 175 L 240 220 L 190 270 L 140 240 Z" fill={colors['Sukoharjo']} />
-            <text x="190" y="230" fill="#fff" fontSize="12" fontWeight="bold" textAnchor="middle" style={{textShadow: '0 1px 3px rgba(0,0,0,0.6)'}} pointerEvents="none">Sukoharjo</text>
+            <path d="M 45 50 L 55 50 L 60 60 L 50 85 L 35 75 L 40 60 Z" fill={colors['Sukoharjo']} />
+            <text x="47" y="68" fill="#fff" fontSize="4" fontWeight="bold" textAnchor="middle" style={{textShadow: '0 0.5px 1px rgba(0,0,0,0.6)'}} pointerEvents="none">Sukoharjo</text>
             <title>Sukoharjo</title>
           </g>
           
           {/* Karanganyar (Right) */}
           <g className="hover:brightness-110 cursor-pointer transition-all hover:drop-shadow-lg">
-            <path d="M 210 130 L 280 160 L 340 180 L 330 230 L 240 220 L 215 175 Z" fill={colors['Karanganyar']} />
-            <text x="275" y="195" fill="#fff" fontSize="12" fontWeight="bold" textAnchor="middle" style={{textShadow: '0 1px 3px rgba(0,0,0,0.6)'}} pointerEvents="none">Karanganyar</text>
+            <path d="M 65 35 L 95 35 L 85 60 L 60 60 L 55 50 L 55 40 Z" fill={colors['Karanganyar']} />
+            <text x="75" y="48" fill="#fff" fontSize="4" fontWeight="bold" textAnchor="middle" style={{textShadow: '0 0.5px 1px rgba(0,0,0,0.6)'}} pointerEvents="none">Karanganyar</text>
             <title>Karanganyar</title>
           </g>
           
           {/* Wonogiri (Bottom Right) */}
           <g className="hover:brightness-110 cursor-pointer transition-all hover:drop-shadow-lg">
-            <path d="M 190 270 L 240 220 L 330 230 L 300 290 L 220 295 Z" fill={colors['Wonogiri']} />
-            <text x="260" y="270" fill="#fff" fontSize="12" fontWeight="bold" textAnchor="middle" style={{textShadow: '0 1px 3px rgba(0,0,0,0.6)'}} pointerEvents="none">Wonogiri</text>
+            <path d="M 60 60 L 85 60 L 90 90 L 70 100 L 50 85 Z" fill={colors['Wonogiri']} />
+            <text x="70" y="80" fill="#fff" fontSize="4" fontWeight="bold" textAnchor="middle" style={{textShadow: '0 0.5px 1px rgba(0,0,0,0.6)'}} pointerEvents="none">Wonogiri</text>
             <title>Wonogiri</title>
           </g>
         </g>
@@ -156,7 +156,7 @@ export const DashboardHeatMap: React.FC = () => {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         {stats.map((stat, idx) => (
           <div key={idx} className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700/50 flex flex-col gap-2 min-w-0">
             <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 text-xs font-semibold truncate">
@@ -165,13 +165,17 @@ export const DashboardHeatMap: React.FC = () => {
               </div>
               <span className="truncate" title={stat.label}>{stat.label}</span>
             </div>
-            <div className="text-base xl:text-lg font-black text-gray-800 dark:text-gray-100 truncate" title={stat.value}>
+            <div className="text-lg xl:text-xl font-black text-gray-800 dark:text-gray-100 truncate" title={stat.value}>
               {stat.value}
             </div>
-            {stat.trend && (
-              <div className={`text-[10px] font-bold flex items-center gap-1 truncate ${stat.trendUp ? 'text-emerald-500' : 'text-red-500'}`} title={`${stat.trend} dari periode sebelumnya`}>
-                <ArrowTrendingUpIcon className={`w-3 h-3 shrink-0 ${stat.trendUp ? '' : 'rotate-180'}`} />
+            {stat.trend ? (
+              <div className={`text-xs font-bold flex items-center gap-1 truncate ${stat.trendUp ? 'text-emerald-500' : 'text-red-500'}`} title={`${stat.trend} dari periode sebelumnya`}>
+                <ArrowTrendingUpIcon className={`w-3.5 h-3.5 shrink-0 ${stat.trendUp ? '' : 'rotate-180'}`} />
                 <span className="truncate">{stat.trend} dari periode sebelumnya</span>
+              </div>
+            ) : (
+              <div className="text-xs font-bold text-transparent select-none">
+                -
               </div>
             )}
           </div>
