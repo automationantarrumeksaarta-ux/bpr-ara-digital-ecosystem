@@ -45,54 +45,77 @@ const TUJUAN_COLORS = {
 // SVG Component representing the Map
 const SurakartaMap = ({ colors }: { colors: Record<string, string> }) => {
   return (
-    <div className="relative w-full aspect-[4/3] flex items-center justify-center bg-gray-50/50 dark:bg-gray-800/30 rounded-xl overflow-hidden">
-      <svg viewBox="0 0 400 300" className="w-full h-full drop-shadow-md">
-        {/* Simple Abstract Map Polygons representing Surakarta region */}
-        <g stroke="#ffffff" strokeWidth="2" strokeLinejoin="round">
+    <div className="relative w-full aspect-[4/3] flex items-center justify-center bg-gray-50/50 dark:bg-gray-800/30 rounded-xl overflow-hidden group">
+      <svg viewBox="20 60 340 250" className="w-full h-full drop-shadow-xl p-2 transition-transform duration-500 group-hover:scale-105">
+        <g stroke="#ffffff" strokeWidth="2.5" strokeLinejoin="round">
           {/* Boyolali (Top Left) */}
-          <path d="M 50 150 L 80 80 L 160 90 L 180 140 L 120 180 Z" fill={colors['Boyolali']} />
-          <text x="110" y="130" fill="#fff" fontSize="10" fontWeight="bold" textAnchor="middle" style={{textShadow: '0 1px 2px rgba(0,0,0,0.5)'}}>Boyolali</text>
+          <g className="hover:brightness-110 cursor-pointer transition-all hover:drop-shadow-lg">
+            <path d="M 50 150 L 80 80 L 160 90 L 180 140 L 120 180 Z" fill={colors['Boyolali']} />
+            <text x="110" y="130" fill="#fff" fontSize="12" fontWeight="bold" textAnchor="middle" style={{textShadow: '0 1px 3px rgba(0,0,0,0.6)'}} pointerEvents="none">Boyolali</text>
+            <title>Boyolali</title>
+          </g>
           
           {/* Klaten (Bottom Left) */}
-          <path d="M 50 150 L 120 180 L 140 240 L 80 260 L 40 200 Z" fill={colors['Klaten']} />
-          <text x="90" y="210" fill="#fff" fontSize="10" fontWeight="bold" textAnchor="middle" style={{textShadow: '0 1px 2px rgba(0,0,0,0.5)'}}>Klaten</text>
+          <g className="hover:brightness-110 cursor-pointer transition-all hover:drop-shadow-lg">
+            <path d="M 50 150 L 120 180 L 140 240 L 80 260 L 40 200 Z" fill={colors['Klaten']} />
+            <text x="90" y="215" fill="#fff" fontSize="12" fontWeight="bold" textAnchor="middle" style={{textShadow: '0 1px 3px rgba(0,0,0,0.6)'}} pointerEvents="none">Klaten</text>
+            <title>Klaten</title>
+          </g>
           
           {/* Sragen (Top Right) */}
-          <path d="M 160 90 L 250 70 L 320 100 L 280 160 L 210 130 Z" fill={colors['Sragen']} />
-          <text x="240" y="115" fill="#fff" fontSize="10" fontWeight="bold" textAnchor="middle" style={{textShadow: '0 1px 2px rgba(0,0,0,0.5)'}}>Sragen</text>
+          <g className="hover:brightness-110 cursor-pointer transition-all hover:drop-shadow-lg">
+            <path d="M 160 90 L 250 70 L 320 100 L 280 160 L 210 130 Z" fill={colors['Sragen']} />
+            <text x="240" y="115" fill="#fff" fontSize="12" fontWeight="bold" textAnchor="middle" style={{textShadow: '0 1px 3px rgba(0,0,0,0.6)'}} pointerEvents="none">Sragen</text>
+            <title>Sragen</title>
+          </g>
           
           {/* Surakarta (Center) */}
-          <circle cx="195" cy="155" r="25" fill={colors['Surakarta']} />
-          <text x="195" y="158" fill="#fff" fontSize="10" fontWeight="bold" textAnchor="middle" style={{textShadow: '0 1px 2px rgba(0,0,0,0.5)'}}>Surakarta</text>
+          <g className="hover:brightness-110 cursor-pointer transition-all hover:drop-shadow-lg z-10 relative">
+            <circle cx="195" cy="155" r="25" fill={colors['Surakarta']} strokeWidth="3" />
+            <text x="195" y="159" fill="#fff" fontSize="11" fontWeight="900" textAnchor="middle" style={{textShadow: '0 1px 3px rgba(0,0,0,0.8)'}} pointerEvents="none">Surakarta</text>
+            <title>Surakarta</title>
+          </g>
           
           {/* Sukoharjo (Bottom Center) */}
-          <path d="M 175 175 L 215 175 L 240 220 L 190 270 L 140 240 Z" fill={colors['Sukoharjo']} />
-          <text x="190" y="225" fill="#fff" fontSize="10" fontWeight="bold" textAnchor="middle" style={{textShadow: '0 1px 2px rgba(0,0,0,0.5)'}}>Sukoharjo</text>
+          <g className="hover:brightness-110 cursor-pointer transition-all hover:drop-shadow-lg">
+            <path d="M 175 175 L 215 175 L 240 220 L 190 270 L 140 240 Z" fill={colors['Sukoharjo']} />
+            <text x="190" y="230" fill="#fff" fontSize="12" fontWeight="bold" textAnchor="middle" style={{textShadow: '0 1px 3px rgba(0,0,0,0.6)'}} pointerEvents="none">Sukoharjo</text>
+            <title>Sukoharjo</title>
+          </g>
           
           {/* Karanganyar (Right) */}
-          <path d="M 210 130 L 280 160 L 340 180 L 330 230 L 240 220 L 215 175 Z" fill={colors['Karanganyar']} />
-          <text x="275" y="190" fill="#fff" fontSize="10" fontWeight="bold" textAnchor="middle" style={{textShadow: '0 1px 2px rgba(0,0,0,0.5)'}}>Karanganyar</text>
+          <g className="hover:brightness-110 cursor-pointer transition-all hover:drop-shadow-lg">
+            <path d="M 210 130 L 280 160 L 340 180 L 330 230 L 240 220 L 215 175 Z" fill={colors['Karanganyar']} />
+            <text x="275" y="195" fill="#fff" fontSize="12" fontWeight="bold" textAnchor="middle" style={{textShadow: '0 1px 3px rgba(0,0,0,0.6)'}} pointerEvents="none">Karanganyar</text>
+            <title>Karanganyar</title>
+          </g>
           
           {/* Wonogiri (Bottom Right) */}
-          <path d="M 190 270 L 240 220 L 330 230 L 300 290 L 220 295 Z" fill={colors['Wonogiri']} />
-          <text x="260" y="265" fill="#fff" fontSize="10" fontWeight="bold" textAnchor="middle" style={{textShadow: '0 1px 2px rgba(0,0,0,0.5)'}}>Wonogiri</text>
+          <g className="hover:brightness-110 cursor-pointer transition-all hover:drop-shadow-lg">
+            <path d="M 190 270 L 240 220 L 330 230 L 300 290 L 220 295 Z" fill={colors['Wonogiri']} />
+            <text x="260" y="270" fill="#fff" fontSize="12" fontWeight="bold" textAnchor="middle" style={{textShadow: '0 1px 3px rgba(0,0,0,0.6)'}} pointerEvents="none">Wonogiri</text>
+            <title>Wonogiri</title>
+          </g>
         </g>
       </svg>
       
       {/* Zoom Controls */}
-      <div className="absolute bottom-4 left-4 flex flex-col bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
-        <button className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 border-b border-gray-200 dark:border-gray-700 font-bold">+</button>
-        <button className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 font-bold">-</button>
+      <div className="absolute bottom-4 left-4 flex flex-col bg-white/90 dark:bg-gray-800/90 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 backdrop-blur-sm">
+        <button className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 border-b border-gray-200 dark:border-gray-700 font-bold transition-colors">+</button>
+        <button className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 font-bold transition-colors">-</button>
       </div>
-      <div className="absolute top-4 right-4 bg-white dark:bg-gray-800 p-1.5 rounded-full shadow border border-gray-200 dark:border-gray-700">
+      <div className="absolute top-4 right-4 bg-white/90 dark:bg-gray-800/90 p-2 rounded-full shadow-md border border-gray-200 dark:border-gray-700 backdrop-blur-sm hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer transition-colors">
         <MapPinIcon className="w-4 h-4 text-gray-500" />
       </div>
     </div>
   );
 };
 
+import { useApp } from '../../context/AppContext';
+
 export const DashboardHeatMap: React.FC = () => {
   const [activeTab, setActiveTab] = useState('Daftar Nasabah Bermasalah');
+  const { openCustomer360 } = useApp();
 
   // Stats Data
   const stats = [
@@ -133,22 +156,22 @@ export const DashboardHeatMap: React.FC = () => {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
         {stats.map((stat, idx) => (
-          <div key={idx} className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700/50 flex flex-col gap-2">
-            <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 text-xs font-semibold">
-              <div className={`p-1.5 rounded-lg ${stat.bg} ${stat.color}`}>
+          <div key={idx} className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700/50 flex flex-col gap-2 min-w-0">
+            <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 text-xs font-semibold truncate">
+              <div className={`p-1.5 rounded-lg shrink-0 ${stat.bg} ${stat.color}`}>
                 <stat.icon className="w-4 h-4" />
               </div>
-              {stat.label}
+              <span className="truncate" title={stat.label}>{stat.label}</span>
             </div>
-            <div className="text-lg sm:text-xl font-black text-gray-800 dark:text-gray-100">
+            <div className="text-base xl:text-lg font-black text-gray-800 dark:text-gray-100 truncate" title={stat.value}>
               {stat.value}
             </div>
             {stat.trend && (
-              <div className={`text-[10px] font-bold flex items-center gap-1 ${stat.trendUp ? 'text-emerald-500' : 'text-red-500'}`}>
-                <ArrowTrendingUpIcon className={`w-3 h-3 ${stat.trendUp ? '' : 'rotate-180'}`} />
-                {stat.trend} dari periode sebelumnya
+              <div className={`text-[10px] font-bold flex items-center gap-1 truncate ${stat.trendUp ? 'text-emerald-500' : 'text-red-500'}`} title={`${stat.trend} dari periode sebelumnya`}>
+                <ArrowTrendingUpIcon className={`w-3 h-3 shrink-0 ${stat.trendUp ? '' : 'rotate-180'}`} />
+                <span className="truncate">{stat.trend} dari periode sebelumnya</span>
               </div>
             )}
           </div>
@@ -509,7 +532,10 @@ export const DashboardHeatMap: React.FC = () => {
                   <td className="py-3 px-4 text-right font-medium">{row.tgh}</td>
                   <td className="py-3 px-4 text-right font-medium">{row.angs}</td>
                   <td className="py-3 px-4 text-center">
-                    <button className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold rounded shadow-sm transition-colors">
+                    <button 
+                      onClick={() => openCustomer360('1')}
+                      className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold rounded shadow-sm transition-colors"
+                    >
                       Lihat
                     </button>
                   </td>
