@@ -113,6 +113,7 @@ export const TaskTableView: React.FC<TaskTableViewProps> = ({
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
   const [filterJenis, setFilterJenis] = useState<string>('ALL');
   const [filterPrioritas, setFilterPrioritas] = useState<string>('ALL');
+  const [filterRole, setFilterRole] = useState<'ALL' | 'PIC' | 'VALIDATOR'>('ALL');
   const [filterSearch, setFilterSearch] = useState<string>('');
   const [sortField, setSortField] = useState<'tanggal' | 'prioritas' | 'status'>('tanggal');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
@@ -283,6 +284,9 @@ export const TaskTableView: React.FC<TaskTableViewProps> = ({
       const isValidator = t.validator && t.validator.split(',').some((v: string) => v.trim().toLowerCase() === userNameLower);
       
       if (!isPic && !isValidator) return false;
+
+      if (filterRole === 'PIC' && !isPic) return false;
+      if (filterRole === 'VALIDATOR' && !isValidator) return false;
     }
 
     if (filterStatus !== 'ALL' && t.status !== filterStatus) return false;
@@ -338,7 +342,23 @@ export const TaskTableView: React.FC<TaskTableViewProps> = ({
 
       {/* Top Filter Bar */}
       <div className="p-4 sm:p-6 pb-2 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Role Filter (only shown if not Super Admin and they are assigned tasks) */}
+          {currentUser && currentUser.role !== 'Super Admin' && currentUser.roleTier !== 'Super Admin' && currentUser.roleTier !== 'TOP' && currentUser.role !== 'Master Admin' && (
+            <div className="relative">
+              <select
+                value={filterRole}
+                onChange={(e) => setFilterRole(e.target.value as any)}
+                className="appearance-none bg-white dark:bg-[#18181A] border border-gray-200/80 dark:border-gray-800 rounded-xl px-3 py-1.5 pr-8 text-xs font-bold text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 shadow-xs"
+              >
+                <option value="ALL">Semua Peran Saya</option>
+                <option value="PIC">Tugas Saya (PIC)</option>
+                <option value="VALIDATOR">Tugas Validasi</option>
+              </select>
+              <ChevronDown className="w-3.5 h-3.5 absolute right-2.5 top-2.5 text-gray-400 pointer-events-none" />
+            </div>
+          )}
+
           {/* BEIS Search Input */}
           <div className="relative">
             <input

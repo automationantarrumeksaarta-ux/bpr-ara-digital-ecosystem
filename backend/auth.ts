@@ -477,19 +477,20 @@ router.post('/tasks', (req, res) => {
       (id, tanggal, deskripsi_tugas, jenis_teknis, timeline, prioritas, status,
        tanggal_fu, penyelesaian, pic, assigned_to, validator, beis_domain, beis_level,
        beis_category, unit, output_dod, output_dod2, outcome, category, subcategory,
-       arahan, synced_to_calendar, evidence_files, mentions, created_by, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+       arahan, arahan_atasan, arahan_atasan_utama, synced_to_calendar, evidence_files, mentions, created_by, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
     `).run(
       t.id, t.tanggal || '', t.deskripsiTugas || '', t.jenisTeknis || '',
       t.timeline || '', t.prioritas || '', t.status || 'In Progress',
       t.tanggalFU || '', t.penyelesaian || '', t.pic || '', t.assignedTo || '',
-      t.validator || '', t.beisDomain || '', t.beisLevel || '',
-      t.beisCategory || '', t.unit || '', t.outputDoD || '', t.outputDoD2 || '',
-      t.outcome || '', t.category || '', t.subcategory || '',
-      t.arahan || '', t.syncedToCalendar ? 1 : 0, 
-      t.evidenceFiles ? JSON.stringify(t.evidenceFiles) : '[]',
-      t.mentions ? JSON.stringify(t.mentions) : '[]',
-      decoded.id || ''
+      t.validator || '', t.beisDomain || '', t.beisLevel || '', t.beisCategory || '',
+      t.unit || '', t.outputDoD || '', t.outputDoD2 || '', t.outcome || '',
+      t.category || '', t.subcategory || '', t.arahan || '',
+      t.arahanAtasan || '', t.arahanAtasanUtama || '',
+      t.syncedToCalendar ? 1 : 0, 
+      JSON.stringify(t.evidenceFiles || []),
+      JSON.stringify(t.mentions || []),
+      t.createdBy || ''
     );
 
     res.status(201).json({ message: 'Task created', id: t.id });
@@ -524,7 +525,9 @@ router.put('/tasks/:taskId', (req, res) => {
       beisLevel: 'beis_level', beisCategory: 'beis_category', unit: 'unit',
       outputDoD: 'output_dod', outputDoD2: 'output_dod2', outcome: 'outcome',
       category: 'category', subcategory: 'subcategory', arahan: 'arahan',
-      syncedToCalendar: 'synced_to_calendar', evidenceFiles: 'evidence_files'
+      arahanAtasan: 'arahan_atasan', arahanAtasanUtama: 'arahan_atasan_utama',
+      syncedToCalendar: 'synced_to_calendar', evidenceFiles: 'evidence_files',
+      mentions: 'mentions', createdBy: 'created_by'
     };
 
     for (const [jsKey, dbCol] of Object.entries(fieldMap)) {
@@ -532,7 +535,7 @@ router.put('/tasks/:taskId', (req, res) => {
         fields.push(`${dbCol} = ?`);
         if (jsKey === 'syncedToCalendar') {
           values.push(t[jsKey] ? 1 : 0);
-        } else if (jsKey === 'evidenceFiles') {
+        } else if (jsKey === 'evidenceFiles' || jsKey === 'mentions') {
           values.push(JSON.stringify(t[jsKey]));
         } else {
           values.push(t[jsKey]);

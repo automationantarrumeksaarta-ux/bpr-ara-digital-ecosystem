@@ -180,6 +180,8 @@ export function initDb() {
       category TEXT,
       subcategory TEXT,
       arahan TEXT,
+      arahan_atasan TEXT,
+      arahan_atasan_utama TEXT,
       synced_to_calendar INTEGER DEFAULT 0,
       evidence_files TEXT DEFAULT '[]',
       mentions TEXT DEFAULT '[]',
@@ -200,7 +202,7 @@ export function initDb() {
     );
   `);
 
-  // Add evidence_files column if it doesn't exist
+  // Add columns if they don't exist
   try {
     const tableInfo = db.prepare("PRAGMA table_info(beis_tasks)").all() as any[];
     const hasEvidenceFiles = tableInfo.some(col => col.name === 'evidence_files');
@@ -217,6 +219,16 @@ export function initDb() {
     if (!hasCreatedBy) {
       db.exec("ALTER TABLE beis_tasks ADD COLUMN created_by TEXT");
       console.log('Added created_by column to beis_tasks table.');
+    }
+    const hasArahanAtasan = tableInfo.some(col => col.name === 'arahan_atasan');
+    if (!hasArahanAtasan) {
+      db.exec("ALTER TABLE beis_tasks ADD COLUMN arahan_atasan TEXT");
+      console.log('Added arahan_atasan column to beis_tasks table.');
+    }
+    const hasArahanAtasanUtama = tableInfo.some(col => col.name === 'arahan_atasan_utama');
+    if (!hasArahanAtasanUtama) {
+      db.exec("ALTER TABLE beis_tasks ADD COLUMN arahan_atasan_utama TEXT");
+      console.log('Added arahan_atasan_utama column to beis_tasks table.');
     }
   } catch (e) {
     console.error('Error adding columns:', e);
