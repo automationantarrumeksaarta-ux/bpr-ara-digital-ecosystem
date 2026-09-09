@@ -303,83 +303,102 @@ export const DecisionQueue: React.FC<DecisionQueueProps> = ({ tasks, currentUser
                       <p className={`font-bold text-foreground ${approved ? 'line-through' : ''}`}>{t.assignedTo}</p>
                       <p className="text-xs text-muted uppercase">{t.unit}</p>
                     </td>
-                    <td className="px-4 py-3 max-w-sm align-top pt-4">
-                      <p className={`font-semibold text-foreground ${approved ? 'line-through' : ''}`}>{t.deskripsiTugas}</p>
-                      <p className="text-[10px] text-muted mt-1 mb-1">Target: {t.outputDoD}</p>
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className={`font-mono font-bold text-success text-[10px] ${approved ? 'line-through' : ''}`}>{t.taskId}</span>
-                        {t.status === 'Blocked' && (
-                          <span className="text-[9px] bg-danger/10 text-danger px-1 py-0.5 rounded font-sans">
-                            BLOCKED
-                          </span>
-                        )}
-                      </div>
-                      
-                      <div className="mt-3 space-y-3">
-                        {/* Arahan Atasan Utama (B -> A) */}
+                    <td className="px-4 py-4 max-w-sm align-top">
+                      <div className="flex flex-col gap-3">
+                        {/* Deskripsi & Meta */}
                         <div>
-                          <label className="block text-[10px] font-bold text-primary mb-1 flex items-center justify-between">
-                            <span>👑 Arahan Atasan Utama (B → A):</span>
-                            {!approved && (
-                              <div className="flex gap-0.5">
-                                {(['W', 'O', 'P', 'S'] as const).map(p => (
-                                  <button
-                                    key={p}
-                                    type="button"
-                                    onClick={() => {
-                                      const labels = { W: 'W: [Tujuan]: ', O: 'O: [Hambatan]: ', P: 'P: [Rencana]: ', S: 'S: [Langkah]: ' };
-                                      const currentVal = arahanUtamaInputs[t.id] ?? t.arahanAtasanUtama ?? '';
-                                      setArahanUtamaInputs({...arahanUtamaInputs, [t.id]: currentVal ? `${currentVal}\n${labels[p]}` : labels[p]});
-                                    }}
-                                    className="px-1 py-0.5 bg-primary-light text-primary rounded text-[9px] hover:bg-primary-light/80"
-                                  >
-                                    +{p}
-                                  </button>
-                                ))}
-                              </div>
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <span className={`font-mono font-bold text-emerald-600 dark:text-emerald-400 text-[10px] bg-emerald-50 dark:bg-emerald-950/30 px-1.5 py-0.5 rounded border border-emerald-100 dark:border-emerald-900/30 ${approved ? 'line-through opacity-50' : ''}`}>{t.taskId}</span>
+                            {t.status === 'Blocked' && (
+                              <span className="text-[9px] bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800/30 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
+                                Blocked
+                              </span>
                             )}
-                          </label>
-                          <textarea
-                            value={arahanUtamaInputs[t.id] ?? t.arahanAtasanUtama ?? ''}
-                            onChange={(e) => setArahanUtamaInputs({...arahanUtamaInputs, [t.id]: e.target.value})}
-                            placeholder="Arahan strategis dari Atasan Utama..."
-                            rows={2}
-                            disabled={approved}
-                            className="w-full text-[11px] p-2 bg-primary-light/30 border border-primary/20 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary"
-                          />
+                          </div>
+                          <p className={`text-xs font-semibold text-gray-900 dark:text-gray-100 leading-snug ${approved ? 'line-through opacity-50' : ''}`}>
+                            {t.deskripsiTugas}
+                          </p>
+                          {t.outputDoD && (
+                            <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-1 font-medium">
+                              <span className="w-1 h-1 rounded-full bg-gray-400 dark:bg-gray-600"></span>
+                              Target: {t.outputDoD}
+                            </p>
+                          )}
                         </div>
 
-                        {/* Arahan Supervisor (A -> Staff) */}
-                        <div>
-                          <label className="block text-[10px] font-bold text-primary-dark mb-1 flex items-center justify-between">
-                            <span>👔 Arahan Supervisor (A → Staff):</span>
-                            {!approved && (
-                              <div className="flex gap-0.5">
-                                {(['W', 'O', 'P', 'S'] as const).map(p => (
-                                  <button
-                                    key={p}
-                                    type="button"
-                                    onClick={() => {
-                                      const labels = { W: 'W: [Tujuan]: ', O: 'O: [Hambatan]: ', P: 'P: [Rencana]: ', S: 'S: [Langkah]: ' };
-                                      const currentVal = arahanInputs[t.id] ?? t.arahanAtasan ?? '';
-                                      setArahanInputs({...arahanInputs, [t.id]: currentVal ? `${currentVal}\n${labels[p]}` : labels[p]});
-                                    }}
-                                    className="px-1 py-0.5 bg-primary-light text-primary rounded text-[9px] hover:bg-primary-light/80"
-                                  >
-                                    +{p}
-                                  </button>
-                                ))}
-                              </div>
-                            )}
-                          </label>
-                          <textarea
-                            value={arahanInputs[t.id] ?? t.arahanAtasan ?? ''}
-                            onChange={(e) => setArahanInputs({...arahanInputs, [t.id]: e.target.value})}
-                            placeholder="Arahan operasional / WOPS di sini..."
-                            rows={2}
-                            disabled={approved}
-                            className="w-full text-[11px] p-2 bg-primary-light/30 border border-primary/20 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary"
-                          />
+                        {/* Arahan Inputs */}
+                        <div className="space-y-2.5 mt-1 border-t border-gray-100 dark:border-gray-800/60 pt-3">
+                          {/* Arahan Atasan Utama (B -> A) */}
+                          <div className="space-y-1.5">
+                            <div className="flex items-center justify-between">
+                              <label className="text-[10px] font-bold text-purple-700 dark:text-purple-400 flex items-center gap-1">
+                                <span>Arahan Eksekutif (B → A)</span>
+                              </label>
+                              {!approved && (
+                                <div className="flex gap-1">
+                                  {(['W', 'O', 'P', 'S'] as const).map(p => (
+                                    <button
+                                      key={p}
+                                      type="button"
+                                      onClick={() => {
+                                        const labels = { W: 'W: [Tujuan]: ', O: 'O: [Hambatan]: ', P: 'P: [Rencana]: ', S: 'S: [Langkah]: ' };
+                                        const currentVal = arahanUtamaInputs[t.id] ?? t.arahanAtasanUtama ?? '';
+                                        setArahanUtamaInputs({...arahanUtamaInputs, [t.id]: currentVal ? `${currentVal}\n${labels[p]}` : labels[p]});
+                                      }}
+                                      className="px-1.5 py-0.5 bg-gray-100 hover:bg-purple-100 dark:bg-gray-800 dark:hover:bg-purple-900/40 text-gray-500 hover:text-purple-700 dark:hover:text-purple-300 rounded text-[9px] font-bold transition-colors"
+                                      title={`Tambah ${p}`}
+                                    >
+                                      +{p}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            <textarea
+                              value={arahanUtamaInputs[t.id] ?? t.arahanAtasanUtama ?? ''}
+                              onChange={(e) => setArahanUtamaInputs({...arahanUtamaInputs, [t.id]: e.target.value})}
+                              placeholder="Ketik arahan strategis di sini..."
+                              rows={2}
+                              disabled={approved}
+                              className="w-full text-[11px] px-3 py-2 bg-purple-50/30 dark:bg-purple-950/10 border border-purple-100 dark:border-purple-900/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-300 dark:focus:border-purple-700 text-gray-800 dark:text-gray-200 placeholder-gray-400 resize-none transition-all"
+                            />
+                          </div>
+
+                          {/* Arahan Supervisor (A -> Staff) */}
+                          <div className="space-y-1.5">
+                            <div className="flex items-center justify-between">
+                              <label className="text-[10px] font-bold text-blue-700 dark:text-blue-400 flex items-center gap-1">
+                                <span>Arahan Supervisor (A → Staff)</span>
+                              </label>
+                              {!approved && (
+                                <div className="flex gap-1">
+                                  {(['W', 'O', 'P', 'S'] as const).map(p => (
+                                    <button
+                                      key={p}
+                                      type="button"
+                                      onClick={() => {
+                                        const labels = { W: 'W: [Tujuan]: ', O: 'O: [Hambatan]: ', P: 'P: [Rencana]: ', S: 'S: [Langkah]: ' };
+                                        const currentVal = arahanInputs[t.id] ?? t.arahanAtasan ?? '';
+                                        setArahanInputs({...arahanInputs, [t.id]: currentVal ? `${currentVal}\n${labels[p]}` : labels[p]});
+                                      }}
+                                      className="px-1.5 py-0.5 bg-gray-100 hover:bg-blue-100 dark:bg-gray-800 dark:hover:bg-blue-900/40 text-gray-500 hover:text-blue-700 dark:hover:text-blue-300 rounded text-[9px] font-bold transition-colors"
+                                      title={`Tambah ${p}`}
+                                    >
+                                      +{p}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            <textarea
+                              value={arahanInputs[t.id] ?? t.arahanAtasan ?? ''}
+                              onChange={(e) => setArahanInputs({...arahanInputs, [t.id]: e.target.value})}
+                              placeholder="Ketik arahan teknis / operasional..."
+                              rows={2}
+                              disabled={approved}
+                              className="w-full text-[11px] px-3 py-2 bg-blue-50/30 dark:bg-blue-950/10 border border-blue-100 dark:border-blue-900/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 dark:focus:border-blue-700 text-gray-800 dark:text-gray-200 placeholder-gray-400 resize-none transition-all"
+                            />
+                          </div>
                         </div>
                       </div>
                     </td>
