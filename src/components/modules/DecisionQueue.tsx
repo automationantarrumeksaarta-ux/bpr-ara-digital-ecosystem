@@ -18,6 +18,7 @@ export const DecisionQueue: React.FC<DecisionQueueProps> = ({ tasks, currentUser
   const [arahanInputs, setArahanInputs] = useState<Record<string, string>>({});
   const [arahanUtamaInputs, setArahanUtamaInputs] = useState<Record<string, string>>({});
   const [previewFile, setPreviewFile] = useState<EvidenceFile | null>(null);
+  const [editingArahanId, setEditingArahanId] = useState<string | null>(null);
   
   const allUsers = getAllUsersList();
   
@@ -335,30 +336,78 @@ export const DecisionQueue: React.FC<DecisionQueueProps> = ({ tasks, currentUser
                                 <span>Arahan / Catatan Validator</span>
                               </label>
                               <div className="flex gap-1">
-                                {(['W', 'O', 'P', 'S'] as const).map(p => (
+                                {editingArahanId === t.id ? (
+                                  (['W', 'O', 'P', 'S'] as const).map(p => (
+                                    <button
+                                      key={p}
+                                      type="button"
+                                      onClick={() => {
+                                        const labels = { W: 'W: [Tujuan]: ', O: 'O: [Hambatan]: ', P: 'P: [Rencana]: ', S: 'S: [Langkah]: ' };
+                                        const currentVal = arahanInputs[t.id] ?? t.arahanAtasan ?? '';
+                                        setArahanInputs({...arahanInputs, [t.id]: currentVal ? `${currentVal}\n${labels[p]}` : labels[p]});
+                                      }}
+                                      className="px-1.5 py-0.5 bg-gray-100 hover:bg-emerald-100 dark:bg-gray-800 dark:hover:bg-emerald-900/40 text-gray-500 hover:text-emerald-700 dark:hover:text-emerald-300 rounded text-[9px] font-bold transition-colors"
+                                      title={`Tambah ${p}`}
+                                    >
+                                      +{p}
+                                    </button>
+                                  ))
+                                ) : (
                                   <button
-                                    key={p}
-                                    type="button"
-                                    onClick={() => {
-                                      const labels = { W: 'W: [Tujuan]: ', O: 'O: [Hambatan]: ', P: 'P: [Rencana]: ', S: 'S: [Langkah]: ' };
-                                      const currentVal = arahanInputs[t.id] ?? t.arahanAtasan ?? '';
-                                      setArahanInputs({...arahanInputs, [t.id]: currentVal ? `${currentVal}\n${labels[p]}` : labels[p]});
-                                    }}
-                                    className="px-1.5 py-0.5 bg-gray-100 hover:bg-emerald-100 dark:bg-gray-800 dark:hover:bg-emerald-900/40 text-gray-500 hover:text-emerald-700 dark:hover:text-emerald-300 rounded text-[9px] font-bold transition-colors"
-                                    title={`Tambah ${p}`}
+                                    onClick={() => setEditingArahanId(t.id)}
+                                    className="px-2 py-0.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 rounded text-[9px] font-bold transition-colors"
                                   >
-                                    +{p}
+                                    Edit Arahan
                                   </button>
-                                ))}
+                                )}
                               </div>
                             </div>
-                            <textarea
-                              value={arahanInputs[t.id] ?? t.arahanAtasan ?? ''}
-                              onChange={(e) => setArahanInputs({...arahanInputs, [t.id]: e.target.value})}
-                              placeholder="Ketik arahan strategis, teknis, atau catatan perbaikan di sini..."
-                              rows={3}
-                              className="w-full text-[11px] px-3 py-2 bg-emerald-50/30 dark:bg-emerald-950/10 border border-emerald-100 dark:border-emerald-900/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-300 dark:focus:border-emerald-700 text-gray-800 dark:text-gray-200 placeholder-gray-400 resize-none transition-all"
-                            />
+                            
+                            {editingArahanId === t.id ? (
+                              <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1">
+                                <textarea
+                                  value={arahanInputs[t.id] ?? t.arahanAtasan ?? ''}
+                                  onChange={(e) => setArahanInputs({...arahanInputs, [t.id]: e.target.value})}
+                                  placeholder="Ketik arahan strategis, teknis, atau catatan perbaikan di sini..."
+                                  rows={3}
+                                  className="w-full text-[11px] px-3 py-2 bg-emerald-50/30 dark:bg-emerald-950/10 border border-emerald-100 dark:border-emerald-900/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-300 dark:focus:border-emerald-700 text-gray-800 dark:text-gray-200 placeholder-gray-400 resize-none transition-all"
+                                  autoFocus
+                                />
+                                <div className="flex justify-end gap-1.5">
+                                  <button
+                                    onClick={() => {
+                                      // Cancel edit, reset value
+                                      setArahanInputs({...arahanInputs, [t.id]: t.arahanAtasan || ''});
+                                      setEditingArahanId(null);
+                                    }}
+                                    className="px-3 py-1 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 text-[10px] font-bold rounded-lg transition-colors"
+                                  >
+                                    Batal
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      onUpdateTask({
+                                        ...t,
+                                        arahanAtasan: arahanInputs[t.id] !== undefined ? arahanInputs[t.id] : (t.arahanAtasan || ''),
+                                        updatedAt: new Date().toISOString()
+                                      });
+                                      setEditingArahanId(null);
+                                      alert("Arahan berhasil disimpan!");
+                                    }}
+                                    className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded-lg transition-colors shadow-sm"
+                                  >
+                                    Simpan
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div 
+                                className="w-full text-[11px] px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800/50 rounded-xl text-gray-800 dark:text-gray-300 min-h-[40px] whitespace-pre-wrap cursor-text hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                onClick={() => setEditingArahanId(t.id)}
+                              >
+                                {t.arahanAtasan ? t.arahanAtasan : <span className="text-gray-400 italic">Belum ada arahan... Klik untuk Edit</span>}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
