@@ -119,7 +119,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 export const AppRouter: React.FC = () => {
-  const { isAuthenticated, setIsAuthenticated, setCurrentUser, rolePermissions, currentUser, isAuthLoading, flowTasks } = useApp();
+  const { isAuthenticated, setIsAuthenticated, setCurrentUser, rolePermissions, currentUser, isAuthLoading, flowTasks, updateTask } = useApp();
 
   if (isAuthLoading) {
     return <FallbackLoading />;
@@ -181,7 +181,7 @@ export const AppRouter: React.FC = () => {
           <Route path="/operations/reports/beis" element={<BEISDashboard tasks={flowTasks} currentUser={currentUser!} />} />
           <Route path="/operations/reports/analytics" element={<ReportsAnalyticsView />} />
           <Route path="/operations/reports/center" element={<PlaceholderView title="Pusat Laporan & OJK" />} />
-          <Route path="/operations/decision-queue" element={<DecisionQueue tasks={flowTasks} currentUser={currentUser!} />} />
+          <Route path="/operations/decision-queue" element={<DecisionQueue tasks={flowTasks} currentUser={currentUser!} onUpdateTask={updateTask} />} />
           <Route path="/operations/calendar" element={<CalendarView tasks={flowTasks} onSyncCalendar={() => {}} />} />
           
           {/* People Group */}

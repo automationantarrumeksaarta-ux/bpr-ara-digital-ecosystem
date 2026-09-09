@@ -177,6 +177,7 @@ interface AppContextType {
   updatePtpStatus: (ptpId: string, status: PromiseToPayRecord['status'], brokenReason?: string) => void;
   createFlowTask: (taskData: Partial<TaskItem> & Partial<FlowTaskLegacy>) => void;
   updateTaskStatus: (taskId: string, status: any, progress?: number, evidenceNote?: string, options?: { evidenceFiles?: any[] }) => void;
+  updateTask: (updatedTask: TaskItem) => void;
   deleteFlowTask: (taskId: string) => void;
   resolveEwsAlert: (alertId: string, actionNote: string) => void;
   addEwsAlerts: (alerts: EwsAlert[]) => void;
@@ -1395,6 +1396,28 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     );
   };
 
+  const updateTask = (updatedTask: TaskItem) => {
+    setFlowTasks((prev) =>
+      prev.map((t) => {
+        if (t.id === updatedTask.id) {
+          // Sync full update to database
+          syncTaskToDb(updatedTask, 'PUT');
+
+          recordAuditLog(
+            'SYSTEM',
+            'SYSTEM',
+            '-',
+            'UPDATE',
+            `Update Detail Tugas "${updatedTask.deskripsiTugas}"`
+          );
+
+          return updatedTask;
+        }
+        return t;
+      })
+    );
+  };
+
   const deleteFlowTask = async (taskId: string) => {
     if (!window.confirm('Apakah Anda yakin ingin menghapus aktivitas ini?')) {
       return;
@@ -1681,6 +1704,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         updatePtpStatus,
         createFlowTask,
         updateTaskStatus,
+        updateTask,
         deleteFlowTask,
         resolveEwsAlert,
         addEwsAlerts,
