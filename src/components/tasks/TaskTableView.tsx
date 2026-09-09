@@ -578,34 +578,18 @@ export const TaskTableView: React.FC<TaskTableViewProps> = ({
                         </div>
                       </td>
 
-                      {/* Arahan Atasan (B -> A -> Staff) */}
-                      <td 
-                        className="py-3.5 px-4 max-w-xs cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors rounded-xl"
-                        onClick={() => setArahanModalTask(t)}
-                        title="Klik untuk melihat atau mengedit Arahan Atasan"
-                      >
-                        <div className="flex items-start justify-between gap-2 group">
-                          <div className="space-y-1 text-[11px] w-full">
-                            {t.arahanAtasanUtama && (
-                              <div className="text-purple-900 dark:text-purple-300 bg-purple-50/80 dark:bg-purple-950/40 p-1.5 rounded-lg border border-purple-100 dark:border-purple-900/40 font-serif italic">
-                                <span className="font-sans font-bold not-italic text-[10px] text-purple-700 dark:text-purple-400 block">👑 B → A:</span>
-                                <span className="line-clamp-2">{t.arahanAtasanUtama}</span>
-                              </div>
-                            )}
-                            {t.arahanAtasan && (
-                              <div className="text-blue-900 dark:text-blue-300 bg-blue-50/80 dark:bg-blue-950/40 p-1.5 rounded-lg border border-blue-100 dark:border-blue-900/40 font-serif italic">
-                                <span className="font-sans font-bold not-italic text-[10px] text-blue-700 dark:text-blue-400 block">👔 A → Staff:</span>
-                                <span className="line-clamp-2">{t.arahanAtasan}</span>
-                              </div>
-                            )}
-                            {!t.arahanAtasanUtama && !t.arahanAtasan && (
-                              <div className="text-center w-full">
-                                <span className="text-gray-400 dark:text-gray-500 italic font-serif text-[10px] border border-dashed border-gray-300 dark:border-gray-700 rounded p-1 block hover:bg-gray-200 dark:hover:bg-gray-700">
-                                  + Tambah Arahan
-                                </span>
-                              </div>
-                            )}
-                          </div>
+                      {/* Arahan Atasan */}
+                      <td className="py-3.5 px-4 max-w-xs align-top">
+                        <div className="space-y-2 text-[11px] text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                          {t.arahanAtasanUtama && (
+                            <div className="line-clamp-4" title={t.arahanAtasanUtama}>{t.arahanAtasanUtama}</div>
+                          )}
+                          {t.arahanAtasan && (
+                            <div className="line-clamp-4" title={t.arahanAtasan}>{t.arahanAtasan}</div>
+                          )}
+                          {!t.arahanAtasanUtama && !t.arahanAtasan && (
+                            <span className="text-gray-400 dark:text-gray-500 italic">-</span>
+                          )}
                         </div>
                       </td>
 
