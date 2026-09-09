@@ -83,10 +83,7 @@ export const DecisionQueue: React.FC<DecisionQueueProps> = ({ tasks, currentUser
     // Check if the current user is specifically named as the validator for this task
     let isNamedValidator = false;
     if (t.validator && currentUser.name) {
-      const nameParts = currentUser.name.toLowerCase().split(' ');
-      // Usually the first name or the role is in the validator string
-      // Let's check if any part of the name (longer than 2 chars) matches the validator string
-      isNamedValidator = nameParts.some(part => part.length > 2 && t.validator!.toLowerCase().includes(part));
+      isNamedValidator = t.validator.split(',').some((v: string) => v.trim().toLowerCase() === currentUser.name!.trim().toLowerCase());
     }
     
     // If we only strictly follow the matrix, Super Admin might see nothing if they aren't assigned as approver.
