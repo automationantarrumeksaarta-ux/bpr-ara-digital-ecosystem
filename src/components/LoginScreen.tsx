@@ -439,9 +439,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                       });
                       const regData = await res.json();
                       if (res.ok) {
-                        // Immediately login after register using the returned token
-                        localStorage.setItem('auth_token', regData.token);
-                        pendingUserRef.current = regData.user;
+                        // Registration successful, but needs admin approval
+                        alert(regData.message || 'Registrasi berhasil. Silakan tunggu admin untuk mengaktifkan akun Anda.');
+                        setActiveTab('login'); // switch to login tab
                         return true;
                       } else {
                         setErrorMsg(regData.error || 'Pendaftaran gagal');

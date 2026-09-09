@@ -71,8 +71,8 @@ router.post('/register', async (req, res) => {
     const userId = 'usr-' + Date.now().toString(36) + Math.random().toString(36).substring(2, 5);
 
     db.prepare(`
-      INSERT INTO users (id, username, email, password_hash, name, role, roleTier, unit)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO users (id, username, email, password_hash, name, role, roleTier, unit, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING')
     `).run(
       userId,
       username,
@@ -87,18 +87,8 @@ router.post('/register', async (req, res) => {
     // Delete OTP after successful use
     db.prepare('DELETE FROM otp_verifications WHERE email = ?').run(email);
 
-    // Create JWT
-    const payload = {
-      id: userId,
-      username,
-      email,
-      roleTier: roleTier || 'LOW',
-    };
-    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
-
     res.status(201).json({ 
-      message: 'User registered successfully',
-      token,
+      message: 'Registrasi berhasil. Silakan tunggu admin untuk memberikan akses Role kepada Anda sebelum dapat login.',
       user: {
         id: userId,
         username,
@@ -107,7 +97,7 @@ router.post('/register', async (req, res) => {
         role: role || 'User',
         roleTier: roleTier || 'LOW',
         unit: unit || 'PMO',
-        status: 'ACTIVE'
+        status: 'PENDING'
       }
     });
   } catch (error) {
@@ -133,6 +123,10 @@ router.post('/login-otp', async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {
       return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    if (user.status === 'PENDING') {
+      return res.status(403).json({ error: 'Akun Anda belum aktif. Silakan hubungi admin untuk memberikan Role dan mengaktifkan akun Anda.' });
     }
 
     let targetEmail = user.email;
