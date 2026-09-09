@@ -328,75 +328,36 @@ export const DecisionQueue: React.FC<DecisionQueueProps> = ({ tasks, currentUser
 
                         {/* Arahan Inputs */}
                         <div className="space-y-2.5 mt-1 border-t border-gray-100 dark:border-gray-800/60 pt-3">
-                          {/* Arahan Atasan Utama (B -> A) */}
+                          {/* Arahan Validator */}
                           <div className="space-y-1.5">
                             <div className="flex items-center justify-between">
-                              <label className="text-[10px] font-bold text-purple-700 dark:text-purple-400 flex items-center gap-1">
-                                <span>Arahan Eksekutif (B → A)</span>
+                              <label className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
+                                <span>Arahan / Catatan Validator</span>
                               </label>
-                              {!approved && (
-                                <div className="flex gap-1">
-                                  {(['W', 'O', 'P', 'S'] as const).map(p => (
-                                    <button
-                                      key={p}
-                                      type="button"
-                                      onClick={() => {
-                                        const labels = { W: 'W: [Tujuan]: ', O: 'O: [Hambatan]: ', P: 'P: [Rencana]: ', S: 'S: [Langkah]: ' };
-                                        const currentVal = arahanUtamaInputs[t.id] ?? t.arahanAtasanUtama ?? '';
-                                        setArahanUtamaInputs({...arahanUtamaInputs, [t.id]: currentVal ? `${currentVal}\n${labels[p]}` : labels[p]});
-                                      }}
-                                      className="px-1.5 py-0.5 bg-gray-100 hover:bg-purple-100 dark:bg-gray-800 dark:hover:bg-purple-900/40 text-gray-500 hover:text-purple-700 dark:hover:text-purple-300 rounded text-[9px] font-bold transition-colors"
-                                      title={`Tambah ${p}`}
-                                    >
-                                      +{p}
-                                    </button>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                            <textarea
-                              value={arahanUtamaInputs[t.id] ?? t.arahanAtasanUtama ?? ''}
-                              onChange={(e) => setArahanUtamaInputs({...arahanUtamaInputs, [t.id]: e.target.value})}
-                              placeholder="Ketik arahan strategis di sini..."
-                              rows={2}
-                              disabled={approved}
-                              className="w-full text-[11px] px-3 py-2 bg-purple-50/30 dark:bg-purple-950/10 border border-purple-100 dark:border-purple-900/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-300 dark:focus:border-purple-700 text-gray-800 dark:text-gray-200 placeholder-gray-400 resize-none transition-all"
-                            />
-                          </div>
-
-                          {/* Arahan Supervisor (A -> Staff) */}
-                          <div className="space-y-1.5">
-                            <div className="flex items-center justify-between">
-                              <label className="text-[10px] font-bold text-blue-700 dark:text-blue-400 flex items-center gap-1">
-                                <span>Arahan Supervisor (A → Staff)</span>
-                              </label>
-                              {!approved && (
-                                <div className="flex gap-1">
-                                  {(['W', 'O', 'P', 'S'] as const).map(p => (
-                                    <button
-                                      key={p}
-                                      type="button"
-                                      onClick={() => {
-                                        const labels = { W: 'W: [Tujuan]: ', O: 'O: [Hambatan]: ', P: 'P: [Rencana]: ', S: 'S: [Langkah]: ' };
-                                        const currentVal = arahanInputs[t.id] ?? t.arahanAtasan ?? '';
-                                        setArahanInputs({...arahanInputs, [t.id]: currentVal ? `${currentVal}\n${labels[p]}` : labels[p]});
-                                      }}
-                                      className="px-1.5 py-0.5 bg-gray-100 hover:bg-blue-100 dark:bg-gray-800 dark:hover:bg-blue-900/40 text-gray-500 hover:text-blue-700 dark:hover:text-blue-300 rounded text-[9px] font-bold transition-colors"
-                                      title={`Tambah ${p}`}
-                                    >
-                                      +{p}
-                                    </button>
-                                  ))}
-                                </div>
-                              )}
+                              <div className="flex gap-1">
+                                {(['W', 'O', 'P', 'S'] as const).map(p => (
+                                  <button
+                                    key={p}
+                                    type="button"
+                                    onClick={() => {
+                                      const labels = { W: 'W: [Tujuan]: ', O: 'O: [Hambatan]: ', P: 'P: [Rencana]: ', S: 'S: [Langkah]: ' };
+                                      const currentVal = arahanInputs[t.id] ?? t.arahanAtasan ?? '';
+                                      setArahanInputs({...arahanInputs, [t.id]: currentVal ? `${currentVal}\n${labels[p]}` : labels[p]});
+                                    }}
+                                    className="px-1.5 py-0.5 bg-gray-100 hover:bg-emerald-100 dark:bg-gray-800 dark:hover:bg-emerald-900/40 text-gray-500 hover:text-emerald-700 dark:hover:text-emerald-300 rounded text-[9px] font-bold transition-colors"
+                                    title={`Tambah ${p}`}
+                                  >
+                                    +{p}
+                                  </button>
+                                ))}
+                              </div>
                             </div>
                             <textarea
                               value={arahanInputs[t.id] ?? t.arahanAtasan ?? ''}
                               onChange={(e) => setArahanInputs({...arahanInputs, [t.id]: e.target.value})}
-                              placeholder="Ketik arahan teknis / operasional..."
-                              rows={2}
-                              disabled={approved}
-                              className="w-full text-[11px] px-3 py-2 bg-blue-50/30 dark:bg-blue-950/10 border border-blue-100 dark:border-blue-900/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 dark:focus:border-blue-700 text-gray-800 dark:text-gray-200 placeholder-gray-400 resize-none transition-all"
+                              placeholder="Ketik arahan strategis, teknis, atau catatan perbaikan di sini..."
+                              rows={3}
+                              className="w-full text-[11px] px-3 py-2 bg-emerald-50/30 dark:bg-emerald-950/10 border border-emerald-100 dark:border-emerald-900/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-300 dark:focus:border-emerald-700 text-gray-800 dark:text-gray-200 placeholder-gray-400 resize-none transition-all"
                             />
                           </div>
                         </div>

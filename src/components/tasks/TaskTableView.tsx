@@ -581,13 +581,9 @@ export const TaskTableView: React.FC<TaskTableViewProps> = ({
                       {/* Arahan Atasan */}
                       <td className="py-3.5 px-4 max-w-xs align-top">
                         <div className="space-y-2 text-[11px] text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                          {t.arahanAtasanUtama && (
-                            <div className="line-clamp-4" title={t.arahanAtasanUtama}>{t.arahanAtasanUtama}</div>
-                          )}
-                          {t.arahanAtasan && (
+                          {t.arahanAtasan ? (
                             <div className="line-clamp-4" title={t.arahanAtasan}>{t.arahanAtasan}</div>
-                          )}
-                          {!t.arahanAtasanUtama && !t.arahanAtasan && (
+                          ) : (
                             <span className="text-gray-400 dark:text-gray-500 italic">-</span>
                           )}
                         </div>
