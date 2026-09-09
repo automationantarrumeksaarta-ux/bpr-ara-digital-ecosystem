@@ -41,6 +41,14 @@ import { CBSDataCenterView } from '../components/modules/CBSDataCenterView';
 import { AppShell } from '../components/layout/AppShell';
 import { LoginScreen } from '../components/LoginScreen';
 
+// Mobile Components
+import { MobileLayout } from '../components/mobile/MobileLayout';
+import MobileHome from '../components/mobile/pages/MobileHome';
+import MobileAttendanceData from '../components/mobile/pages/MobileAttendanceData';
+import MobileLiveAttendance from '../components/mobile/pages/MobileLiveAttendance';
+import MobileNotifications from '../components/mobile/pages/MobileNotifications';
+import MobileProfile from '../components/mobile/pages/MobileProfile';
+
 const FallbackLoading = () => (
   <div className="p-6 flex items-center justify-center h-full">
     <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
@@ -200,10 +208,20 @@ export const AppRouter: React.FC = () => {
           
           {/* Legacy Group */}
           <Route path="/legacy/heat-map" element={<HeatMapView />} />
-          
-          {/* 404 Route */}
-          <Route path="*" element={<NotFound />} />
         </Route>
+
+        {/* Mobile View Routes (Independent of AppShell) */}
+        <Route element={<ProtectedRoute><MobileLayout /></ProtectedRoute>}>
+          <Route path="/mobile" element={<Navigate to="/mobile/home" replace />} />
+          <Route path="/mobile/home" element={<MobileHome />} />
+          <Route path="/mobile/attendance" element={<MobileAttendanceData />} />
+          <Route path="/mobile/live-attendance" element={<MobileLiveAttendance />} />
+          <Route path="/mobile/notifications" element={<MobileNotifications />} />
+          <Route path="/mobile/profile" element={<MobileProfile />} />
+        </Route>
+        
+        {/* 404 Route */}
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </Suspense>
   );

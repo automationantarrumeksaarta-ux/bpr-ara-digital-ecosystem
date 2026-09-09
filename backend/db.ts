@@ -200,6 +200,23 @@ export function initDb() {
       read INTEGER DEFAULT 0,
       timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
     );
+    CREATE TABLE IF NOT EXISTS attendances (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      date TEXT NOT NULL,
+      clock_in_time TEXT,
+      clock_out_time TEXT,
+      clock_in_lat REAL,
+      clock_in_lng REAL,
+      clock_out_lat REAL,
+      clock_out_lng REAL,
+      clock_in_location TEXT,
+      clock_out_location TEXT,
+      status TEXT DEFAULT 'Hadir',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(user_id, date)
+    );
   `);
 
   // Add columns if they don't exist
