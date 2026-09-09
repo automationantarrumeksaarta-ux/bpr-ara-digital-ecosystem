@@ -93,7 +93,8 @@ export const DecisionQueue: React.FC<DecisionQueueProps> = ({ tasks, currentUser
     if (!isMyTask) return false;
 
     // Khusus untuk tier TOP, hanya tampilkan yang sudah divalidasi approvernya
-    if (currentUser.roleTier === 'TOP') {
+    // KECUALI jika secara eksplisit ditunjuk sebagai validator untuk task tersebut
+    if (currentUser.roleTier === 'TOP' && !isNamedValidator) {
       if (t.status !== 'Validated Closed' && t.status !== 'Improved') {
         return false;
       }
