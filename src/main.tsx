@@ -3,6 +3,19 @@ import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 
+// Intercept fetch for Android APK - redirect API calls to VPS server
+const originalFetch = window.fetch;
+window.fetch = async (...args) => {
+  let [resource, config] = args;
+  const API_BASE = 'http://103.42.244.240:3535';
+  
+  if (typeof resource === 'string' && resource.startsWith('/api')) {
+    resource = `${API_BASE}${resource}`;
+  }
+  
+  return originalFetch(resource, config);
+};
+
 class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean, error: Error | null, info: any}> {
   state = { hasError: false, error: null, info: null };
 

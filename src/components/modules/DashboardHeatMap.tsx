@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { 
-  Coins as BanknotesIcon, 
-  Users as UserGroupIcon, 
-  FileText as DocumentTextIcon, 
-  AlertTriangle as ExclamationTriangleIcon, 
-  BarChart3 as ChartBarIcon, 
+import {
+  Coins as BanknotesIcon,
+  Users as UserGroupIcon,
+  FileText as DocumentTextIcon,
+  AlertTriangle as ExclamationTriangleIcon,
+  BarChart3 as ChartBarIcon,
   MapPin as MapPinIcon,
   Briefcase as BriefcaseIcon,
   TrendingUp as ArrowTrendingUpIcon,
@@ -23,23 +23,23 @@ const WILAYAH_COLORS = {
 };
 
 const SEKTOR_COLORS = {
-  Karanganyar: '#f97316', 
-  Sragen: '#fbbf24',      
-  Sukoharjo: '#f97316',   
-  Wonogiri: '#4ade80',    
-  Klaten: '#fbbf24',      
-  Boyolali: '#4ade80',    
-  Surakarta: '#ef4444',   
+  Karanganyar: '#f97316',
+  Sragen: '#fbbf24',
+  Sukoharjo: '#f97316',
+  Wonogiri: '#4ade80',
+  Klaten: '#fbbf24',
+  Boyolali: '#4ade80',
+  Surakarta: '#ef4444',
 };
 
 const TUJUAN_COLORS = {
-  Karanganyar: '#f97316', 
-  Sragen: '#fbbf24',      
-  Sukoharjo: '#f97316',   
-  Wonogiri: '#4ade80',    
-  Klaten: '#fbbf24',      
-  Boyolali: '#4ade80',    
-  Surakarta: '#ef4444',   
+  Karanganyar: '#f97316',
+  Sragen: '#fbbf24',
+  Sukoharjo: '#f97316',
+  Wonogiri: '#4ade80',
+  Klaten: '#fbbf24',
+  Boyolali: '#4ade80',
+  Surakarta: '#ef4444',
 };
 
 // SVG Component representing the Map
@@ -51,54 +51,54 @@ const SurakartaMap = ({ colors }: { colors: Record<string, string> }) => {
           {/* Boyolali (Top Left) */}
           <g className="hover:brightness-110 cursor-pointer transition-all hover:drop-shadow-lg">
             <path d="M 10 20 L 35 10 L 60 25 L 55 40 L 45 40 L 45 50 L 25 50 Z" fill={colors['Boyolali']} />
-            <text x="32" y="32" fill="#fff" fontSize="4" fontWeight="bold" textAnchor="middle" style={{textShadow: '0 0.5px 1px rgba(0,0,0,0.6)'}} pointerEvents="none">Boyolali</text>
+            <text x="32" y="32" fill="#fff" fontSize="4" fontWeight="bold" textAnchor="middle" style={{ textShadow: '0 0.5px 1px rgba(0,0,0,0.6)' }} pointerEvents="none">Boyolali</text>
             <title>Boyolali</title>
           </g>
-          
+
           {/* Klaten (Bottom Left) */}
           <g className="hover:brightness-110 cursor-pointer transition-all hover:drop-shadow-lg">
             <path d="M 25 50 L 45 50 L 40 60 L 35 75 L 20 80 L 15 60 Z" fill={colors['Klaten']} />
-            <text x="28" y="65" fill="#fff" fontSize="4" fontWeight="bold" textAnchor="middle" style={{textShadow: '0 0.5px 1px rgba(0,0,0,0.6)'}} pointerEvents="none">Klaten</text>
+            <text x="28" y="65" fill="#fff" fontSize="4" fontWeight="bold" textAnchor="middle" style={{ textShadow: '0 0.5px 1px rgba(0,0,0,0.6)' }} pointerEvents="none">Klaten</text>
             <title>Klaten</title>
           </g>
-          
+
           {/* Sragen (Top Right) */}
           <g className="hover:brightness-110 cursor-pointer transition-all hover:drop-shadow-lg">
             <path d="M 60 25 L 90 15 L 95 35 L 65 35 L 55 40 Z" fill={colors['Sragen']} />
-            <text x="75" y="27" fill="#fff" fontSize="4" fontWeight="bold" textAnchor="middle" style={{textShadow: '0 0.5px 1px rgba(0,0,0,0.6)'}} pointerEvents="none">Sragen</text>
+            <text x="75" y="27" fill="#fff" fontSize="4" fontWeight="bold" textAnchor="middle" style={{ textShadow: '0 0.5px 1px rgba(0,0,0,0.6)' }} pointerEvents="none">Sragen</text>
             <title>Sragen</title>
           </g>
-          
+
           {/* Surakarta (Center) */}
           <g className="hover:brightness-110 cursor-pointer transition-all hover:drop-shadow-lg z-10 relative">
             <path d="M 45 40 L 55 40 L 55 50 L 45 50 Z" fill={colors['Surakarta']} strokeWidth="0.8" />
-            <text x="50" y="46.5" fill="#fff" fontSize="2.5" fontWeight="900" textAnchor="middle" style={{textShadow: '0 0.5px 1px rgba(0,0,0,0.8)'}} pointerEvents="none">Solo</text>
+            <text x="50" y="46.5" fill="#fff" fontSize="2.5" fontWeight="900" textAnchor="middle" style={{ textShadow: '0 0.5px 1px rgba(0,0,0,0.8)' }} pointerEvents="none">Solo</text>
             <title>Surakarta</title>
           </g>
-          
+
           {/* Sukoharjo (Bottom Center) */}
           <g className="hover:brightness-110 cursor-pointer transition-all hover:drop-shadow-lg">
             <path d="M 45 50 L 55 50 L 60 60 L 50 85 L 35 75 L 40 60 Z" fill={colors['Sukoharjo']} />
-            <text x="47" y="68" fill="#fff" fontSize="4" fontWeight="bold" textAnchor="middle" style={{textShadow: '0 0.5px 1px rgba(0,0,0,0.6)'}} pointerEvents="none">Sukoharjo</text>
+            <text x="47" y="68" fill="#fff" fontSize="4" fontWeight="bold" textAnchor="middle" style={{ textShadow: '0 0.5px 1px rgba(0,0,0,0.6)' }} pointerEvents="none">Sukoharjo</text>
             <title>Sukoharjo</title>
           </g>
-          
+
           {/* Karanganyar (Right) */}
           <g className="hover:brightness-110 cursor-pointer transition-all hover:drop-shadow-lg">
             <path d="M 65 35 L 95 35 L 85 60 L 60 60 L 55 50 L 55 40 Z" fill={colors['Karanganyar']} />
-            <text x="75" y="48" fill="#fff" fontSize="4" fontWeight="bold" textAnchor="middle" style={{textShadow: '0 0.5px 1px rgba(0,0,0,0.6)'}} pointerEvents="none">Karanganyar</text>
+            <text x="75" y="48" fill="#fff" fontSize="4" fontWeight="bold" textAnchor="middle" style={{ textShadow: '0 0.5px 1px rgba(0,0,0,0.6)' }} pointerEvents="none">Karanganyar</text>
             <title>Karanganyar</title>
           </g>
-          
+
           {/* Wonogiri (Bottom Right) */}
           <g className="hover:brightness-110 cursor-pointer transition-all hover:drop-shadow-lg">
             <path d="M 60 60 L 85 60 L 90 90 L 70 100 L 50 85 Z" fill={colors['Wonogiri']} />
-            <text x="70" y="80" fill="#fff" fontSize="4" fontWeight="bold" textAnchor="middle" style={{textShadow: '0 0.5px 1px rgba(0,0,0,0.6)'}} pointerEvents="none">Wonogiri</text>
+            <text x="70" y="80" fill="#fff" fontSize="4" fontWeight="bold" textAnchor="middle" style={{ textShadow: '0 0.5px 1px rgba(0,0,0,0.6)' }} pointerEvents="none">Wonogiri</text>
             <title>Wonogiri</title>
           </g>
         </g>
       </svg>
-      
+
       {/* Zoom Controls */}
       <div className="absolute bottom-4 left-4 flex flex-col bg-white/90 dark:bg-gray-800/90 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 backdrop-blur-sm">
         <button className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 border-b border-gray-200 dark:border-gray-700 font-bold transition-colors">+</button>
@@ -129,7 +129,7 @@ export const DashboardHeatMap: React.FC = () => {
 
   return (
     <div className="w-full h-full p-4 sm:p-6 lg:p-8 overflow-y-auto space-y-6">
-      
+
       {/* Title & Filters */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
         <div>
@@ -140,11 +140,11 @@ export const DashboardHeatMap: React.FC = () => {
             Analisis Persebaran Pembiayaan, Nasabah Bermasalah, dan Kontribusi AO Karesidenan Surakarta
           </p>
         </div>
-        
+
         <div className="flex flex-wrap gap-2">
           {['Periode: Jan 2024 - Des 2024', 'Cabang: Semua Cabang', 'AO: Semua AO', 'Kabupaten: Semua Kabupaten', 'Kecamatan: Semua Kecamatan'].map((filter, i) => (
             <button key={i} className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-xs font-semibold text-gray-600 dark:text-gray-300 shadow-sm hover:bg-gray-50 transition-colors">
-              {filter.split(': ')[0] === 'Periode' ? <ChartBarIcon className="w-3.5 h-3.5"/> : <MapPinIcon className="w-3.5 h-3.5"/>}
+              {filter.split(': ')[0] === 'Periode' ? <ChartBarIcon className="w-3.5 h-3.5" /> : <MapPinIcon className="w-3.5 h-3.5" />}
               <div className="flex flex-col items-start leading-none">
                 <span className="text-[9px] text-gray-400">{filter.split(': ')[0]}</span>
                 <span>{filter.split(': ')[1]}</span>
@@ -195,7 +195,7 @@ export const DashboardHeatMap: React.FC = () => {
               <p className="text-[10px] text-gray-500 mt-1">Sebaran tingkat risiko nasabah bermasalah di wilayah Karesidenan Surakarta</p>
             </div>
           </div>
-          
+
           <div className="flex items-center justify-center gap-4 text-[9px] font-bold text-gray-500 mb-4">
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#4ade80]"></span> Rendah</span>
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#fbbf24]"></span> Sedang</span>
@@ -241,7 +241,7 @@ export const DashboardHeatMap: React.FC = () => {
               <p className="text-[10px] text-gray-500 mt-1">Kontribusi jumlah nasabah bermasalah per sektor usaha</p>
             </div>
           </div>
-          
+
           <div className="flex items-center justify-center gap-4 text-[9px] font-bold text-gray-500 mb-4">
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#4ade80]"></span> Rendah</span>
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#fbbf24]"></span> Sedang</span>
@@ -288,7 +288,7 @@ export const DashboardHeatMap: React.FC = () => {
               <p className="text-[10px] text-gray-500 mt-1">Rasio nasabah bermasalah berdasarkan tujuan penggunaan dana</p>
             </div>
           </div>
-          
+
           <div className="flex items-center justify-center gap-4 text-[9px] font-bold text-gray-500 mb-4">
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#4ade80]"></span> Rendah</span>
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#fbbf24]"></span> Sedang</span>
@@ -326,26 +326,26 @@ export const DashboardHeatMap: React.FC = () => {
 
       {/* Tables and Matrix Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
+
         {/* Heat Map Wilayah Table */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700/50 p-5 col-span-1">
           <h3 className="text-sm font-bold text-gray-800 dark:text-gray-100 mb-1">Heat Map Nasabah Bermasalah per Wilayah</h3>
           <p className="text-[10px] text-gray-500 mb-4">Semakin merah warna, semakin tinggi jumlah nasabah bermasalah</p>
-          
+
           <div className="flex flex-col gap-4">
             <div className="w-full flex justify-center mb-2">
-               <div className="w-1/2 aspect-[4/3]">
-                 <SurakartaMap colors={WILAYAH_COLORS} />
-               </div>
+              <div className="w-1/2 aspect-[4/3]">
+                <SurakartaMap colors={WILAYAH_COLORS} />
+              </div>
             </div>
             <div className="w-full">
               <table className="w-full text-left text-xs text-gray-600 dark:text-gray-400">
                 <thead className="text-[10px] font-bold text-gray-500 border-b border-gray-100 dark:border-gray-800">
                   <tr>
                     <th className="pb-2">Kabupaten/Kota</th>
-                    <th className="pb-2 text-center">Jumlah Nasabah<br/>Bermasalah</th>
-                    <th className="pb-2 text-center">Rasio<br/>Bermasalah</th>
-                    <th className="pb-2 text-right">Baki Debet<br/>Bermasalah</th>
+                    <th className="pb-2 text-center">Jumlah Nasabah<br />Bermasalah</th>
+                    <th className="pb-2 text-center">Rasio<br />Bermasalah</th>
+                    <th className="pb-2 text-right">Baki Debet<br />Bermasalah</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50 dark:divide-gray-800/50">
@@ -382,16 +382,16 @@ export const DashboardHeatMap: React.FC = () => {
             Ranking AO (Kontribusi Nasabah Bermasalah)
           </h3>
           <p className="text-[10px] text-gray-500 mb-4">&nbsp;</p>
-          
+
           <table className="w-full text-left text-xs text-gray-600 dark:text-gray-400">
             <thead className="text-[10px] font-bold text-gray-500 border-b border-gray-100 dark:border-gray-800">
               <tr>
                 <th className="pb-2">Peringkat</th>
                 <th className="pb-2">AO</th>
-                <th className="pb-2 text-center">Total<br/>Nasabah</th>
+                <th className="pb-2 text-center">Total<br />Nasabah</th>
                 <th className="pb-2 text-center">Bermasalah</th>
                 <th className="pb-2 text-center">Rasio</th>
-                <th className="pb-2 text-right">Baki Debet<br/>Bermasalah</th>
+                <th className="pb-2 text-right">Baki Debet<br />Bermasalah</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50 dark:divide-gray-800/50">
@@ -430,7 +430,7 @@ export const DashboardHeatMap: React.FC = () => {
             Risk Matrix (Wilayah x Nominal vs Rasio)
           </h3>
           <p className="text-[10px] text-gray-500 mb-6">&nbsp;</p>
-          
+
           <div className="relative w-full aspect-square max-w-[300px] mx-auto flex flex-col items-center justify-center p-6 border-l-2 border-b-2 border-gray-300 dark:border-gray-600 mt-4">
             {/* Axis Labels */}
             <div className="absolute -left-6 top-1/2 -translate-y-1/2 -rotate-90 text-[10px] font-bold text-gray-500">
@@ -439,7 +439,7 @@ export const DashboardHeatMap: React.FC = () => {
             <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[10px] font-bold text-gray-500">
               Nominal Bermasalah (Baki Debet)
             </div>
-            
+
             {/* Axis Scales */}
             <div className="absolute -left-1 top-0 text-[9px] text-gray-400 -translate-x-full">Tinggi</div>
             <div className="absolute -left-1 bottom-0 text-[9px] text-gray-400 -translate-x-full">Rendah</div>
@@ -454,25 +454,25 @@ export const DashboardHeatMap: React.FC = () => {
                 <span className="text-white/90 font-medium text-[9px] mt-1">Sragen, Sukoharjo</span>
                 <div className="absolute inset-0 border-2 border-transparent group-hover:border-white rounded-tl-lg"></div>
               </div>
-              
+
               {/* Q1: Prioritas (High Ratio, High Nominal) */}
               <div className="bg-rose-500/90 rounded-tr-lg flex flex-col items-center justify-center p-2 text-center hover:bg-rose-600 transition-colors cursor-pointer group relative">
                 <span className="text-white font-black text-xs">Prioritas</span>
                 <span className="text-white/90 font-medium text-[9px] mt-1">Karanganyar</span>
                 <div className="absolute inset-0 border-2 border-transparent group-hover:border-white rounded-tr-lg"></div>
               </div>
-              
+
               {/* Q3: Sehat (Low Ratio, Low Nominal) */}
               <div className="bg-emerald-400/80 rounded-bl-lg flex flex-col items-center justify-center p-2 text-center hover:bg-emerald-500 transition-colors cursor-pointer group relative">
                 <span className="text-white font-black text-xs">Sehat</span>
                 <span className="text-white/90 font-medium text-[9px] mt-1">Wonogiri, Klaten, Boyolali</span>
                 <div className="absolute inset-0 border-2 border-transparent group-hover:border-white rounded-bl-lg"></div>
               </div>
-              
+
               {/* Q4: Monitor (Low Ratio, High Nominal) */}
               <div className="bg-amber-400/80 rounded-br-lg flex flex-col items-center justify-center p-2 text-center hover:bg-amber-500 transition-colors cursor-pointer group relative">
                 <span className="text-white font-black text-xs">Monitor</span>
-                <span className="text-white/90 font-medium text-[9px] mt-1">(Portfolio besar)<br/>Surakarta</span>
+                <span className="text-white/90 font-medium text-[9px] mt-1">(Portfolio besar)<br />Surakarta</span>
                 <div className="absolute inset-0 border-2 border-transparent group-hover:border-white rounded-br-lg"></div>
               </div>
             </div>
@@ -485,7 +485,7 @@ export const DashboardHeatMap: React.FC = () => {
         {/* Tabs */}
         <div className="flex border-b border-gray-100 dark:border-gray-800 overflow-x-auto">
           {['Daftar Nasabah Bermasalah', 'Detail per Wilayah', 'Detail per AO', 'Detail per Sektor', 'Detail per Tujuan'].map((tab) => (
-            <button 
+            <button
               key={tab}
               onClick={() => setActiveTab(tab)}
               className={`px-6 py-3.5 text-xs font-bold whitespace-nowrap transition-colors border-b-2 ${activeTab === tab ? 'border-blue-600 text-blue-600 bg-blue-50/50 dark:bg-blue-900/10 dark:border-blue-500 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 dark:hover:text-gray-300'}`}
@@ -536,7 +536,7 @@ export const DashboardHeatMap: React.FC = () => {
                   <td className="py-3 px-4 text-right font-medium">{row.tgh}</td>
                   <td className="py-3 px-4 text-right font-medium">{row.angs}</td>
                   <td className="py-3 px-4 text-center">
-                    <button 
+                    <button
                       onClick={() => openCustomer360('1')}
                       className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold rounded shadow-sm transition-colors"
                     >

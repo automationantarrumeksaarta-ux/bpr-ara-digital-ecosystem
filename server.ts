@@ -7,6 +7,7 @@ import dotenv from 'dotenv';
 import compression from 'compression';
 import fs from 'fs';
 import multer from 'multer';
+import cors from 'cors';
 import parserRoutes from './backend/parser.js';
 import { initDb } from './backend/db.js';
 
@@ -25,6 +26,7 @@ const _dirname = typeof __dirname !== 'undefined' ? __dirname : path.dirname(_fi
 const app = express();
 const PORT = Number(process.env.PORT) || 3535;
 
+app.use(cors());
 app.use(compression());
 app.use(express.json());
 
