@@ -298,9 +298,9 @@ export const TaskTableView: React.FC<TaskTableViewProps> = ({
     return true;
   }).sort((a, b) => {
     if (sortField === 'tanggal') {
-      return sortDirection === 'desc' 
-        ? new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime()
-        : new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime();
+      const timeA = new Date(a.tanggal || 0).getTime() || 0;
+      const timeB = new Date(b.tanggal || 0).getTime() || 0;
+      return sortDirection === 'desc' ? timeB - timeA : timeA - timeB;
     }
     return 0;
   });
