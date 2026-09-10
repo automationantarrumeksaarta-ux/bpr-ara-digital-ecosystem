@@ -37,6 +37,18 @@ const LABEL_PENDEK: Record<string, string> = {
   'Field Survey': 'Survey\nLapangan',
 };
 
+/**
+ * Modul yang sudah punya layar versi APK tersendiri.
+ *
+ * Modul di luar daftar ini tetap membuka halaman web-nya di dalam WebView.
+ * Halaman web dirancang untuk layar lebar, jadi terasa sempit di HP — modul
+ * yang sering dipakai di lapangan sebaiknya dipindah ke daftar ini.
+ */
+const VERSI_MOBILE: Record<string, string> = {
+  EXECUTIVE_DASHBOARD: '/mobile/ringkasan',
+  FLOW_TASKS: '/mobile/tugas',
+};
+
 /** Modul yang memang hanya hidup di mobile — belum ada halaman web-nya. */
 const MOBILE_ONLY: MobileMenuItem[] = [
   { id: 'ACTIVITIES', label: 'Activities', icon: Activity, path: '/mobile/activities', mobileOnly: true },
@@ -58,7 +70,7 @@ export function useMobileMenu(limit?: number): { items: MobileMenuItem[]; total:
       id: item.id,
       label: LABEL_PENDEK[item.title] ?? item.title,
       icon: item.icon,
-      path: item.path!,
+      path: VERSI_MOBILE[item.id] ?? item.path!,
     }));
 
     // Buang duplikat path bila satu modul muncul di lebih dari satu grup.

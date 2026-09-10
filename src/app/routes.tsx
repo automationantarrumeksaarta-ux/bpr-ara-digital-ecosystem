@@ -50,6 +50,8 @@ import MobileLiveAttendance from '../components/mobile/pages/MobileLiveAttendanc
 import MobileNotifications from '../components/mobile/pages/MobileNotifications';
 import MobileProfile from '../components/mobile/pages/MobileProfile';
 import { MobileActivities, MobileInfoGaji } from '../components/mobile/pages/MobileComingSoon';
+import MobileDashboard from '../components/mobile/pages/MobileDashboard';
+import MobileTaskBoard from '../components/mobile/pages/MobileTaskBoard';
 
 const FallbackLoading = () => (
   <div className="p-6 flex items-center justify-center h-full">
@@ -209,6 +211,10 @@ export const AppRouter: React.FC = () => {
           <Route path="/mobile/live-attendance" element={<MobileLiveAttendance />} />
           <Route path="/mobile/notifications" element={<MobileNotifications />} />
           <Route path="/mobile/profile" element={<MobileProfile />} />
+          {/* Modul web yang sudah punya layar versi APK tersendiri */}
+          <Route path="/mobile/ringkasan" element={<MobileDashboard />} />
+          <Route path="/mobile/tugas" element={<MobileTaskBoard />} />
+
           {/* Modul khusus mobile — belum ada padanannya di web */}
           <Route path="/mobile/activities" element={<MobileActivities />} />
           <Route path="/mobile/info-gaji" element={<MobileInfoGaji />} />
