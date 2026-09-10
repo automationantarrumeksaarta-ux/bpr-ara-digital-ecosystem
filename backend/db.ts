@@ -203,6 +203,42 @@ export function initDb() {
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
+    -- Aktivitas lapangan: foto + lokasi + keterangan, dicatat dari aplikasi.
+    -- Daftar di aplikasi hanya menampilkan hari berjalan supaya tetap ringkas;
+    -- seluruh riwayat tetap tersimpan dan dibaca dari menu Marketing di web.
+    CREATE TABLE IF NOT EXISTS activities (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      user_name TEXT,
+      date TEXT NOT NULL,
+      photo_url TEXT,
+      lat REAL,
+      lng REAL,
+      location TEXT,
+      description TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- Slip gaji yang sudah disetujui HR di halaman Payroll web.
+    -- Aplikasi hanya boleh menampilkan yang berstatus APPROVED.
+    CREATE TABLE IF NOT EXISTS payroll_slips (
+      id TEXT PRIMARY KEY,
+      period TEXT NOT NULL,            -- YYYY-MM
+      employee_id TEXT NOT NULL,
+      employee_name TEXT,
+      role TEXT,
+      base_salary REAL DEFAULT 0,
+      meal_allowance REAL DEFAULT 0,
+      incentive REAL DEFAULT 0,
+      deductions REAL DEFAULT 0,
+      macro_grade TEXT,
+      status TEXT DEFAULT 'DRAFT',     -- DRAFT | APPROVED
+      approved_by TEXT,
+      approved_at DATETIME,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(period, employee_id)
+    );
+
     CREATE TABLE IF NOT EXISTS notifications (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,

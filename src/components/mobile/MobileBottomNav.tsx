@@ -12,6 +12,18 @@ interface Tab {
   primary?: boolean;
 }
 
+/**
+ * Kelima rute ini adalah tab sejajar — hanya di sinilah navigasi bawah muncul.
+ * Layar lain (modul yang dibuka dari menu beranda) memakai tombol kembali.
+ */
+export const TAB_UTAMA = [
+  '/mobile/home',
+  '/mobile/attendance',
+  '/mobile/live-attendance',
+  '/mobile/notifications',
+  '/mobile/profile',
+] as const;
+
 const TABS: Tab[] = [
   { name: 'Beranda', path: '/mobile/home', icon: Home },
   { name: 'Absensi', path: '/mobile/attendance', icon: CalendarDays },

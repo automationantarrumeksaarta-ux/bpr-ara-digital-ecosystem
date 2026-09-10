@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { CalendarDays, ClipboardList, Search, User2, X } from 'lucide-react';
+import { CalendarDays, ClipboardList, Plus, Search, User2, X } from 'lucide-react';
 import { useApp } from '../../../context/AppContext';
 import { AppBar, Card, EmptyState, Screen, Stack } from '../ui/primitives';
 import { ink, radius, surface, text, tone, HIT_TARGET, type ToneName } from '../ui/tokens';
@@ -65,10 +65,11 @@ const tenggat = (tanggal?: string): { teks: string; mendesak: boolean } | null =
 };
 
 const MobileTaskBoard: React.FC = () => {
-  const { flowTasks, currentUser } = useApp();
+  const { flowTasks, currentUser, createFlowTask, allUsers } = useApp() as any;
   const [tahap, setTahap] = useState<Tahap>('aktif');
   const [cari, setCari] = useState('');
   const [hanyaSaya, setHanyaSaya] = useState(false);
+  const [formTerbuka, setFormTerbuka] = useState(false);
 
   const namaSaya = (currentUser?.name ?? '').trim().toLowerCase();
   const tabSaya = ((currentUser as any)?.assignedMemberTab ?? '').trim().toLowerCase();
@@ -111,7 +112,7 @@ const MobileTaskBoard: React.FC = () => {
     <Screen>
       <AppBar title="Task Board" back />
 
-      <Stack className="gap-4">
+      <Stack className="gap-4 pb-24">
         {/* --- Pencarian --- */}
         <label className={`flex items-center gap-2.5 px-3.5 ${HIT_TARGET} ${surface.card} ${radius.control} border ${surface.divider}`}>
           <Search className={`w-4 h-4 shrink-0 ${ink.faint}`} />
@@ -219,9 +220,163 @@ const MobileTaskBoard: React.FC = () => {
           </Card>
         )}
 
-        <div className="h-2" />
       </Stack>
+
+      {/*
+        Satu aksi utama layar ini: membuat tugas. Diangkat dari bawah supaya
+        tidak bertabrakan dengan gesture bar sistem.
+      */}
+      <button
+        type="button"
+        onClick={() => setFormTerbuka(true)}
+        aria-label="Buat tugas baru"
+        className="fixed bottom-8 right-5 z-40 w-14 h-14 rounded-full bg-primary text-white shadow-lg shadow-primary/30 flex items-center justify-center active:scale-95 transition-transform"
+        style={{ marginBottom: 'env(safe-area-inset-bottom)' }}
+      >
+        <Plus className="w-7 h-7" strokeWidth={2.2} />
+      </button>
+
+      {formTerbuka && <FormTugas onTutup={() => setFormTerbuka(false)} onTersimpan={() => { setFormTerbuka(false); }} />}
     </Screen>
+  );
+};
+
+/* ------------------------------------------------------------------ form */
+
+const PRIORITAS = ['P1', 'P2', 'P3', 'P4', 'P5'] as const;
+
+/**
+ * Form tugas baru — lembar penuh, bukan dialog.
+ *
+ * Di layar HP, dialog kecil menyisakan sedikit ruang untuk papan ketik dan
+ * membuat isian terdorong keluar layar. Lembar penuh memberi seluruh tinggi
+ * layar dan tetap punya satu jalan keluar yang jelas di kiri atas.
+ */
+const FormTugas: React.FC<{ onTutup: () => void; onTersimpan: () => void }> = ({ onTutup, onTersimpan }) => {
+  const { createFlowTask, currentUser, allUsers } = useApp() as any;
+
+  const [deskripsi, setDeskripsi] = useState('');
+  const [prioritas, setPrioritas] = useState<string>('P3');
+  const [pic, setPic] = useState<string>(currentUser?.name ?? '');
+  const [tenggatTgl, setTenggatTgl] = useState('');
+  const [menyimpan, setMenyimpan] = useState(false);
+
+  const simpan = () => {
+    if (!deskripsi.trim()) return;
+    setMenyimpan(true);
+    createFlowTask({
+      deskripsiTugas: deskripsi.trim(),
+      prioritas,
+      assignedTo: pic,
+      pic,
+      tanggalFU: tenggatTgl || undefined,
+      status: 'Planned',
+    });
+    onTersimpan();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col bg-white">
+      <header
+        className={`shrink-0 border-b ${surface.divider} flex items-center gap-1 h-12 px-1`}
+        style={{ paddingTop: 'env(safe-area-inset-top)' }}
+      >
+        <button
+          type="button"
+          onClick={onTutup}
+          aria-label="Batal"
+          className={`w-11 h-11 flex items-center justify-center ${ink.base} active:opacity-50`}
+        >
+          <X className="w-6 h-6" />
+        </button>
+        <h1 className={`${text.title} ${ink.strong} flex-1`}>Tugas baru</h1>
+      </header>
+
+      <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-5">
+        <label className="flex flex-col gap-1.5">
+          <span className={`${text.caption} ${ink.muted} uppercase tracking-wide font-semibold px-1`}>
+            Deskripsi tugas
+          </span>
+          <textarea
+            value={deskripsi}
+            onChange={e => setDeskripsi(e.target.value)}
+            rows={3}
+            autoFocus
+            placeholder="Mis. Kunjungan penagihan debitur an. Budi Santoso"
+            className={`w-full px-3.5 py-3 ${radius.control} border ${surface.divider} ${text.body} ${ink.strong} placeholder:text-slate-400 outline-none focus:border-blue-500 resize-none`}
+          />
+        </label>
+
+        <div className="flex flex-col gap-1.5">
+          <span className={`${text.caption} ${ink.muted} uppercase tracking-wide font-semibold px-1`}>
+            Prioritas
+          </span>
+          <div className="flex gap-2">
+            {PRIORITAS.map(p => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => setPrioritas(p)}
+                className={`flex-1 min-h-[44px] ${radius.control} ${text.body} font-semibold border transition-colors ${
+                  prioritas === p
+                    ? 'bg-primary text-white border-transparent'
+                    : `${surface.card} ${ink.base} ${surface.divider}`
+                }`}
+              >
+                {p}
+              </button>
+            ))}
+          </div>
+          <span className={`${text.caption} ${ink.faint} px-1`}>P1 paling mendesak, P5 paling longgar</span>
+        </div>
+
+        <label className="flex flex-col gap-1.5">
+          <span className={`${text.caption} ${ink.muted} uppercase tracking-wide font-semibold px-1`}>
+            Penanggung jawab
+          </span>
+          <div className={`relative flex items-center px-3.5 min-h-[44px] ${surface.card} ${radius.control} border ${surface.divider}`}>
+            <span className={`flex-1 ${text.body} ${ink.strong} truncate`}>{pic || 'Pilih'}</span>
+            <User2 className={`w-4 h-4 ${ink.faint}`} />
+            <select
+              value={pic}
+              onChange={e => setPic(e.target.value)}
+              aria-label="Penanggung jawab"
+              className="absolute inset-0 w-full h-full opacity-0"
+            >
+              {[currentUser?.name, ...(allUsers ?? []).map((u: any) => u.name)]
+                .filter((v, i, arr) => v && arr.indexOf(v) === i)
+                .map((n: string) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </div>
+        </label>
+
+        <label className="flex flex-col gap-1.5">
+          <span className={`${text.caption} ${ink.muted} uppercase tracking-wide font-semibold px-1`}>
+            Tenggat (opsional)
+          </span>
+          <input
+            type="date"
+            value={tenggatTgl}
+            onChange={e => setTenggatTgl(e.target.value)}
+            className={`w-full px-3.5 min-h-[44px] ${radius.control} border ${surface.divider} ${text.body} ${ink.strong} outline-none focus:border-blue-500`}
+          />
+        </label>
+      </div>
+
+      <div
+        className={`shrink-0 border-t ${surface.divider} px-4 py-3`}
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 12px)' }}
+      >
+        <button
+          type="button"
+          disabled={!deskripsi.trim() || menyimpan}
+          onClick={simpan}
+          className={`w-full min-h-[52px] ${radius.control} ${text.headline} text-white bg-primary disabled:bg-slate-300 transition-transform active:scale-[0.98] disabled:active:scale-100`}
+        >
+          {menyimpan ? 'Menyimpan…' : 'Simpan tugas'}
+        </button>
+      </div>
+    </div>
   );
 };
 

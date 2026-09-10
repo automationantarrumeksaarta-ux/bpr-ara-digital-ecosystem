@@ -92,10 +92,14 @@ app.get('/api/health', (req, res) => {
 import authRoutes from './backend/auth.js';
 import notificationRoutes from './backend/notifications.js';
 import attendanceRoutes from './backend/attendance.js';
+import activityRoutes from './backend/activities.js';
+import payrollRoutes from './backend/payroll.js';
 
 app.use('/api/auth', authRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/attendances', attendanceRoutes);
+app.use('/api/activities', activityRoutes);
+app.use('/api/payroll', payrollRoutes);
 app.use('/api', parserRoutes);
 
 // AI Assistant endpoint

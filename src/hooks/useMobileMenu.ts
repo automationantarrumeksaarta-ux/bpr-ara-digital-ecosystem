@@ -1,6 +1,6 @@
 import type React from 'react';
 import { useMemo } from 'react';
-import { Wallet, Activity } from 'lucide-react';
+import { Wallet, Camera } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { accessibleItems } from '../utils/access';
 
@@ -49,9 +49,23 @@ const VERSI_MOBILE: Record<string, string> = {
   FLOW_TASKS: '/mobile/tugas',
 };
 
+/**
+ * Modul yang sengaja TIDAK ditampilkan di aplikasi.
+ *
+ * Ketiganya adalah pekerjaan meja: mengelola proyek, menelusuri profil
+ * nasabah, dan merekap kampanye pemasaran. Semuanya butuh layar lebar dan
+ * tidak dikerjakan sambil di lapangan. Pencatatan lapangannya sendiri
+ * diwakili menu Aktivitas, yang hasilnya dibaca lewat menu Marketing di web.
+ */
+const SEMBUNYIKAN_DI_APK = new Set([
+  'PROJECT_MANAGEMENT',
+  'CRM_CUSTOMERS',
+  'MARKETING_ACTIVITY',
+]);
+
 /** Modul yang memang hanya hidup di mobile — belum ada halaman web-nya. */
 const MOBILE_ONLY: MobileMenuItem[] = [
-  { id: 'ACTIVITIES', label: 'Activities', icon: Activity, path: '/mobile/activities', mobileOnly: true },
+  { id: 'ACTIVITIES', label: 'Aktivitas', icon: Camera, path: '/mobile/aktivitas', mobileOnly: true },
   { id: 'INFO_GAJI', label: 'Info Gaji', icon: Wallet, path: '/mobile/info-gaji', mobileOnly: true },
 ];
 
@@ -66,7 +80,9 @@ export function useMobileMenu(limit?: number): { items: MobileMenuItem[]; total:
   const { currentUser, rolePermissions } = useApp();
 
   return useMemo(() => {
-    const dariWeb = accessibleItems(currentUser?.role, rolePermissions).map(item => ({
+    const dariWeb = accessibleItems(currentUser?.role, rolePermissions)
+      .filter(item => !SEMBUNYIKAN_DI_APK.has(item.id))
+      .map(item => ({
       id: item.id,
       label: LABEL_PENDEK[item.title] ?? item.title,
       icon: item.icon,

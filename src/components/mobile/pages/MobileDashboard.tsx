@@ -1,20 +1,23 @@
 import React from 'react';
-import { AlertTriangle, ArrowDownRight, ArrowUpRight, Landmark, PiggyBank, Wallet } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import {
+  AlertTriangle, BadgeAlert, CalendarClock, ChevronRight, FileWarning,
+  Landmark, PiggyBank, ScrollText, TrendingUp, Wallet,
+} from 'lucide-react';
 import { useApp } from '../../../context/AppContext';
 import { AppBar, Card, EmptyState, Screen, Section, Stack } from '../ui/primitives';
 import { ink, radius, surface, text, tone } from '../ui/tokens';
 
 /**
- * Ringkasan keuangan versi aplikasi.
+ * Dashboard Umum versi aplikasi.
  *
- * Bukan ExecutiveDashboard yang dipersempit. Dashboard web menyusun informasi
- * untuk layar lebar: empat kartu sejajar, dua grafik berdampingan, tabel
- * sepuluh kolom. Di layar HP susunan itu jadi satu kolom panjang dengan tabel
- * yang harus digeser ke samping.
+ * Isinya sama dengan ExecutiveDashboard di web, susunannya dibangun ulang.
+ * Web menaruh empat kartu sejajar, dua grafik berdampingan, dan tabel sebelas
+ * kolom — bentuk yang hanya bekerja di layar lebar.
  *
- * Di sini isinya sama tetapi disusun ulang untuk dibaca sambil berdiri:
- * dua angka terpenting lebih dulu, komposisi kredit sebagai batang bertumpuk
- * (lebih terbaca daripada donat kecil), lalu rincian sebagai daftar.
+ * Di sini urutannya mengikuti apa yang paling dulu dicari saat membuka
+ * aplikasi sambil berdiri: posisi kredit dan dana, lalu kualitas kredit
+ * dengan acuannya, lalu hal-hal yang menuntut tindakan.
  */
 
 const rupiahRingkas = (v: number): string => {
@@ -27,7 +30,6 @@ const rupiahRingkas = (v: number): string => {
 
 const pct = (v: number) => `${v.toFixed(2).replace('.', ',')}%`;
 
-/** Warna kolektibilitas — sama dengan yang dipakai dashboard web. */
 const WARNA_KOLEK: Record<string, { nama: string; warna: string }> = {
   L: { nama: 'Lancar', warna: '#22c55e' },
   DPK: { nama: 'Dalam Perhatian', warna: '#eab308' },
@@ -40,7 +42,7 @@ const WARNA_KOLEK: Record<string, { nama: string; warna: string }> = {
 const BATAS_NPL_SEHAT = 5;
 
 const MobileDashboard: React.FC = () => {
-  const { macroMetrics } = useApp() as any;
+  const { macroMetrics, creditApplications, ewsAlerts, ptpRecords, flowTasks } = useApp() as any;
 
   const osKredit = macroMetrics.outstandingKredit || 0;
   const tabungan = macroMetrics.totalTabungan || 0;
@@ -53,13 +55,40 @@ const MobileDashboard: React.FC = () => {
 
   const kualitas: any[] = macroMetrics.kualitasKredit ?? [];
   const periodeKualitas: string | null = macroMetrics.periodeKualitas ?? null;
-  const adaData = osKredit > 0 || dpk > 0 || kualitas.length > 0;
+  const topKredit: any[] = (macroMetrics.top10Kredit ?? []).slice(0, 5);
 
+  const adaData = osKredit > 0 || dpk > 0 || kualitas.length > 0;
   const nplSehat = npl > 0 && npl <= BATAS_NPL_SEHAT;
+
+  /* Hal yang menuntut tindakan — dihitung dari data yang ada, bukan angka tetap. */
+  const perluPerhatian = [
+    {
+      label: 'Kredit menunggu keputusan',
+      catatan: 'Persetujuan komite / direksi',
+      jumlah: (creditApplications ?? []).filter((a: any) =>
+        ['Analysis', 'ANALYSIS', 'COMMITTEE', 'Approval'].includes(a.stage ?? a.status)).length,
+      icon: FileWarning,
+    },
+    {
+      label: 'Nasabah masuk EWS',
+      catatan: 'Perlu tindak lanjut',
+      jumlah: (ewsAlerts ?? []).filter((e: any) => e.status !== 'RESOLVED').length,
+      icon: BadgeAlert,
+    },
+    {
+      label: 'Janji bayar jatuh tempo',
+      catatan: 'Hari ini atau lewat',
+      jumlah: (ptpRecords ?? []).filter((p: any) => ['DUE', 'BROKEN', 'ESCALATED'].includes(p.status)).length,
+      icon: CalendarClock,
+    },
+  ];
+
+  const tugasSaya = (flowTasks ?? []).filter((t: any) =>
+    !['Validated Closed', 'Improved', 'Accepted', 'Selesai'].includes(t.status)).length;
 
   return (
     <Screen>
-      <AppBar title="Ringkasan Keuangan" back />
+      <AppBar title="Dashboard Umum" back />
 
       {!adaData ? (
         <Stack>
@@ -73,7 +102,7 @@ const MobileDashboard: React.FC = () => {
         </Stack>
       ) : (
         <Stack>
-          {/* --- Dua angka terpenting, satu per satu, bukan empat kartu sempit --- */}
+          {/* --- Posisi kredit & dana --- */}
           <Card className="flex flex-col gap-4">
             <div className="flex items-start gap-3">
               <span className={`w-10 h-10 ${radius.control} ${tone.primary.bgSoft} flex items-center justify-center shrink-0`}>
@@ -98,14 +127,27 @@ const MobileDashboard: React.FC = () => {
                   Dana Pihak Ketiga
                 </span>
                 <span className={`block ${text.largeTitle} ${ink.strong} mt-0.5`}>{rupiahRingkas(dpk)}</span>
-                <span className={`block ${text.caption} ${ink.faint} mt-1`}>
-                  Tabungan {rupiahRingkas(tabungan)} · Deposito {rupiahRingkas(deposito)}
-                </span>
+                {/*
+                  Komposisi tabungan vs deposito sebagai satu batang. Di web ini
+                  berupa diagram lingkaran terpisah; di HP satu baris sudah
+                  menyampaikan hal yang sama.
+                */}
+                {dpk > 0 && (
+                  <>
+                    <span className="flex h-1.5 rounded-full overflow-hidden bg-slate-100 mt-2.5">
+                      <span style={{ width: `${(tabungan / dpk) * 100}%`, backgroundColor: '#3b82f6' }} />
+                      <span style={{ width: `${(deposito / dpk) * 100}%`, backgroundColor: '#06b6d4' }} />
+                    </span>
+                    <span className={`block ${text.caption} ${ink.faint} mt-1.5`}>
+                      Tabungan {rupiahRingkas(tabungan)} · Deposito {rupiahRingkas(deposito)}
+                    </span>
+                  </>
+                )}
               </span>
             </div>
           </Card>
 
-          {/* --- Kualitas kredit: batang bertumpuk, bukan donat kecil --- */}
+          {/* --- Kualitas kredit --- */}
           <Section
             title="Kualitas Kredit"
             action={
@@ -127,10 +169,6 @@ const MobileDashboard: React.FC = () => {
                 <span className={`${text.footnote} ${ink.muted}`}>RR {pct(rr)}</span>
               </div>
 
-              {/*
-                Batas 5% ditandai eksplisit. Angka NPL tanpa acuan tidak
-                memberi tahu pembaca apakah 19,91% itu wajar atau gawat.
-              */}
               <p className={`${text.caption} ${nplSehat ? tone.positive.text : tone.danger.text} -mt-2`}>
                 {nplSehat
                   ? `Di bawah batas sehat OJK (${BATAS_NPL_SEHAT}%)`
@@ -143,10 +181,7 @@ const MobileDashboard: React.FC = () => {
                     {kualitas.map(k => (
                       <span
                         key={k.kolektibilitas}
-                        style={{
-                          width: `${k.persen}%`,
-                          backgroundColor: WARNA_KOLEK[k.kolektibilitas]?.warna ?? '#94a3b8',
-                        }}
+                        style={{ width: `${k.persen}%`, backgroundColor: WARNA_KOLEK[k.kolektibilitas]?.warna ?? '#94a3b8' }}
                         title={`${WARNA_KOLEK[k.kolektibilitas]?.nama ?? k.kolektibilitas} ${k.persen}%`}
                       />
                     ))}
@@ -162,9 +197,7 @@ const MobileDashboard: React.FC = () => {
                         <span className={`flex-1 min-w-0 ${text.body} ${ink.base} truncate`}>
                           {WARNA_KOLEK[k.kolektibilitas]?.nama ?? k.kolektibilitas}
                         </span>
-                        <span className={`${text.caption} ${ink.faint} tabular-nums shrink-0`}>
-                          {k.jmlRekening} rek
-                        </span>
+                        <span className={`${text.caption} ${ink.faint} tabular-nums shrink-0`}>{k.jmlRekening} rek</span>
                         <span className={`${text.body} font-semibold ${ink.strong} tabular-nums shrink-0 w-14 text-right`}>
                           {pct(k.persen)}
                         </span>
@@ -176,15 +209,80 @@ const MobileDashboard: React.FC = () => {
             </Card>
           </Section>
 
+          {/* --- Perlu tindakan --- */}
+          <Section title="Perlu Tindakan">
+            <Card flush className={`overflow-hidden divide-y ${surface.hairline}`}>
+              {perluPerhatian.map(p => (
+                <div key={p.label} className="px-4 py-3.5 flex items-center gap-3">
+                  <p.icon
+                    className={`w-[18px] h-[18px] shrink-0 ${p.jumlah > 0 ? tone.warning.text : ink.faint}`}
+                    strokeWidth={1.8}
+                  />
+                  <span className="flex-1 min-w-0">
+                    <span className={`block ${text.body} font-medium ${ink.strong}`}>{p.label}</span>
+                    <span className={`block ${text.caption} ${ink.faint} mt-0.5`}>{p.catatan}</span>
+                  </span>
+                  <span className={`${text.title} tabular-nums shrink-0 ${p.jumlah > 0 ? tone.warning.text : ink.faint}`}>
+                    {p.jumlah}
+                  </span>
+                </div>
+              ))}
+              <Link
+                to="/mobile/tugas"
+                className="px-4 py-3.5 flex items-center gap-3 active:bg-slate-50"
+              >
+                <ScrollText className={`w-[18px] h-[18px] shrink-0 ${tugasSaya > 0 ? tone.primary.text : ink.faint}`} strokeWidth={1.8} />
+                <span className="flex-1 min-w-0">
+                  <span className={`block ${text.body} font-medium ${ink.strong}`}>Tugas belum selesai</span>
+                  <span className={`block ${text.caption} ${ink.faint} mt-0.5`}>Buka Task Board</span>
+                </span>
+                <span className={`${text.title} tabular-nums shrink-0 ${tugasSaya > 0 ? tone.primary.text : ink.faint}`}>
+                  {tugasSaya}
+                </span>
+                <ChevronRight className={`w-4 h-4 shrink-0 ${ink.faint}`} />
+              </Link>
+            </Card>
+          </Section>
+
+          {/* --- Kredit bermasalah terbesar --- */}
+          {topKredit.length > 0 && (
+            <Section title="Kredit Bermasalah Terbesar">
+              <Card flush className={`overflow-hidden divide-y ${surface.hairline}`}>
+                {topKredit.map((k, i) => (
+                  <div key={k.applicationId ?? i} className="px-4 py-3 flex items-center gap-3">
+                    <span className={`${text.caption} ${ink.faint} tabular-nums w-4 shrink-0`}>{i + 1}</span>
+                    <span className="flex-1 min-w-0">
+                      <span className={`block ${text.body} font-medium ${ink.strong} truncate`}>
+                        {k.borrowerName ?? '-'}
+                      </span>
+                      <span className={`block ${text.caption} ${ink.faint} mt-0.5`}>
+                        {rupiahRingkas(k.plafon || 0)}
+                      </span>
+                    </span>
+                    <span
+                      className={`${text.caption} font-bold px-1.5 py-0.5 ${radius.control} shrink-0`}
+                      style={{
+                        backgroundColor: `${WARNA_KOLEK[k.status]?.warna ?? '#94a3b8'}1a`,
+                        color: WARNA_KOLEK[k.status]?.warna ?? '#64748b',
+                      }}
+                    >
+                      {k.status ?? '-'}
+                    </span>
+                  </div>
+                ))}
+              </Card>
+            </Section>
+          )}
+
           {/* --- Angka pendukung --- */}
           <Section title="Lainnya">
             <Card flush className={`overflow-hidden divide-y ${surface.hairline}`}>
               {[
-                { label: 'Laba tahun berjalan', nilai: rupiahRingkas(laba), icon: laba >= 0 ? ArrowUpRight : ArrowDownRight, positif: laba >= 0 },
-                { label: 'Total aset', nilai: rupiahRingkas(aset), icon: PiggyBank, positif: true },
+                { label: 'Laba tahun berjalan', nilai: rupiahRingkas(laba), icon: TrendingUp },
+                { label: 'Total aset', nilai: rupiahRingkas(aset), icon: PiggyBank },
               ].map(b => (
                 <div key={b.label} className="px-4 py-3.5 flex items-center gap-3">
-                  <b.icon className={`w-[18px] h-[18px] shrink-0 ${b.positif ? tone.positive.text : tone.danger.text}`} />
+                  <b.icon className={`w-[18px] h-[18px] shrink-0 ${ink.muted}`} strokeWidth={1.8} />
                   <span className={`flex-1 ${text.body} ${ink.base}`}>{b.label}</span>
                   <span className={`${text.headline} ${ink.strong} tabular-nums`}>{b.nilai}</span>
                 </div>
