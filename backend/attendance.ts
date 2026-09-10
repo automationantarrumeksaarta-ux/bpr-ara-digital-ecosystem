@@ -3,6 +3,43 @@ import { db } from './db.js';
 
 const router = express.Router();
 
+/**
+ * Waktu absensi HARUS dihitung dalam zona waktu kantor, bukan zona waktu
+ * server. Tiga masalah pada versi sebelumnya:
+ *
+ * 1. `new Date().toISOString().split('T')[0]` memakai tanggal UTC. Absen pada
+ *    00:00–06:59 WIB tercatat di tanggal kemarin.
+ * 2. `toLocaleTimeString('id-ID')` memakai zona waktu SERVER. Di VPS yang
+ *    zonanya UTC (bawaan umum), absen 08:00 WIB tersimpan sebagai "01.00" —
+ *    seluruh jam absensi meleset 7 jam.
+ * 3. Format id-ID memakai titik ("08.45"), lalu dibandingkan sebagai string
+ *    dengan '08:30'. Karena '.' (46) < ':' (58), "08.45" > "08:30" bernilai
+ *    false — pegawai yang datang pukul 08.45 tidak pernah ditandai terlambat.
+ *
+ * ZONA_WAKTU bisa diubah lewat env untuk kantor di zona lain (WITA/WIT).
+ */
+const ZONA_WAKTU = process.env.TZ_KANTOR || 'Asia/Jakarta';
+
+/** Tanggal kerja YYYY-MM-DD menurut zona waktu kantor. */
+const tanggalKantor = (d = new Date()): string =>
+  new Intl.DateTimeFormat('en-CA', {
+    timeZone: ZONA_WAKTU, year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(d);
+
+/** Jam HH:MM (24 jam, selalu titik dua) menurut zona waktu kantor. */
+const jamKantor = (d = new Date()): string =>
+  new Intl.DateTimeFormat('en-GB', {
+    timeZone: ZONA_WAKTU, hour: '2-digit', minute: '2-digit', hour12: false,
+  }).format(d);
+
+/** Bandingkan "HH:MM" sebagai menit, bukan sebagai string. */
+const keMenit = (jam: string): number => {
+  const m = jam.match(/(\d{1,2})[:.](\d{2})/);
+  return m ? Number(m[1]) * 60 + Number(m[2]) : 0;
+};
+
+const BATAS_TERLAMBAT = keMenit(process.env.JAM_MASUK_BATAS || '08:30');
+
 // Get attendance records for a user
 router.get('/', (req, res) => {
   try {
@@ -37,8 +74,8 @@ router.post('/clock-in', (req, res) => {
       return res.status(400).json({ error: 'user_id is required' });
     }
 
-    const today = new Date().toISOString().split('T')[0];
-    const now = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+    const today = tanggalKantor();
+    const now = jamKantor();
 
     // Check if already clocked in today
     const existing = db.prepare('SELECT * FROM attendances WHERE user_id = ? AND date = ?').get(user_id, today) as any;
@@ -48,8 +85,7 @@ router.post('/clock-in', (req, res) => {
 
     const id = 'att-' + Date.now().toString(36) + Math.random().toString(36).substring(2, 5);
     
-    // Check if late (e.g. after 08:30)
-    const status = now > '08:30' ? 'Terlambat' : 'Hadir';
+    const status = keMenit(now) > BATAS_TERLAMBAT ? 'Terlambat' : 'Hadir';
 
     db.prepare(`
       INSERT INTO attendances (id, user_id, date, clock_in_time, clock_in_lat, clock_in_lng, clock_in_location, status)
@@ -72,8 +108,8 @@ router.post('/clock-out', (req, res) => {
       return res.status(400).json({ error: 'user_id is required' });
     }
 
-    const today = new Date().toISOString().split('T')[0];
-    const now = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+    const today = tanggalKantor();
+    const now = jamKantor();
 
     const existing = db.prepare('SELECT * FROM attendances WHERE user_id = ? AND date = ?').get(user_id, today) as any;
     if (!existing) {
