@@ -53,6 +53,9 @@ import MobileDashboard from '../components/mobile/pages/MobileDashboard';
 import MobileTaskBoard from '../components/mobile/pages/MobileTaskBoard';
 import MobileActivities from '../components/mobile/pages/MobileActivities';
 import MobileInfoGaji from '../components/mobile/pages/MobileInfoGaji';
+import MobileApprovalQueue from '../components/mobile/pages/MobileApprovalQueue';
+import MobileCalendar from '../components/mobile/pages/MobileCalendar';
+import MobileLoanOrigination from '../components/mobile/pages/MobileLoanOrigination';
 
 const FallbackLoading = () => (
   <div className="p-6 flex items-center justify-center h-full">
@@ -215,6 +218,9 @@ export const AppRouter: React.FC = () => {
           {/* Modul web yang sudah punya layar versi APK tersendiri */}
           <Route path="/mobile/ringkasan" element={<MobileDashboard />} />
           <Route path="/mobile/tugas" element={<MobileTaskBoard />} />
+          <Route path="/mobile/persetujuan" element={<MobileApprovalQueue />} />
+          <Route path="/mobile/kalender" element={<MobileCalendar />} />
+          <Route path="/mobile/kredit" element={<MobileLoanOrigination />} />
 
           {/* Modul khusus mobile — belum ada padanannya di web */}
           <Route path="/mobile/aktivitas" element={<MobileActivities />} />

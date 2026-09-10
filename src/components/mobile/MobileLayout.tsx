@@ -1,10 +1,26 @@
-import React from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import MobileBottomNav, { TAB_UTAMA } from './MobileBottomNav';
+import { useAndroidBackButton } from '../../hooks/useAndroidBackButton';
+import { radius, text } from './ui/tokens';
 import { surface } from './ui/tokens';
 
 export const MobileLayout: React.FC = () => {
   const { pathname } = useLocation();
+  const [pesanKeluar, setPesanKeluar] = useState(false);
+
+  /*
+   * Tombol kembali perangkat. Tanpa ini, Android menutup aplikasi dari layar
+   * mana pun — termasuk saat pengguna baru masuk satu tingkat ke dalam.
+   */
+  const peringatkanKeluar = useCallback(() => setPesanKeluar(true), []);
+  useAndroidBackButton(peringatkanKeluar);
+
+  useEffect(() => {
+    if (!pesanKeluar) return;
+    const t = setTimeout(() => setPesanKeluar(false), 2000);
+    return () => clearTimeout(t);
+  }, [pesanKeluar]);
 
   /*
    * Navigasi bawah hanya muncul di lima tab utama.
@@ -33,6 +49,16 @@ export const MobileLayout: React.FC = () => {
         </main>
 
         {tampilkanNav && <MobileBottomNav />}
+
+        {/* Konfirmasi keluar, gaya snackbar Material. */}
+        {pesanKeluar && (
+          <div
+            role="status"
+            className={`absolute left-1/2 -translate-x-1/2 bottom-24 z-50 px-4 py-2.5 ${radius.pill} bg-slate-900 text-white ${text.footnote} font-medium shadow-lg whitespace-nowrap`}
+          >
+            Tekan sekali lagi untuk keluar
+          </div>
+        )}
       </div>
     </div>
   );

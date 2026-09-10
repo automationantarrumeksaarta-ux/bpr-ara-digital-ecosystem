@@ -19,7 +19,7 @@ const MobileHome: React.FC = () => {
   const { currentUser, notifications } = useApp();
   const navigate = useNavigate();
   const { rekap, hariIni, memuat } = useMobileAttendance();
-  const { items: menu } = useMobileMenu(8);
+  const { items: menu } = useMobileMenu();
 
   const nama = currentUser?.name || 'Pengguna';
   const belumDibaca = notifications?.filter(n => !n.read).length ?? 0;

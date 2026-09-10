@@ -1,101 +1,81 @@
 import type React from 'react';
 import { useMemo } from 'react';
-import { Wallet, Camera } from 'lucide-react';
+import {
+  BadgeCheck, CalendarDays, Camera, FileText, LayoutDashboard, ListChecks, Wallet,
+} from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { accessibleItems } from '../utils/access';
+import { isItemAllowed } from '../utils/access';
+import { navigationConfig } from '../config/navigationConfig';
 
 export interface MobileMenuItem {
   id: string;
-  /** label pendek untuk grid mobile; judul web sering terlalu panjang */
   label: string;
   icon: React.ElementType;
   path: string;
-  /** modul yang hanya ada di aplikasi mobile, belum ada padanannya di web */
+  /** modul yang hanya ada di aplikasi, belum ada padanannya di web */
   mobileOnly?: boolean;
 }
 
 /**
- * Judul web -> label pendek untuk grid mobile. Di lebar 4 kolom, teks seperti
- * "Collection Management" akan terpotong atau memaksa 3 baris.
- */
-const LABEL_PENDEK: Record<string, string> = {
-  'Dashboard Utama': 'Dashboard',
-  'Loan Origination': 'Loan\nOrigination',
-  'Approval Queue': 'Approval\nQueue',
-  'Collection Management': 'Collection',
-  'NPL & Restructuring': 'NPL &\nRestruk.',
-  'Reports & Analytics': 'Reports',
-  'Marketing Activities': 'Marketing',
-  'Collateral Appraisal': 'Appraisal',
-  'Committee Approval': 'Komite\nKredit',
-  'Legal & Documents': 'Legal',
-  'Funding Dashboard': 'Funding',
-  'Branch Network': 'Jaringan\nCabang',
-  'BEIS Reporting': 'BEIS',
-  'Customer 360': 'Customer\n360',
-  'Credit Analysis': 'Analisis\nKredit',
-  'Field Survey': 'Survey\nLapangan',
-};
-
-/**
- * Modul yang sudah punya layar versi APK tersendiri.
+ * Menu aplikasi adalah DAFTAR PILIHAN, bukan cerminan seluruh menu web.
  *
- * Modul di luar daftar ini tetap membuka halaman web-nya di dalam WebView.
- * Halaman web dirancang untuk layar lebar, jadi terasa sempit di HP — modul
- * yang sering dipakai di lapangan sebaiknya dipindah ke daftar ini.
- */
-const VERSI_MOBILE: Record<string, string> = {
-  EXECUTIVE_DASHBOARD: '/mobile/ringkasan',
-  FLOW_TASKS: '/mobile/tugas',
-};
-
-/**
- * Modul yang sengaja TIDAK ditampilkan di aplikasi.
+ * Versi sebelumnya menampilkan semua modul yang boleh diakses lalu memotongnya
+ * di item ke-8. Karena modul khusus aplikasi (Aktivitas, Info Gaji) ditaruh
+ * paling akhir, keduanya SELALU terpotong dan tidak pernah muncul sama sekali.
+ * Modul seperti Analisis Kredit, Survey Lapangan, dan Appraisal pun ikut
+ * tampil padahal pekerjaannya dilakukan di meja, bukan di lapangan.
  *
- * Ketiganya adalah pekerjaan meja: mengelola proyek, menelusuri profil
- * nasabah, dan merekap kampanye pemasaran. Semuanya butuh layar lebar dan
- * tidak dikerjakan sambil di lapangan. Pencatatan lapangannya sendiri
- * diwakili menu Aktivitas, yang hasilnya dibaca lewat menu Marketing di web.
+ * Sekarang isinya ditetapkan eksplisit, dan tidak ada pemotongan.
  */
-const SEMBUNYIKAN_DI_APK = new Set([
-  'PROJECT_MANAGEMENT',
-  'CRM_CUSTOMERS',
-  'MARKETING_ACTIVITY',
-]);
+interface DefinisiMenu {
+  id: string;
+  label: string;
+  icon: React.ElementType;
+  path: string;
+  /** id modul web yang menentukan hak aksesnya; kosong = selalu boleh */
+  izinDari?: string;
+  mobileOnly?: boolean;
+}
 
-/** Modul yang memang hanya hidup di mobile — belum ada halaman web-nya. */
-const MOBILE_ONLY: MobileMenuItem[] = [
+const MENU_APK: DefinisiMenu[] = [
+  { id: 'EXECUTIVE_DASHBOARD', label: 'Dashboard\nUmum', icon: LayoutDashboard, path: '/mobile/ringkasan', izinDari: 'EXECUTIVE_DASHBOARD' },
+  { id: 'FLOW_TASKS', label: 'Task Board', icon: ListChecks, path: '/mobile/tugas', izinDari: 'FLOW_TASKS' },
+  { id: 'DECISION_QUEUE', label: 'Approval\nQueue', icon: BadgeCheck, path: '/mobile/persetujuan', izinDari: 'DECISION_QUEUE' },
+  { id: 'CALENDAR_VIEW', label: 'Kalender', icon: CalendarDays, path: '/mobile/kalender', izinDari: 'CALENDAR_VIEW' },
+  { id: 'LOS_CREDIT', label: 'Loan\nOrigination', icon: FileText, path: '/mobile/kredit', izinDari: 'LOS_CREDIT' },
+
+  // Modul khusus aplikasi — selalu tersedia, tidak bergantung menu web.
   { id: 'ACTIVITIES', label: 'Aktivitas', icon: Camera, path: '/mobile/aktivitas', mobileOnly: true },
   { id: 'INFO_GAJI', label: 'Info Gaji', icon: Wallet, path: '/mobile/info-gaji', mobileOnly: true },
 ];
 
+/** Cari definisi item di navigationConfig untuk mengecek hak aksesnya. */
+function itemWeb(id: string) {
+  for (const grup of navigationConfig) {
+    for (const item of grup.items) {
+      if (item.id === id) return item;
+      for (const anak of item.children ?? []) {
+        if (anak.id === id) return anak;
+      }
+    }
+  }
+  return null;
+}
+
 /**
- * Menu beranda mobile = modul web yang boleh diakses pengguna (memakai aturan
- * RBAC yang sama dengan web) + modul khusus mobile di urutan terakhir.
- *
- * Sebelumnya daftar menu ditulis tetap di MobileHome, sehingga semua peran
- * melihat menu yang sama — termasuk modul yang tidak berhak mereka buka.
+ * Menu beranda aplikasi. Modul web tetap tunduk pada aturan RBAC yang sama
+ * dengan web; modul khusus aplikasi selalu tampil.
  */
-export function useMobileMenu(limit?: number): { items: MobileMenuItem[]; total: number } {
+export function useMobileMenu(): { items: MobileMenuItem[]; total: number } {
   const { currentUser, rolePermissions } = useApp();
 
   return useMemo(() => {
-    const dariWeb = accessibleItems(currentUser?.role, rolePermissions)
-      .filter(item => !SEMBUNYIKAN_DI_APK.has(item.id))
-      .map(item => ({
-      id: item.id,
-      label: LABEL_PENDEK[item.title] ?? item.title,
-      icon: item.icon,
-      path: VERSI_MOBILE[item.id] ?? item.path!,
-    }));
+    const items = MENU_APK.filter(m => {
+      if (m.mobileOnly || !m.izinDari) return true;
+      const web = itemWeb(m.izinDari);
+      return web ? isItemAllowed(web, currentUser?.role, rolePermissions) : false;
+    }).map(({ izinDari, ...rest }) => rest);
 
-    // Buang duplikat path bila satu modul muncul di lebih dari satu grup.
-    const unik = new Map<string, MobileMenuItem>();
-    for (const m of [...dariWeb, ...MOBILE_ONLY]) {
-      if (!unik.has(m.path)) unik.set(m.path, m);
-    }
-
-    const semua = [...unik.values()];
-    return { items: limit ? semua.slice(0, limit) : semua, total: semua.length };
-  }, [currentUser?.role, rolePermissions, limit]);
+    return { items, total: items.length };
+  }, [currentUser?.role, rolePermissions]);
 }
