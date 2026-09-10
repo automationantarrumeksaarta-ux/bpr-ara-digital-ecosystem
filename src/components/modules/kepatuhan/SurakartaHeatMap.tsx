@@ -2,11 +2,19 @@ import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { Minus, Plus, Locate } from 'lucide-react';
 import { KARESIDENAN_SURAKARTA, SURAKARTA_VIEWBOX } from '../../../data/geo/surakartaMap';
 
-/** Ambang risiko (dalam persen) — dipakai bersama oleh peta, legenda, dan tabel. */
+/**
+ * Ambang risiko (persen), dipakai bersama oleh peta, legenda, dan tabel.
+ *
+ * Dikalibrasi ke acuan pengawasan BPR: batas NPL sehat menurut OJK adalah 5%,
+ * dan di atas ~11% sudah tergolong tidak sehat. Ambang sebelumnya (10/13/16)
+ * hanya cocok untuk data contoh — pada data nominatif sungguhan yang NPL-nya
+ * ~20%, hampir semua wilayah menjadi merah sehingga peta tidak lagi
+ * membedakan apa pun.
+ */
 export const RISK_STOPS = [
-  { max: 10, label: 'Rendah', color: '#4ade80' },
-  { max: 13, label: 'Sedang', color: '#fbbf24' },
-  { max: 16, label: 'Tinggi', color: '#f97316' },
+  { max: 5, label: 'Rendah', color: '#4ade80' },
+  { max: 10, label: 'Sedang', color: '#fbbf24' },
+  { max: 15, label: 'Tinggi', color: '#f97316' },
   { max: Infinity, label: 'Sangat Tinggi', color: '#ef4444' },
 ] as const;
 

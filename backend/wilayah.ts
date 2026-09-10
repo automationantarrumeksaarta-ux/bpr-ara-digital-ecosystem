@@ -107,6 +107,48 @@ export interface HasilResolusi {
   kecamatan: string | null;
 }
 
+/**
+ * Kolom "Kabupaten" pada nominatif kredit berisi nilai seperti
+ * "Kab. Karanganyar" atau "Kota Surakarta". Jauh lebih dapat dipercaya
+ * daripada menebak dari teks alamat, jadi dipakai lebih dulu bila tersedia.
+ *
+ * Mengembalikan null untuk kabupaten di luar Karesidenan Surakarta (data asli
+ * memuat mis. Kab. Grobogan) — nasabahnya tetap dicatat, hanya tidak muncul
+ * di peta.
+ */
+export function resolveKabupaten(nilai: string | undefined | null): WilayahId | null {
+  if (!nilai) return null;
+  const teks = normalize(String(nilai));
+  if (!teks) return null;
+  for (const [id, nama] of Object.entries(NAMA_WILAYAH) as [WilayahId, string[]][]) {
+    if (nama.some(n => mengandungKata(teks, n))) return id;
+  }
+  return null;
+}
+
+/** Cocokkan nama kecamatan mentah ke ejaan baku, dibatasi pada satu kabupaten. */
+export function resolveKecamatan(
+  nilai: string | undefined | null,
+  wilayah: WilayahId | null,
+): string | null {
+  if (!nilai) return null;
+  const teks = normalize(String(nilai));
+  if (!teks) return null;
+
+  const kandidat = wilayah
+    ? KECAMATAN_PER_WILAYAH[wilayah]
+    : Object.values(KECAMATAN_PER_WILAYAH).flat();
+
+  const cocok = kandidat.find(k => normalize(k) === teks);
+  if (cocok) return cocok;
+
+  // Data asli kadang mengisi kolom kecamatan dengan nama kelurahan
+  // (mis. CANGAKAN di Karanganyar). Nilainya tetap disimpan apa adanya
+  // supaya tidak hilang, hanya dengan huruf besar di awal kata.
+  return String(nilai).trim().replace(/\s+/g, ' ').toLowerCase()
+    .replace(/(^|\s)\S/g, c => c.toUpperCase());
+}
+
 /** Cocokkan sebagai kata utuh, supaya "Simo" tidak ikut cocok pada "Simongan". */
 const mengandungKata = (teks: string, frasa: string) =>
   new RegExp(`(^| )${frasa.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}( |$)`).test(teks);

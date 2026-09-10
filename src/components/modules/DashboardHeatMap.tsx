@@ -198,18 +198,26 @@ export const DashboardHeatMap: React.FC = () => {
       totalNasabah,
       bakiDebet,
       bermasalah,
-      rasio: totalNasabah ? (bermasalah / totalNasabah) * 100 : 0,
+      // Dua rasio yang berbeda, dan keduanya perlu ditampilkan.
+      //
+      // NPL yang dilaporkan BPR ke OJK dihitung dari NOMINAL baki debet, bukan
+      // dari jumlah nasabah. Pada data Juni 2026 selisihnya besar: 19,91% (
+      // nominal) vs 25,76% (jumlah nasabah). Menampilkan angka jumlah nasabah
+      // dengan label "Rasio Bermasalah" membuat dashboard kepatuhan
+      // bertentangan dengan Laporan Rekap Nominatif Kredit yang resmi.
+      nplNominal: bakiDebet ? (bakiBermasalah / bakiDebet) * 100 : 0,
+      rasioJumlah: totalNasabah ? (bermasalah / totalNasabah) * 100 : 0,
       bakiBermasalah,
     };
   }, [wilayahTerfilter, PORTOFOLIO_WILAYAH, TOTAL_PEMBIAYAAN]);
 
   const stats = [
-    { label: 'Total Pembiayaan', value: rupiahPenuh(Math.round(kpi.totalPembiayaan)), icon: BanknotesIcon, trend: TREN_PERIODE_SEBELUMNYA.totalPembiayaan, baik: true, bg: 'bg-blue-50 dark:bg-blue-900/20', color: 'text-blue-600 dark:text-blue-400' },
+    { label: 'Total Pembiayaan', value: rupiahRingkas(Math.round(kpi.totalPembiayaan)), icon: BanknotesIcon, trend: TREN_PERIODE_SEBELUMNYA.totalPembiayaan, baik: true, bg: 'bg-blue-50 dark:bg-blue-900/20', color: 'text-blue-600 dark:text-blue-400' },
     { label: 'Total Nasabah', value: kpi.totalNasabah.toLocaleString('id-ID'), icon: UserGroupIcon, trend: TREN_PERIODE_SEBELUMNYA.totalNasabah, baik: true, bg: 'bg-indigo-50 dark:bg-indigo-900/20', color: 'text-indigo-600 dark:text-indigo-400' },
-    { label: 'Baki Debet', value: rupiahPenuh(kpi.bakiDebet), icon: DocumentTextIcon, trend: TREN_PERIODE_SEBELUMNYA.bakiDebet, baik: true, bg: 'bg-cyan-50 dark:bg-cyan-900/20', color: 'text-cyan-600 dark:text-cyan-400' },
+    { label: 'Baki Debet', value: rupiahRingkas(kpi.bakiDebet), icon: DocumentTextIcon, trend: TREN_PERIODE_SEBELUMNYA.bakiDebet, baik: true, bg: 'bg-cyan-50 dark:bg-cyan-900/20', color: 'text-cyan-600 dark:text-cyan-400' },
     { label: 'Nasabah Bermasalah', value: kpi.bermasalah.toLocaleString('id-ID'), icon: ExclamationTriangleIcon, trend: TREN_PERIODE_SEBELUMNYA.nasabahBermasalah, baik: false, bg: 'bg-red-50 dark:bg-red-900/20', color: 'text-red-600 dark:text-red-400' },
-    { label: 'Rasio Bermasalah', value: pct(kpi.rasio), icon: PercentIcon, trend: TREN_PERIODE_SEBELUMNYA.rasioBermasalah, baik: false, bg: 'bg-amber-50 dark:bg-amber-900/20', color: 'text-amber-600 dark:text-amber-400' },
-    { label: 'Baki Debet Bermasalah', value: rupiahPenuh(kpi.bakiBermasalah), icon: BanknotesIcon, trend: TREN_PERIODE_SEBELUMNYA.bakiDebetBermasalah, baik: false, bg: 'bg-rose-50 dark:bg-rose-900/20', color: 'text-rose-600 dark:text-rose-400' },
+    { label: 'NPL (nominal)', value: pct(kpi.nplNominal), icon: PercentIcon, trend: TREN_PERIODE_SEBELUMNYA.rasioBermasalah, baik: false, bg: 'bg-amber-50 dark:bg-amber-900/20', color: 'text-amber-600 dark:text-amber-400', catatan: `${pct(kpi.rasioJumlah)} dari jumlah nasabah` },
+    { label: 'Baki Debet Bermasalah', value: rupiahRingkas(kpi.bakiBermasalah), icon: BanknotesIcon, trend: TREN_PERIODE_SEBELUMNYA.bakiDebetBermasalah, baik: false, bg: 'bg-rose-50 dark:bg-rose-900/20', color: 'text-rose-600 dark:text-rose-400' },
   ];
 
   // ---- nilai pewarna untuk ketiga peta ----
@@ -347,6 +355,11 @@ export const DashboardHeatMap: React.FC = () => {
                 <ArrowTrendingUpIcon className={`w-3.5 h-3.5 shrink-0 ${naik ? '' : 'rotate-180'}`} />
                 <span className="truncate">{pct(Math.abs(stat.trend))} dari periode sebelumnya</span>
               </div>
+              {'catatan' in stat && stat.catatan && (
+                <div className="text-[10px] text-gray-400 truncate" title={stat.catatan}>
+                  {stat.catatan}
+                </div>
+              )}
             </div>
           );
         })}
@@ -397,6 +410,17 @@ export const DashboardHeatMap: React.FC = () => {
           <SurakartaHeatMap values={nilaiSektor} selectedId={wilayahFilter} onSelect={pilihWilayah} />
           <div className="mt-4 space-y-2">
             <h4 className="text-[10px] font-bold text-gray-700 dark:text-gray-300">Sektor dengan Risiko Tertinggi</h4>
+{/*
+              Kolom sektor/tujuan tidak selalu ada di berkas nominatif kredit
+              (berkas CBS saat ini tidak memuatnya). Lebih baik dinyatakan
+              terus terang daripada menampilkan peta abu-abu tanpa keterangan.
+            */}
+            {RASIO_SEKTOR.length === 0 && (
+              <p className="text-[11px] text-gray-500 leading-relaxed">
+                Berkas nominatif kredit yang diunggah tidak memuat kolom
+                <span className="font-semibold"> Sektor Usaha</span>, sehingga peta ini belum bisa diisi.
+              </p>
+            )}
             {RASIO_SEKTOR.map(s => {
               const aktif = sektorAktif === s.sektor;
               return (
@@ -428,6 +452,17 @@ export const DashboardHeatMap: React.FC = () => {
           <SurakartaHeatMap values={nilaiTujuan} selectedId={wilayahFilter} onSelect={pilihWilayah} />
           <div className="mt-4 space-y-2">
             <h4 className="text-[10px] font-bold text-gray-700 dark:text-gray-300">Tujuan dengan Risiko Tertinggi</h4>
+{/*
+              Kolom sektor/tujuan tidak selalu ada di berkas nominatif kredit
+              (berkas CBS saat ini tidak memuatnya). Lebih baik dinyatakan
+              terus terang daripada menampilkan peta abu-abu tanpa keterangan.
+            */}
+            {RASIO_TUJUAN.length === 0 && (
+              <p className="text-[11px] text-gray-500 leading-relaxed">
+                Berkas nominatif kredit yang diunggah tidak memuat kolom
+                <span className="font-semibold"> Tujuan Penggunaan</span>, sehingga peta ini belum bisa diisi.
+              </p>
+            )}
             {RASIO_TUJUAN.map(t => {
               const aktif = tujuanAktif === t.tujuan;
               return (
@@ -762,7 +797,18 @@ export const DashboardHeatMap: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50 dark:divide-gray-800/50">
-                {RASIO_SEKTOR.map(s => {
+    {/*
+              Kolom sektor/tujuan tidak selalu ada di berkas nominatif kredit
+              (berkas CBS saat ini tidak memuatnya). Lebih baik dinyatakan
+              terus terang daripada menampilkan peta abu-abu tanpa keterangan.
+            */}
+            {RASIO_SEKTOR.length === 0 && (
+              <p className="text-[11px] text-gray-500 leading-relaxed">
+                Berkas nominatif kredit yang diunggah tidak memuat kolom
+                <span className="font-semibold"> Sektor Usaha</span>, sehingga peta ini belum bisa diisi.
+              </p>
+            )}
+            {RASIO_SEKTOR.map(s => {
                   const perWilayah = SEKTOR_PER_WILAYAH[s.sektor] ?? {};
                   const tertinggi = (Object.entries(perWilayah) as [WilayahId, number][])
                     .sort((a, b) => b[1] - a[1])[0];

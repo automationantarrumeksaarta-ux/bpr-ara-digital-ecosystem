@@ -2,7 +2,10 @@ import express from 'express';
 import multer from 'multer';
 import * as xlsx from 'xlsx';
 import db from './db.js';
-import { resolveWilayah, normalizeKolektibilitas, isBermasalah, KOLEK_BERMASALAH } from './wilayah.js';
+import {
+  resolveWilayah, resolveKabupaten, resolveKecamatan,
+  normalizeKolektibilitas, isBermasalah, KOLEK_BERMASALAH,
+} from './wilayah.js';
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -34,18 +37,22 @@ router.post('/reports/upload', upload.array('files'), (req, res) => {
       } else if (filename.toLowerCase().includes('rekap') || filename.toLowerCase().includes('npl')) {
         processRekapKredit(workbook);
         results.push(`Processed Rekap Kredit: ${filename}`);
+      // Pola yang lebih spesifik harus diperiksa lebih dulu. Berkas
+      // "Nom Depo Baru Agust 26.xls" mengandung "nom depo" DAN "depo baru";
+      // pada urutan sebelumnya ia selalu tertangkap processNomDepo sehingga
+      // laporan deposito baru tidak pernah diproses sebagai laporan pembukaan.
+      } else if (filename.toLowerCase().includes('depo baru')) {
+        processDepoBaru(workbook);
+        results.push(`Processed Deposito Baru: ${filename}`);
+      } else if (filename.toLowerCase().includes('tab baru')) {
+        processTabBaru(workbook);
+        results.push(`Processed Tabungan Baru: ${filename}`);
       } else if (filename.toLowerCase().includes('nom tab')) {
         processNomTab(workbook);
         results.push(`Processed Nominatif Tabungan: ${filename}`);
       } else if (filename.toLowerCase().includes('nom depo')) {
         processNomDepo(workbook);
         results.push(`Processed Nominatif Deposito: ${filename}`);
-      } else if (filename.toLowerCase().includes('tab baru')) {
-        processTabBaru(workbook);
-        results.push(`Processed Tabungan Baru: ${filename}`);
-      } else if (filename.toLowerCase().includes('depo baru')) {
-        processDepoBaru(workbook);
-        results.push(`Processed Deposito Baru: ${filename}`);
       } else if (filename.toLowerCase().includes('data aji') || filename.toLowerCase().includes('kredit')) {
         processNomKredit(workbook);
         results.push(`Processed Jadwal Tagihan/Mutasi Kredit: ${filename}`);
@@ -449,37 +456,101 @@ function processDepoBaru(workbook: xlsx.WorkBook) {
  * bergeser di file CBS sudah cukup membuat seluruh data salah. Sekarang header
  * dicari dulu, dengan indeks lama sebagai cadangan bila header tak dikenali.
  */
+/**
+ * Ekspor nominatif kredit dari core banking menuliskan SETIAP DIGIT sebagai
+ * HTML numeric character reference tanpa titik koma: "&#51&#56.&#55..."
+ * adalah "38.769.000,00". Tanpa didekode, Baki Debet Rp 38.769.000 terbaca
+ * menjadi 5156,55 — seluruh angka di dashboard jadi karangan.
+ *
+ * Berkas lain (tabungan, deposito, neraca, rekap) tidak terpengaruh, dan
+ * dekoder ini tidak mengubah teks yang memang bersih.
+ */
+const decodeEntitas = (v: unknown): string =>
+  String(v ?? '').replace(/&#(\d+);?/g, (_, d) => String.fromCharCode(Number(d)));
+
+const teks = (v: unknown): string => decodeEntitas(v).replace(/\s+/g, ' ').trim();
+
+const angka = (v: unknown): number => {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
+  const bersih = decodeEntitas(v)
+    .replace(/[^\d,.-]/g, '')
+    .replace(/\.(?=\d{3}\b)/g, '')   // titik pemisah ribuan
+    .replace(',', '.');              // koma desimal
+  const n = parseFloat(bersih);
+  return Number.isFinite(n) ? n : 0;
+};
+
+/**
+ * Cari baris header dan petakan nama kolom -> indeks.
+ *
+ * Menangani header dua baris (kolom bergabung): pada nominatif kredit,
+ * "Tungakan" di baris atas membentang ke beberapa kolom dengan sub-judul
+ * "Pokok / Bunga / Total" di baris bawah. Label induk dirambatkan ke kanan
+ * lalu digabung dengan sub-judulnya, sehingga kolom 16 dikenali sebagai
+ * "Tungakan Pokok" dan kolom 20 sebagai "Tungakan Total".
+ *
+ * Sebelumnya indeks kolom ditulis tetap (row[14], row[27], row[28]); satu
+ * kolom bergeser di file CBS sudah cukup membuat seluruh data salah.
+ */
 function petakanKolom(data: any[][]): { header: number; kolom: Record<string, number> } {
+  // Catatan ejaan: file asli menulis "Tungakan" (kurang satu g), dan kolom AO
+  // diberi judul "Petugas". Keduanya harus ikut dikenali.
   const POLA: Record<string, RegExp> = {
     rekening: /^(no\.?\s*)?(rek|rekening|no rek)/i,
-    nama: /^(nama|nama nasabah|nama debitur)/i,
+    nama: /^nama\s*(nasabah|debitur|peminjam)?/i,
     alamat: /^(alamat|almt)/i,
-    plafon: /^(plafon|limit|plafond)/i,
+    kabupaten: /^(kabupaten|kab\.?|kota)$/i,
+    kecamatan: /^kecamatan$/i,
+    plafon: /^(plafon|plafond|limit|jumlah pinjaman)/i,
     bakiDebet: /^(baki\s*debet|outstanding|os|saldo pokok)/i,
-    tunggakanPokok: /(tunggakan.*pokok|tggk.*pokok)/i,
-    tunggakanBunga: /(tunggakan.*bunga|tggk.*bunga)/i,
-    angsuran: /^(angsuran|jumlah angsuran|ags)/i,
-    tagihan: /^(tagihan|jumlah tagihan)/i,
-    kolektibilitas: /^(kol|kolek|kolektibilitas)/i,
-    ao: /^(ao|account officer|petugas|nama ao)/i,
-    sektor: /^(sektor|sektor ekonomi|sektor usaha)/i,
-    tujuan: /^(tujuan|tujuan penggunaan|penggunaan)/i,
+    tunggakanPokok: /^tung+akan\s+pokok$/i,
+    tunggakanBunga: /^tung+akan\s+bunga$/i,
+    angsuran: /^jadwal angsuran.*total$/i,
+    tagihan: /^(jumlah\s+)?tagihan$/i,
+    kolektibilitas: /^(kol|kolek|kolektibilitas)$/i,
+    ao: /^(ao|account officer|petugas|nama ao)$/i,
+    sektor: /^sektor/i,
+    tujuan: /^(tujuan|penggunaan)/i,
   };
 
-  for (let r = 0; r < Math.min(data.length, 20); r++) {
+  /** Gabungkan baris header dengan baris sub-header di bawahnya. */
+  const labelGabungan = (baris: any[], sub: any[] | undefined): string[] => {
+    const lebar = Math.max(baris.length, sub?.length ?? 0);
+    const hasil: string[] = [];
+    let induk = '';
+    for (let c = 0; c < lebar; c++) {
+      const atas = teks(baris[c]);
+      if (atas) induk = atas;
+      const bawah = sub ? teks(sub[c]) : '';
+      // Kolom tanpa sub-judul memakai label induknya sendiri, tapi hanya pada
+      // posisi aslinya — supaya "Baki Debet" tidak merambat ke kolom berikutnya.
+      if (bawah) hasil[c] = `${induk} ${bawah}`.trim();
+      else hasil[c] = atas;
+    }
+    return hasil;
+  };
+
+  for (let r = 0; r < Math.min(data.length, 25); r++) {
     const row = data[r];
     if (!row) continue;
+
+    const label = labelGabungan(row, data[r + 1]);
     const kolom: Record<string, number> = {};
-    for (let c = 0; c < row.length; c++) {
-      const sel = String(row[c] ?? '').trim();
+    for (let c = 0; c < label.length; c++) {
+      const sel = label[c];
       if (!sel) continue;
       for (const [nama, pola] of Object.entries(POLA)) {
         if (kolom[nama] === undefined && pola.test(sel)) kolom[nama] = c;
       }
     }
+
     // header dianggap sah bila minimal nama + kolektibilitas ketemu
     if (kolom.nama !== undefined && kolom.kolektibilitas !== undefined) {
-      return { header: r, kolom };
+      // Bila baris berikutnya ikut terpakai sebagai sub-header, data mulai
+      // dua baris di bawah.
+      const adaSubHeader = (data[r + 1] ?? []).some((_: any, c: number) =>
+        teks(data[r + 1][c]) && !teks(row[c]));
+      return { header: adaSubHeader ? r + 1 : r, kolom };
     }
   }
 
@@ -489,14 +560,6 @@ function petakanKolom(data: any[][]): { header: number; kolom: Record<string, nu
     kolom: { rekening: 2, nama: 3, bakiDebet: 14, kolektibilitas: 27, ao: 28 },
   };
 }
-
-const angka = (v: unknown): number => {
-  if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
-  const n = parseFloat(String(v ?? '').replace(/[^\d,.-]/g, '').replace(/\.(?=\d{3}\b)/g, '').replace(',', '.'));
-  return Number.isFinite(n) ? n : 0;
-};
-
-const teks = (v: unknown): string => String(v ?? '').trim();
 
 function processNomKredit(workbook: xlsx.WorkBook) {
   const sheetName = workbook.SheetNames.find(n => n.toUpperCase().includes('NOM_KREDIT') || n.toUpperCase().includes('AJI') || n.toUpperCase().includes('KREDIT')) || workbook.SheetNames[0];
@@ -544,11 +607,28 @@ function processNomKredit(workbook: xlsx.WorkBook) {
 
       const nama = teks(row[kolom.nama]);
       const kolek = normalizeKolektibilitas(row[kolom.kolektibilitas]);
+      // Baris tanpa kolektibilitas sah otomatis terbuang di sini — termasuk
+      // baris header yang diulang di tengah berkas oleh CBS setiap ganti
+      // halaman (nilainya harfiah "Kolek", "Petugas", "Kabupaten").
       if (!nama || !kolek) continue;
 
       const rekening = teks(row[kolom.rekening]) || `${periode}-${r}`;
       const alamat = teks(row[kolom.alamat]);
-      const { wilayah, kecamatan } = resolveWilayah(alamat);
+
+      // Kolom Kabupaten/Kecamatan tersendiri jauh lebih dapat dipercaya
+      // daripada menebak dari teks alamat; alamat hanya dipakai bila kolom
+      // itu tidak ada di berkas.
+      const kabKolom = kolom.kabupaten !== undefined ? teks(row[kolom.kabupaten]) : '';
+      const kecKolom = kolom.kecamatan !== undefined ? teks(row[kolom.kecamatan]) : '';
+
+      let wilayah = resolveKabupaten(kabKolom);
+      let kecamatan = wilayah || kecKolom ? resolveKecamatan(kecKolom, wilayah) : null;
+
+      if (!wilayah) {
+        const dariAlamat = resolveWilayah(`${kecKolom} ${alamat}`.trim());
+        wilayah = dariAlamat.wilayah;
+        kecamatan = kecamatan ?? dariAlamat.kecamatan;
+      }
       if (!wilayah) tanpaWilayah++;
 
       const bakiDebet = angka(row[kolom.bakiDebet]);
