@@ -40,4 +40,20 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!--
+        Diperlukan layar Absen (navigator.geolocation).
+
+        Capacitor sudah meminta izin ini saat runtime sendiri, lihat
+        BridgeWebChromeClient.onGeolocationPermissionsShowPrompt — jadi tidak
+        perlu plugin @capacitor/geolocation. Tetapi permintaan runtime otomatis
+        DITOLAK Android bila izinnya tidak dideklarasikan di sini, sehingga
+        absen tidak akan pernah mendapat lokasi.
+
+        COARSE didaftarkan bersama FINE karena sejak Android 12 pengguna boleh
+        memberi hanya "perkiraan lokasi"; Capacitor menerima kondisi itu
+        sebagai izin yang cukup.
+    -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 </manifest>
