@@ -87,9 +87,8 @@ export const DecisionQueue: React.FC<DecisionQueueProps> = ({ tasks, currentUser
       isNamedValidator = t.validator.split(',').some((v: string) => v.trim().toLowerCase() === currentUser.name!.trim().toLowerCase());
     }
     
-    // If we only strictly follow the matrix, Super Admin might see nothing if they aren't assigned as approver.
-    // Let's stick strictly to the matrix unless it's super admin for safety.
-    const isMyTask = isUnderApprover || isEscalatedToMe || isSuperAdmin || isNamedValidator;
+    // Let's stick strictly to the matrix.
+    const isMyTask = isUnderApprover || isEscalatedToMe || isNamedValidator;
     
     if (!isMyTask) return false;
 
