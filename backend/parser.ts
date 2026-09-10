@@ -2,12 +2,17 @@ import express from 'express';
 import multer from 'multer';
 import * as xlsx from 'xlsx';
 import db from './db.js';
+import { resolveWilayah, normalizeKolektibilitas, isBermasalah, KOLEK_BERMASALAH } from './wilayah.js';
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
-router.post('/upload', upload.array('files'), (req, res) => {
-  console.log('--- POST /api/upload HIT! ---');
+// CATATAN: rute ini dulu terdaftar sebagai POST /api/upload dan tertutup total
+// oleh handler upload lampiran di server.ts yang terdaftar lebih dahulu
+// (multer .single('file') vs .array('files') -> LIMIT_UNEXPECTED_FILE / 500).
+// Sekarang dipisah supaya keduanya bisa hidup berdampingan.
+router.post('/reports/upload', upload.array('files'), (req, res) => {
+  console.log('--- POST /api/reports/upload HIT! ---');
   console.log('Files received:', req.files ? (req.files as any[]).length : 0);
   try {
     const files = req.files as Express.Multer.File[];
@@ -95,6 +100,136 @@ router.get('/ews', (req, res) => {
     const alerts = db.prepare('SELECT * FROM ews_alerts ORDER BY updated_at DESC').all();
     res.json(alerts);
   } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Agregat untuk Dashboard Heat Map & Risiko Pembiayaan (PE Kepatuhan).
+ *
+ * Seluruh angka dihitung dari tabel `loans` hasil upload nominatif kredit.
+ * "Bermasalah" = NPL standar OJK (kolektibilitas KL, D, M) — lihat
+ * KOLEK_BERMASALAH di backend/wilayah.ts.
+ */
+router.get('/kepatuhan/heatmap', (req, res) => {
+  try {
+    const total = db.prepare('SELECT COUNT(*) AS n FROM loans').get() as { n: number };
+    if (!total.n) {
+      // Belum ada data terunggah — beri tahu frontend supaya menampilkan
+      // keadaan kosong, bukan angka nol yang menyesatkan.
+      return res.json({ tersedia: false, alasan: 'Belum ada data nominatif kredit yang diunggah.' });
+    }
+
+    const NPL = KOLEK_BERMASALAH.map(k => `'${k}'`).join(',');
+    const bermasalah = `collectibility IN (${NPL})`;
+
+    const portofolioWilayah = db.prepare(`
+      SELECT
+        kabupaten                                                   AS wilayah,
+        COUNT(*)                                                    AS totalNasabah,
+        COALESCE(SUM(outstanding), 0)                               AS totalBakiDebet,
+        SUM(CASE WHEN ${bermasalah} THEN 1 ELSE 0 END)              AS nasabahBermasalah,
+        COALESCE(SUM(CASE WHEN ${bermasalah} THEN outstanding ELSE 0 END), 0) AS bakiDebetBermasalah
+      FROM loans
+      WHERE kabupaten IS NOT NULL
+      GROUP BY kabupaten
+      ORDER BY nasabahBermasalah DESC
+    `).all();
+
+    const portofolioAO = db.prepare(`
+      SELECT
+        COALESCE(NULLIF(TRIM(officer_name), ''), 'Tanpa AO')        AS ao,
+        COUNT(*)                                                    AS totalNasabah,
+        SUM(CASE WHEN ${bermasalah} THEN 1 ELSE 0 END)              AS nasabahBermasalah,
+        COALESCE(SUM(CASE WHEN ${bermasalah} THEN outstanding ELSE 0 END), 0) AS bakiDebetBermasalah
+      FROM loans
+      GROUP BY ao
+      HAVING nasabahBermasalah > 0
+      ORDER BY nasabahBermasalah DESC
+    `).all();
+
+    /** Rasio bermasalah per kategori (sektor / tujuan). */
+    const perKategori = (kolom: 'sektor' | 'tujuan') => db.prepare(`
+      SELECT
+        ${kolom}                                                    AS kategori,
+        COUNT(*)                                                    AS total,
+        SUM(CASE WHEN ${bermasalah} THEN 1 ELSE 0 END)              AS bermasalah,
+        ROUND(SUM(CASE WHEN ${bermasalah} THEN 1.0 ELSE 0 END) * 100.0 / COUNT(*), 1) AS rasio
+      FROM loans
+      WHERE ${kolom} IS NOT NULL AND TRIM(${kolom}) != ''
+      GROUP BY ${kolom}
+      ORDER BY rasio DESC
+    `).all();
+
+    /** Rasio bermasalah per kategori dipecah per wilayah — pewarna heat map 2 & 3. */
+    const perKategoriWilayah = (kolom: 'sektor' | 'tujuan') => {
+      const baris = db.prepare(`
+        SELECT
+          ${kolom}   AS kategori,
+          kabupaten  AS wilayah,
+          ROUND(SUM(CASE WHEN ${bermasalah} THEN 1.0 ELSE 0 END) * 100.0 / COUNT(*), 1) AS rasio
+        FROM loans
+        WHERE kabupaten IS NOT NULL AND ${kolom} IS NOT NULL AND TRIM(${kolom}) != ''
+        GROUP BY ${kolom}, kabupaten
+      `).all() as { kategori: string; wilayah: string; rasio: number }[];
+
+      const peta: Record<string, Record<string, number>> = {};
+      for (const b of baris) {
+        (peta[b.kategori] ??= {})[b.wilayah] = b.rasio;
+      }
+      return peta;
+    };
+
+    const nasabahBermasalah = db.prepare(`
+      SELECT
+        account_number AS id, kabupaten AS wilayah, kecamatan,
+        COALESCE(NULLIF(TRIM(officer_name), ''), 'Tanpa AO') AS ao,
+        customer_name AS nama, collectibility AS kolektibilitas,
+        sektor, tujuan,
+        outstanding AS bakiDebet,
+        (COALESCE(tunggakan_pokok, 0) + COALESCE(tunggakan_bunga, 0)) AS tunggakan,
+        jumlah_tagihan AS jumlahTagihan, jumlah_angsuran AS jumlahAngsuran
+      FROM loans
+      WHERE ${bermasalah}
+      ORDER BY outstanding DESC
+      LIMIT 500
+    `).all();
+
+    const ringkas = db.prepare(`
+      SELECT
+        COUNT(*)                                                    AS totalNasabah,
+        COALESCE(SUM(limit_amount), 0)                              AS totalPembiayaan,
+        COALESCE(SUM(outstanding), 0)                               AS bakiDebet,
+        SUM(CASE WHEN ${bermasalah} THEN 1 ELSE 0 END)              AS nasabahBermasalah,
+        COALESCE(SUM(CASE WHEN ${bermasalah} THEN outstanding ELSE 0 END), 0) AS bakiDebetBermasalah
+      FROM loans
+    `).get() as any;
+
+    const tanpaWilayah = db.prepare('SELECT COUNT(*) AS n FROM loans WHERE kabupaten IS NULL').get() as { n: number };
+
+    res.json({
+      tersedia: true,
+      ringkas: {
+        ...ringkas,
+        rasioBermasalah: ringkas.totalNasabah
+          ? Number(((ringkas.nasabahBermasalah / ringkas.totalNasabah) * 100).toFixed(1))
+          : 0,
+      },
+      portofolioWilayah,
+      portofolioAO,
+      rasioSektor: perKategori('sektor'),
+      rasioTujuan: perKategori('tujuan'),
+      sektorPerWilayah: perKategoriWilayah('sektor'),
+      tujuanPerWilayah: perKategoriWilayah('tujuan'),
+      nasabahBermasalah,
+      diagnostik: {
+        totalBaris: total.n,
+        tanpaWilayah: tanpaWilayah.n,
+        definisiBermasalah: KOLEK_BERMASALAH.join(', '),
+      },
+    });
+  } catch (error: any) {
+    console.error('Heatmap aggregate error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -307,42 +442,143 @@ function processDepoBaru(workbook: xlsx.WorkBook) {
   // Stub for Deposito Baru
 }
 
+/**
+ * Cari baris header dan petakan nama kolom -> indeks.
+ *
+ * Sebelumnya indeks kolom ditulis tetap (row[14], row[27], row[28]); satu kolom
+ * bergeser di file CBS sudah cukup membuat seluruh data salah. Sekarang header
+ * dicari dulu, dengan indeks lama sebagai cadangan bila header tak dikenali.
+ */
+function petakanKolom(data: any[][]): { header: number; kolom: Record<string, number> } {
+  const POLA: Record<string, RegExp> = {
+    rekening: /^(no\.?\s*)?(rek|rekening|no rek)/i,
+    nama: /^(nama|nama nasabah|nama debitur)/i,
+    alamat: /^(alamat|almt)/i,
+    plafon: /^(plafon|limit|plafond)/i,
+    bakiDebet: /^(baki\s*debet|outstanding|os|saldo pokok)/i,
+    tunggakanPokok: /(tunggakan.*pokok|tggk.*pokok)/i,
+    tunggakanBunga: /(tunggakan.*bunga|tggk.*bunga)/i,
+    angsuran: /^(angsuran|jumlah angsuran|ags)/i,
+    tagihan: /^(tagihan|jumlah tagihan)/i,
+    kolektibilitas: /^(kol|kolek|kolektibilitas)/i,
+    ao: /^(ao|account officer|petugas|nama ao)/i,
+    sektor: /^(sektor|sektor ekonomi|sektor usaha)/i,
+    tujuan: /^(tujuan|tujuan penggunaan|penggunaan)/i,
+  };
+
+  for (let r = 0; r < Math.min(data.length, 20); r++) {
+    const row = data[r];
+    if (!row) continue;
+    const kolom: Record<string, number> = {};
+    for (let c = 0; c < row.length; c++) {
+      const sel = String(row[c] ?? '').trim();
+      if (!sel) continue;
+      for (const [nama, pola] of Object.entries(POLA)) {
+        if (kolom[nama] === undefined && pola.test(sel)) kolom[nama] = c;
+      }
+    }
+    // header dianggap sah bila minimal nama + kolektibilitas ketemu
+    if (kolom.nama !== undefined && kolom.kolektibilitas !== undefined) {
+      return { header: r, kolom };
+    }
+  }
+
+  // cadangan: tata letak lama yang diasumsikan parser sebelumnya
+  return {
+    header: 7,
+    kolom: { rekening: 2, nama: 3, bakiDebet: 14, kolektibilitas: 27, ao: 28 },
+  };
+}
+
+const angka = (v: unknown): number => {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
+  const n = parseFloat(String(v ?? '').replace(/[^\d,.-]/g, '').replace(/\.(?=\d{3}\b)/g, '').replace(',', '.'));
+  return Number.isFinite(n) ? n : 0;
+};
+
+const teks = (v: unknown): string => String(v ?? '').trim();
+
 function processNomKredit(workbook: xlsx.WorkBook) {
   const sheetName = workbook.SheetNames.find(n => n.toUpperCase().includes('NOM_KREDIT') || n.toUpperCase().includes('AJI') || n.toUpperCase().includes('KREDIT')) || workbook.SheetNames[0];
   const sheet = workbook.Sheets[sheetName];
   if (!sheet) return;
 
   const data = xlsx.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
-  
-  const stmt = db.prepare(`
+  const { header, kolom } = petakanKolom(data);
+  console.log('Nominatif kredit — baris header:', header, 'kolom terdeteksi:', Object.keys(kolom).join(', '));
+
+  const periode = new Date().toISOString().slice(0, 10);
+
+  const insertLoan = db.prepare(`
+    INSERT INTO loans (account_number, customer_name, address, limit_amount, outstanding,
+                       tunggakan_pokok, tunggakan_bunga, collectibility, officer_name,
+                       kabupaten, kecamatan, sektor, tujuan, jumlah_tagihan, jumlah_angsuran,
+                       period_date, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(account_number) DO UPDATE SET
+      customer_name = excluded.customer_name, address = excluded.address,
+      limit_amount = excluded.limit_amount, outstanding = excluded.outstanding,
+      tunggakan_pokok = excluded.tunggakan_pokok, tunggakan_bunga = excluded.tunggakan_bunga,
+      collectibility = excluded.collectibility, officer_name = excluded.officer_name,
+      kabupaten = excluded.kabupaten, kecamatan = excluded.kecamatan,
+      sektor = excluded.sektor, tujuan = excluded.tujuan,
+      jumlah_tagihan = excluded.jumlah_tagihan, jumlah_angsuran = excluded.jumlah_angsuran,
+      period_date = excluded.period_date, updated_at = CURRENT_TIMESTAMP
+  `);
+
+  const insertEws = db.prepare(`
     INSERT INTO ews_alerts (borrower_name, ao_name, kolektibilitas, outstanding_amount, risk_level, status)
     VALUES (?, ?, ?, ?, ?, 'TERDETEKSI')
   `);
-  
-  // Clear existing alerts to prevent duplicates on re-upload (simple approach for mock)
+
   db.prepare('DELETE FROM ews_alerts').run();
 
-  for (let r = 8; r < data.length; r++) {
-    const row = data[r];
-    if (!row || !row[2] || !row[3]) continue; // Ensure has Rekening and Nama
+  let diproses = 0, tanpaWilayah = 0, bermasalah = 0;
 
-    const nama = String(row[3]).trim();
-    const bakiDebet = Number(row[14]) || 0;
-    const kolek = String(row[27] || '').trim();
-    const ao = String(row[28] || '').trim();
+  // Satu transaksi: ribuan baris nominatif jadi jauh lebih cepat, dan bila ada
+  // baris rusak di tengah, tabel tidak tertinggal separuh terisi.
+  const jalankan = db.transaction(() => {
+    for (let r = header + 1; r < data.length; r++) {
+      const row = data[r];
+      if (!row) continue;
 
-    if (kolek && kolek !== 'L' && kolek !== '1') {
-      let riskLevel = 'LOW';
-      if (['M', '5', 'D', '4'].includes(kolek)) riskLevel = 'HIGH';
-      else if (['KL', '3', 'DPK', '2'].includes(kolek)) riskLevel = 'MEDIUM';
-      else riskLevel = 'MEDIUM'; // fallback for other non-L
+      const nama = teks(row[kolom.nama]);
+      const kolek = normalizeKolektibilitas(row[kolom.kolektibilitas]);
+      if (!nama || !kolek) continue;
 
-      try {
-        stmt.run(nama, ao, kolek, bakiDebet, riskLevel);
-      } catch (e) {
-        console.error('Error inserting EWS for', nama, e);
+      const rekening = teks(row[kolom.rekening]) || `${periode}-${r}`;
+      const alamat = teks(row[kolom.alamat]);
+      const { wilayah, kecamatan } = resolveWilayah(alamat);
+      if (!wilayah) tanpaWilayah++;
+
+      const bakiDebet = angka(row[kolom.bakiDebet]);
+      const tPokok = angka(row[kolom.tunggakanPokok]);
+      const tBunga = angka(row[kolom.tunggakanBunga]);
+      const angsuran = angka(row[kolom.angsuran]);
+      // Bila kolom tagihan tidak ada di file, pakai total tunggakan sebagai proksi.
+      const tagihan = kolom.tagihan !== undefined ? angka(row[kolom.tagihan]) : tPokok + tBunga;
+      const ao = teks(row[kolom.ao]);
+
+      insertLoan.run(
+        rekening, nama, alamat, angka(row[kolom.plafon]), bakiDebet,
+        tPokok, tBunga, kolek, ao,
+        wilayah, kecamatan, teks(row[kolom.sektor]) || null, teks(row[kolom.tujuan]) || null,
+        tagihan, angsuran, periode,
+      );
+      diproses++;
+
+      if (isBermasalah(kolek)) {
+        bermasalah++;
+        insertEws.run(nama, ao, kolek, bakiDebet, kolek === 'KL' ? 'MEDIUM' : 'HIGH');
       }
     }
+  });
+
+  jalankan();
+
+  console.log(`Nominatif kredit: ${diproses} baris, ${bermasalah} bermasalah (KL/D/M), ${tanpaWilayah} tanpa wilayah terdeteksi.`);
+  if (tanpaWilayah > diproses * 0.3) {
+    console.warn('⚠️  Lebih dari 30% baris tidak terpetakan ke kabupaten. Periksa kolom alamat / tambahkan alias di backend/wilayah.ts');
   }
 }
 

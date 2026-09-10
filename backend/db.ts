@@ -251,6 +251,31 @@ export function initDb() {
     console.error('Error adding columns:', e);
   }
 
+  // Kolom tambahan pada `loans` untuk Dashboard Heat Map & Risiko Pembiayaan.
+  // Diisi oleh parser nominatif kredit (backend/parser.ts).
+  try {
+    const loanCols = (db.prepare('PRAGMA table_info(loans)').all() as any[]).map(c => c.name);
+    const tambahan: Record<string, string> = {
+      kabupaten: 'TEXT',
+      kecamatan: 'TEXT',
+      sektor: 'TEXT',
+      tujuan: 'TEXT',
+      jumlah_tagihan: 'REAL DEFAULT 0',
+      jumlah_angsuran: 'REAL DEFAULT 0',
+      period_date: 'TEXT',
+    };
+    for (const [nama, tipe] of Object.entries(tambahan)) {
+      if (!loanCols.includes(nama)) {
+        db.exec(`ALTER TABLE loans ADD COLUMN ${nama} ${tipe}`);
+        console.log(`Added ${nama} column to loans table.`);
+      }
+    }
+    db.exec('CREATE INDEX IF NOT EXISTS idx_loans_kabupaten ON loans(kabupaten)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_loans_collectibility ON loans(collectibility)');
+  } catch (e) {
+    console.error('Error adding loans columns:', e);
+  }
+
   console.log('Database initialized successfully.');
 }
 

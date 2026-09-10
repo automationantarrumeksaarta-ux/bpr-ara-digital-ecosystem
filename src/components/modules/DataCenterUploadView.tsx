@@ -42,7 +42,9 @@ export const DataCenterUploadView: React.FC = () => {
       const formData = new FormData();
       selectedFiles.forEach(f => formData.append('files', f));
 
-      const res = await fetch('/api/upload', {
+      // /api/upload dipakai untuk lampiran tugas (single file); laporan Excel
+      // punya rute sendiri agar tidak saling menutupi.
+      const res = await fetch('/api/reports/upload', {
         method: 'POST',
         body: formData
       });

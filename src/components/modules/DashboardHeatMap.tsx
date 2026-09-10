@@ -18,20 +18,13 @@ import { useApp } from '../../context/AppContext';
 import { SurakartaHeatMap, RISK_STOPS, riskColor } from './kepatuhan/SurakartaHeatMap';
 import { KARESIDENAN_SURAKARTA } from '../../data/geo/surakartaMap';
 import {
-  PORTOFOLIO_WILAYAH,
-  PORTOFOLIO_AO,
-  NASABAH_BERMASALAH,
-  RASIO_SEKTOR,
-  RASIO_TUJUAN,
-  SEKTOR_PER_WILAYAH,
-  TUJUAN_PER_WILAYAH,
   KECAMATAN_PER_WILAYAH,
   PERIODE_OPTIONS,
   CABANG_OPTIONS,
   TREN_PERIODE_SEBELUMNYA,
-  TOTAL_PEMBIAYAAN,
   type WilayahId,
 } from '../../data/kepatuhan/heatMapData';
+import { useKepatuhanHeatMap } from '../../hooks/useKepatuhanHeatMap';
 
 // ---------------------------------------------------------------- helpers
 
@@ -131,6 +124,18 @@ const TABS: { id: TabId; label: string }[] = [
 
 export const DashboardHeatMap: React.FC = () => {
   const { openCustomer360 } = useApp();
+  const { data, sumber, memuat, catatan, diagnostik } = useKepatuhanHeatMap();
+
+  const {
+    portofolioWilayah: PORTOFOLIO_WILAYAH,
+    portofolioAO: PORTOFOLIO_AO,
+    nasabahBermasalah: NASABAH_BERMASALAH,
+    rasioSektor: RASIO_SEKTOR,
+    rasioTujuan: RASIO_TUJUAN,
+    sektorPerWilayah: SEKTOR_PER_WILAYAH,
+    tujuanPerWilayah: TUJUAN_PER_WILAYAH,
+    totalPembiayaan: TOTAL_PEMBIAYAAN,
+  } = data;
 
   const [activeTab, setActiveTab] = useState<TabId>('nasabah');
   const [periode, setPeriode] = useState<string>(PERIODE_OPTIONS[0]);
@@ -138,12 +143,21 @@ export const DashboardHeatMap: React.FC = () => {
   const [aoFilter, setAoFilter] = useState<string>('Semua AO');
   const [wilayahFilter, setWilayahFilter] = useState<WilayahId | null>(null);
   const [kecamatanFilter, setKecamatanFilter] = useState<string>('Semua Kecamatan');
-  const [sektorAktif, setSektorAktif] = useState<string>(RASIO_SEKTOR[0].sektor);
-  const [tujuanAktif, setTujuanAktif] = useState<string>(RASIO_TUJUAN[0].tujuan);
+  const [sektorDipilih, setSektorDipilih] = useState<string | null>(null);
+  const [tujuanDipilih, setTujuanDipilih] = useState<string | null>(null);
+
+  // Kategori aktif menyesuaikan data yang datang; saat sumber berganti dari
+  // contoh ke API, pilihan lama bisa saja tidak ada lagi.
+  const sektorAktif = (sektorDipilih && RASIO_SEKTOR.some(s => s.sektor === sektorDipilih))
+    ? sektorDipilih
+    : RASIO_SEKTOR[0]?.sektor ?? '';
+  const tujuanAktif = (tujuanDipilih && RASIO_TUJUAN.some(t => t.tujuan === tujuanDipilih))
+    ? tujuanDipilih
+    : RASIO_TUJUAN[0]?.tujuan ?? '';
 
   const daftarAo = useMemo(
     () => ['Semua AO', ...PORTOFOLIO_AO.map(a => a.ao).filter(a => a !== 'Lainnya')],
-    [],
+    [PORTOFOLIO_AO],
   );
 
   const daftarKecamatan = useMemo(
@@ -160,7 +174,7 @@ export const DashboardHeatMap: React.FC = () => {
   // ---- data terfilter ----
   const wilayahTerfilter = useMemo(
     () => PORTOFOLIO_WILAYAH.filter(w => !wilayahFilter || w.wilayah === wilayahFilter),
-    [wilayahFilter],
+    [PORTOFOLIO_WILAYAH, wilayahFilter],
   );
 
   const nasabahTerfilter = useMemo(
@@ -169,7 +183,7 @@ export const DashboardHeatMap: React.FC = () => {
       (aoFilter === 'Semua AO' || n.ao === aoFilter) &&
       (kecamatanFilter === 'Semua Kecamatan' || n.kecamatan === kecamatanFilter),
     ),
-    [wilayahFilter, aoFilter, kecamatanFilter],
+    [NASABAH_BERMASALAH, wilayahFilter, aoFilter, kecamatanFilter],
   );
 
   // ---- KPI dihitung dari data, bukan angka tetap ----
@@ -187,7 +201,7 @@ export const DashboardHeatMap: React.FC = () => {
       rasio: totalNasabah ? (bermasalah / totalNasabah) * 100 : 0,
       bakiBermasalah,
     };
-  }, [wilayahTerfilter]);
+  }, [wilayahTerfilter, PORTOFOLIO_WILAYAH, TOTAL_PEMBIAYAAN]);
 
   const stats = [
     { label: 'Total Pembiayaan', value: rupiahPenuh(Math.round(kpi.totalPembiayaan)), icon: BanknotesIcon, trend: TREN_PERIODE_SEBELUMNYA.totalPembiayaan, baik: true, bg: 'bg-blue-50 dark:bg-blue-900/20', color: 'text-blue-600 dark:text-blue-400' },
@@ -201,23 +215,25 @@ export const DashboardHeatMap: React.FC = () => {
   // ---- nilai pewarna untuk ketiga peta ----
   const rasioWilayah = useMemo(() => {
     const out: Record<string, number> = {};
-    for (const w of PORTOFOLIO_WILAYAH) out[w.wilayah] = (w.nasabahBermasalah / w.totalNasabah) * 100;
+    for (const w of PORTOFOLIO_WILAYAH) {
+      out[w.wilayah] = w.totalNasabah ? (w.nasabahBermasalah / w.totalNasabah) * 100 : 0;
+    }
     return out;
-  }, []);
+  }, [PORTOFOLIO_WILAYAH]);
 
   const nilaiSektor = useMemo(
     () => (SEKTOR_PER_WILAYAH[sektorAktif] ?? {}) as Record<string, number>,
-    [sektorAktif],
+    [SEKTOR_PER_WILAYAH, sektorAktif],
   );
 
   const nilaiTujuan = useMemo(
     () => (TUJUAN_PER_WILAYAH[tujuanAktif] ?? {}) as Record<string, number>,
-    [tujuanAktif],
+    [TUJUAN_PER_WILAYAH, tujuanAktif],
   );
 
   const wilayahUrut = useMemo(
     () => [...PORTOFOLIO_WILAYAH].sort((a, b) => rasioWilayah[b.wilayah] - rasioWilayah[a.wilayah]),
-    [rasioWilayah],
+    [PORTOFOLIO_WILAYAH, rasioWilayah],
   );
 
   // ---- risk matrix: kuadran ditentukan dari median, bukan ditulis manual ----
@@ -241,7 +257,7 @@ export const DashboardHeatMap: React.FC = () => {
       else bucket.sehat.push(nama);
     }
     return bucket;
-  }, [rasioWilayah]);
+  }, [PORTOFOLIO_WILAYAH, rasioWilayah]);
 
   const judulFilter = wilayahFilter ? NAMA_WILAYAH[wilayahFilter] : 'Karesidenan Surakarta';
 
@@ -276,6 +292,40 @@ export const DashboardHeatMap: React.FC = () => {
           <FilterSelect label="Kecamatan" value={kecamatanFilter} options={daftarKecamatan} icon={MapPinIcon} onChange={setKecamatanFilter} />
         </div>
       </div>
+
+      {/* ---------- Penanda sumber data ---------- */}
+      {memuat ? (
+        <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-gray-800 text-xs font-semibold text-slate-500">
+          <span className="w-3 h-3 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+          Memuat data nominatif kredit…
+        </div>
+      ) : sumber === 'contoh' ? (
+        <div className="flex flex-wrap items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 text-xs text-amber-800 dark:text-amber-300">
+          <ExclamationTriangleIcon className="w-4 h-4 shrink-0" />
+          <span className="font-bold">Data contoh.</span>
+          <span>{catatan ?? 'Belum ada data nominatif kredit yang diunggah.'}</span>
+          <span className="opacity-80">
+            Unggah file nominatif kredit di menu Data Center agar dashboard memakai data sebenarnya.
+          </span>
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50 text-xs text-emerald-800 dark:text-emerald-300">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+          <span className="font-bold">Data nominatif kredit.</span>
+          {diagnostik && (
+            <>
+              <span>{diagnostik.totalBaris.toLocaleString('id-ID')} rekening diproses.</span>
+              <span>Bermasalah = kolektibilitas {diagnostik.definisiBermasalah} (NPL OJK).</span>
+              {diagnostik.tanpaWilayah > 0 && (
+                <span className="text-amber-700 dark:text-amber-400 font-semibold">
+                  {diagnostik.tanpaWilayah.toLocaleString('id-ID')} rekening belum terpetakan ke kabupaten
+                  dan tidak masuk peta.
+                </span>
+              )}
+            </>
+          )}
+        </div>
+      )}
 
       {/* ---------- Kartu ringkasan ---------- */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
@@ -353,7 +403,7 @@ export const DashboardHeatMap: React.FC = () => {
                 <button
                   key={s.sektor}
                   type="button"
-                  onClick={() => setSektorAktif(s.sektor)}
+                  onClick={() => setSektorDipilih(s.sektor)}
                   className={`flex items-center justify-between text-xs w-full px-2 py-1 rounded-md transition-colors ${aktif ? 'bg-indigo-50 dark:bg-indigo-900/20 ring-1 ring-indigo-400' : 'hover:bg-gray-50 dark:hover:bg-gray-700/40'}`}
                 >
                   <span className="flex items-center gap-1.5 min-w-0">
@@ -384,7 +434,7 @@ export const DashboardHeatMap: React.FC = () => {
                 <button
                   key={t.tujuan}
                   type="button"
-                  onClick={() => setTujuanAktif(t.tujuan)}
+                  onClick={() => setTujuanDipilih(t.tujuan)}
                   className={`flex items-center justify-between text-xs w-full px-2 py-1 rounded-md transition-colors ${aktif ? 'bg-cyan-50 dark:bg-cyan-900/20 ring-1 ring-cyan-400' : 'hover:bg-gray-50 dark:hover:bg-gray-700/40'}`}
                 >
                   <span className="flex items-center gap-1.5 min-w-0">
