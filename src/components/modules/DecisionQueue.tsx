@@ -87,8 +87,8 @@ export const DecisionQueue: React.FC<DecisionQueueProps> = ({ tasks, currentUser
       isNamedValidator = t.validator.split(',').some((v: string) => v.trim().toLowerCase() === currentUser.name!.trim().toLowerCase());
     }
     
-    // Let's stick strictly to the matrix.
-    const isMyTask = isUnderApprover || isEscalatedToMe || isNamedValidator;
+    // Aturan baru: Approval Queue HANYA untuk yang secara eksplisit ditunjuk sebagai Validator.
+    const isMyTask = isNamedValidator || isEscalatedToMe;
     
     if (!isMyTask) return false;
 
