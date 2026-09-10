@@ -214,6 +214,23 @@ router.get('/kepatuhan/heatmap', (req, res) => {
 
     const tanpaWilayah = db.prepare('SELECT COUNT(*) AS n FROM loans WHERE kabupaten IS NULL').get() as { n: number };
 
+    /*
+     * Angka RESMI berasal dari Laporan Rekap Nominatif Kredit, bukan dihitung
+     * ulang dari nominatif kredit. Nominatif kredit adalah "Jadwal Tagihan"
+     * — sebuah irisan portofolio pada tanggal tertentu — sehingga NPL yang
+     * dihitung darinya tidak akan sama persis dengan yang dilaporkan ke OJK.
+     * Keduanya ditampilkan berdampingan agar selisihnya terlihat, bukan
+     * disembunyikan.
+     */
+    const resmi = db.prepare(`
+      SELECT period_date AS periode, npl_percentage AS npl, repayment_rate AS rr,
+             total_outstanding AS outstanding
+      FROM macro_financials
+      WHERE npl_percentage IS NOT NULL
+      ORDER BY period_date DESC
+      LIMIT 1
+    `).get() ?? null;
+
     res.json({
       tersedia: true,
       ringkas: {
@@ -229,6 +246,7 @@ router.get('/kepatuhan/heatmap', (req, res) => {
       sektorPerWilayah: perKategoriWilayah('sektor'),
       tujuanPerWilayah: perKategoriWilayah('tujuan'),
       nasabahBermasalah,
+      resmi,
       diagnostik: {
         totalBaris: total.n,
         tanpaWilayah: tanpaWilayah.n,
@@ -240,222 +258,8 @@ router.get('/kepatuhan/heatmap', (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+/* ------------------------------------------------------------------ helper umum */
 
-function processNeraca(workbook: xlsx.WorkBook) {
-  // Find Neraca sheet
-  const sheetName = workbook.SheetNames.find(n => n.toUpperCase().includes('NERACA')) || workbook.SheetNames[0];
-  const sheet = workbook.Sheets[sheetName];
-  if (!sheet) return;
-
-  const data = xlsx.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
-  
-  let currentYearProfit = 0;
-  let totalAssets = 0;
-  let depo3 = 0, depo6 = 0, depo12 = 0;
-  let tabUmum = 0, tabWajib = 0, tabKejar = 0;
-
-  for (let r = 0; r < data.length; r++) {
-    const row = data[r];
-    if (!row) continue;
-    for (let c = 0; c < row.length; c++) {
-      const val = String(row[c] || '').toLowerCase();
-      if (val.includes('laba tahun berjalan')) currentYearProfit = Number(row[c+1]) || 0;
-      if (val.includes('jumlah aset')) totalAssets = Number(row[c+1]) || Number(row[c+2]) || 0; // Fallback
-      if (val === 'deposito 3 bulan') depo3 = Number(row[c+1]) || 0;
-      if (val === 'deposito 6 bulan') depo6 = Number(row[c+1]) || 0;
-      if (val === 'deposito 12 bulan') depo12 = Number(row[c+1]) || 0;
-      if (val === 'tabungan umum') tabUmum = Number(row[c+1]) || 0;
-      if (val === 'tabungan wajib') tabWajib = Number(row[c+1]) || 0;
-      if (val === 'tabungan kejar') tabKejar = Number(row[c+1]) || 0;
-    }
-  }
-
-  // If we couldn't find them precisely by string match, fallback to mock if 0 (for safety)
-  if (currentYearProfit === 0) currentYearProfit = 181325116.58;
-  if (totalAssets === 0) totalAssets = 37712478085;
-
-  const totalTabungan = tabUmum + tabWajib + tabKejar;
-  const totalDeposito = depo3 + depo6 + depo12;
-
-  const stmt = db.prepare(`
-    INSERT INTO macro_financials (period_date, current_year_profit, total_assets, total_tabungan, total_deposito)
-    VALUES (?, ?, ?, ?, ?)
-    ON CONFLICT(period_date) DO UPDATE SET
-      current_year_profit = excluded.current_year_profit,
-      total_assets = excluded.total_assets,
-      total_tabungan = excluded.total_tabungan,
-      total_deposito = excluded.total_deposito
-  `);
-  stmt.run('2026-07-31', currentYearProfit, totalAssets, totalTabungan, totalDeposito);
-  
-  const breakdownStmt = db.prepare(`
-    INSERT INTO funding_breakdowns (period_date, account_type, amount)
-    VALUES (?, ?, ?)
-    ON CONFLICT(period_date, account_type) DO UPDATE SET amount = excluded.amount
-  `);
-  breakdownStmt.run('2026-07-31', 'Deposito 3 Bulan', depo3 || 1120000000);
-  breakdownStmt.run('2026-07-31', 'Deposito 6 Bulan', depo6 || 2069800000);
-  breakdownStmt.run('2026-07-31', 'Deposito 12 Bulan', depo12 || 12051500000);
-  breakdownStmt.run('2026-07-31', 'Tabungan Umum', tabUmum || 8046500130);
-  breakdownStmt.run('2026-07-31', 'Tabungan Wajib', tabWajib || 1004878228);
-  breakdownStmt.run('2026-07-31', 'Tabungan Kejar', tabKejar || 152488568);
-}
-
-function processRekapKredit(workbook: xlsx.WorkBook) {
-  const sheetName = workbook.SheetNames.find(n => n.toUpperCase().includes('NPL') || n.toUpperCase().includes('REKAP')) || workbook.SheetNames[0];
-  const sheet = workbook.Sheets[sheetName];
-  if (!sheet) return;
-
-  const data = xlsx.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
-  
-  let npl = 0;
-  let outstanding = 0;
-  let rr = 71.84; // Fallback since RR isn't explicitly in NPL sheet
-
-  for (let r = 0; r < data.length; r++) {
-    const row = data[r];
-    if (!row) continue;
-    
-    // NPL % is usually around Row 28 Col 5
-    if (row[0] && String(row[0]).includes('- NPL')) {
-      // Find the percentage column (usually the last one)
-      let foundNpl = false;
-      for (let i = row.length - 1; i >= 1; i--) {
-        const val = String(row[i] || '').trim();
-        if (val.includes('%') && !val.includes('x')) {
-          const parsed = parseFloat(val.replace(',', '.').replace('%', '').trim());
-          if (!isNaN(parsed)) {
-            npl = parsed;
-            foundNpl = true;
-            break;
-          }
-        }
-      }
-      
-      // Outstanding is usually in the next row
-      const nextRow = data[r+1];
-      if (nextRow) {
-        outstanding = Number(nextRow[3] || nextRow[4]) || 0;
-      }
-    }
-  }
-
-  // Fallbacks if not found
-  if (npl === 0) npl = 19.91;
-  if (outstanding === 0) outstanding = 30459388463;
-
-  const stmt = db.prepare(`
-    INSERT INTO macro_financials (period_date, total_outstanding, npl_percentage, repayment_rate)
-    VALUES (?, ?, ?, ?)
-    ON CONFLICT(period_date) DO UPDATE SET
-      total_outstanding = excluded.total_outstanding,
-      npl_percentage = excluded.npl_percentage,
-      repayment_rate = excluded.repayment_rate
-  `);
-  stmt.run('2026-07-31', outstanding, npl, rr);
-}
-
-function processNomTab(workbook: xlsx.WorkBook) {
-  const sheetName = workbook.SheetNames.find(n => n.toUpperCase().includes('NOM_TAB') || n.toUpperCase().includes('TABUNGAN')) || workbook.SheetNames[0];
-  const sheet = workbook.Sheets[sheetName];
-  if (!sheet) return;
-
-  const data = xlsx.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
-  let totalTabungan = 0;
-
-  for (let r = 0; r < data.length; r++) {
-    const row = data[r];
-    if (!row || row.length < 7) continue;
-    
-    // Balance is usually around col 6 or 7
-    const balance = Number(row[6]) || 0;
-    if (balance > 0 && typeof row[1] === 'number') { // Ensure it's a valid row
-      totalTabungan += balance;
-    }
-  }
-
-  // We only sum it up for logs or detail tables, 
-  // macro total is now reliably handled by Neraca parser to prevent partial sum overwrites
-  if (totalTabungan > 0) {
-    console.log('Parsed Nominatif Tabungan Total (Partial/Full):', totalTabungan);
-  }
-}
-
-function processNomDepo(workbook: xlsx.WorkBook) {
-  const sheetName = workbook.SheetNames.find(n => n.toUpperCase().includes('NOM_DEPO') || n.toUpperCase().includes('DEPOSITO')) || workbook.SheetNames[0];
-  const sheet = workbook.Sheets[sheetName];
-  if (!sheet) return;
-
-  const data = xlsx.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
-  let totalDeposito = 0;
-
-  for (let r = 0; r < data.length; r++) {
-    const row = data[r];
-    if (!row || row.length < 12) continue;
-    
-    // Balance is usually around col 11
-    const balance = Number(row[11]) || 0;
-    if (balance > 0 && typeof row[1] === 'number') { // Ensure it's a valid row
-      totalDeposito += balance;
-    }
-  }
-
-  // We only sum it up for logs or detail tables
-  if (totalDeposito > 0) {
-    console.log('Parsed Nominatif Deposito Total (Partial/Full):', totalDeposito);
-  }
-}
-
-function processTabBaru(workbook: xlsx.WorkBook) {
-  const sheetName = workbook.SheetNames.find(n => n.toUpperCase().includes('TAB_BARU') || n.toUpperCase().includes('TAB BARU')) || workbook.SheetNames[0];
-  const sheet = workbook.Sheets[sheetName];
-  if (!sheet) return;
-
-  const data = xlsx.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
-  
-  db.prepare('DELETE FROM ao_performance').run();
-  
-  const stmt = db.prepare(`
-    INSERT INTO ao_performance (ao_name, achieved, target)
-    VALUES (?, ?, 50000000)
-    ON CONFLICT(ao_name) DO UPDATE SET achieved = achieved + excluded.achieved
-  `);
-
-  for (let r = 8; r < data.length; r++) {
-    const row = data[r];
-    if (!row || row.length < 10) continue;
-    
-    // Find AO name (usually string) and Saldo
-    let aoName = '';
-    let saldo = 0;
-    
-    for (let i = row.length - 1; i >= 5; i--) {
-      const val = row[i];
-      if (typeof val === 'string' && val.length > 2 && !aoName && isNaN(Number(val))) {
-        aoName = val.trim();
-      }
-      if (typeof val === 'number' && val > 1000 && saldo === 0) {
-        saldo = val;
-      }
-    }
-
-    if (aoName && saldo > 0) {
-      stmt.run(aoName, saldo);
-    }
-  }
-}
-
-function processDepoBaru(workbook: xlsx.WorkBook) {
-  // Stub for Deposito Baru
-}
-
-/**
- * Cari baris header dan petakan nama kolom -> indeks.
- *
- * Sebelumnya indeks kolom ditulis tetap (row[14], row[27], row[28]); satu kolom
- * bergeser di file CBS sudah cukup membuat seluruh data salah. Sekarang header
- * dicari dulu, dengan indeks lama sebagai cadangan bila header tak dikenali.
- */
 /**
  * Ekspor nominatif kredit dari core banking menuliskan SETIAP DIGIT sebagai
  * HTML numeric character reference tanpa titik koma: "&#51&#56.&#55..."
@@ -479,6 +283,435 @@ const angka = (v: unknown): number => {
   const n = parseFloat(bersih);
   return Number.isFinite(n) ? n : 0;
 };
+
+const BULAN_ID = [
+  'januari', 'februari', 'maret', 'april', 'mei', 'juni',
+  'juli', 'agustus', 'september', 'oktober', 'november', 'desember',
+];
+
+/**
+ * Tanggal periode laporan, dibaca dari kop berkas.
+ *
+ * Sebelumnya SEMUA hasil parsing ditulis ke period_date '2026-07-31' yang
+ * ditulis tetap di dalam kode, sehingga mengunggah laporan bulan mana pun
+ * selalu menimpa baris yang sama dan riwayat antar periode tidak pernah
+ * terbentuk.
+ *
+ * Mengembalikan null bila tidak ketemu — pemanggil yang memutuskan apakah
+ * menolak berkas atau memakai tanggal hari ini.
+ */
+function bacaPeriode(rows: any[][], batasBaris = 15): string | null {
+  for (let r = 0; r < Math.min(rows.length, batasBaris); r++) {
+    for (const sel of rows[r] ?? []) {
+      const s = teks(sel).toLowerCase();
+      if (!s) continue;
+
+      // "31 Juli 2026", "Per : 31 Agustus 2026", "Per Tanggal : 30 Juni 2026"
+      const m = s.match(/(\d{1,2})\s+([a-z]+)\s+(\d{4})/);
+      if (m) {
+        const bln = BULAN_ID.indexOf(m[2]);
+        if (bln >= 0) {
+          const d = new Date(Date.UTC(Number(m[3]), bln, Number(m[1])));
+          return d.toISOString().slice(0, 10);
+        }
+      }
+
+      // "01/08/2026"
+      const m2 = s.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+      if (m2) {
+        const d = new Date(Date.UTC(Number(m2[3]), Number(m2[2]) - 1, Number(m2[1])));
+        return d.toISOString().slice(0, 10);
+      }
+    }
+  }
+  return null;
+}
+
+/** Akhir bulan dari sebuah tanggal — dipakai menyeragamkan periode laporan. */
+const akhirBulan = (iso: string): string => {
+  const d = new Date(iso + 'T00:00:00Z');
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).toISOString().slice(0, 10);
+};
+
+const hariIni = () => new Date().toISOString().slice(0, 10);
+
+/** Tulis satu kolom macro_financials tanpa menimpa kolom lain pada periode sama. */
+function simpanMacro(periode: string, nilai: Record<string, number | null>) {
+  const kolom = Object.keys(nilai).filter(k => nilai[k] !== null);
+  if (kolom.length === 0) return;
+
+  db.prepare(`INSERT OR IGNORE INTO macro_financials (period_date) VALUES (?)`).run(periode);
+  const set = kolom.map(k => `${k} = ?`).join(', ');
+  db.prepare(`UPDATE macro_financials SET ${set}, updated_at = CURRENT_TIMESTAMP WHERE period_date = ?`)
+    .run(...kolom.map(k => nilai[k]), periode);
+}
+
+/** Cari baris berlabel tertentu lalu ambil angka di kolom sebelahnya. */
+function nilaiBerlabel(rows: any[][], cocok: (label: string) => boolean): number | null {
+  for (const row of rows) {
+    if (!row) continue;
+    for (let c = 0; c < row.length; c++) {
+      const label = teks(row[c]).toLowerCase();
+      if (!label || !cocok(label)) continue;
+      for (let j = c + 1; j < Math.min(c + 3, row.length); j++) {
+        const v = angka(row[j]);
+        if (v !== 0) return v;
+      }
+    }
+  }
+  return null;
+}
+
+/* ------------------------------------------------------------------ NERACA */
+
+/**
+ * Peran berkas: rincian produk simpanan (Tabungan Umum/Wajib/Kejar,
+ * Deposito 3/6/12 bulan) dan laba tahun berjalan.
+ *
+ * Versi sebelumnya memakai nilai cadangan yang ditulis tetap di dalam kode
+ * (laba 181.325.116,58; aset 37.712.478.085; depo 3 bulan 1.120.000.000; dst).
+ * Angka-angka itu persis isi Neraca 31 Juli 2026 — artinya bila Neraca bulan
+ * lain gagal diurai, dashboard diam-diam menampilkan angka Juli 2026 seolah
+ * data terbaru. Semua cadangan itu dibuang; kolom yang tidak ditemukan
+ * dibiarkan kosong dan dicatat di log.
+ */
+function processNeraca(workbook: xlsx.WorkBook) {
+  const sheetName = workbook.SheetNames.find(n => n.toUpperCase().includes('NERACA')) || workbook.SheetNames[0];
+  const sheet = workbook.Sheets[sheetName];
+  if (!sheet) return;
+
+  const rows = xlsx.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
+  const periode = bacaPeriode(rows) ?? hariIni();
+
+  const persis = (target: string) => (l: string) => l === target;
+
+  const laba = nilaiBerlabel(rows, persis('laba tahun berjalan'));
+  const aset = nilaiBerlabel(rows, l => l === 'aset' || l === 'jumlah aset' || l === 'total aset');
+  const kewajiban = nilaiBerlabel(rows, l => l === 'kewajiban' || l === 'jumlah kewajiban');
+
+  const tabUmum = nilaiBerlabel(rows, persis('tabungan umum'));
+  const tabWajib = nilaiBerlabel(rows, persis('tabungan wajib'));
+  const tabKejar = nilaiBerlabel(rows, persis('tabungan kejar'));
+  const depo3 = nilaiBerlabel(rows, persis('deposito 3 bulan'));
+  const depo6 = nilaiBerlabel(rows, persis('deposito 6 bulan'));
+  const depo12 = nilaiBerlabel(rows, persis('deposito 12 bulan'));
+
+  simpanMacro(periode, {
+    current_year_profit: laba,
+    total_assets: aset,
+    total_liabilities: kewajiban,
+  });
+
+  const breakdown = db.prepare(`
+    INSERT INTO funding_breakdowns (period_date, account_type, amount)
+    VALUES (?, ?, ?)
+    ON CONFLICT(period_date, account_type) DO UPDATE SET amount = excluded.amount, updated_at = CURRENT_TIMESTAMP
+  `);
+
+  const rincian: [string, number | null][] = [
+    ['Tabungan Umum', tabUmum],
+    ['Tabungan Wajib', tabWajib],
+    ['Tabungan Kejar', tabKejar],
+    ['Deposito 3 Bulan', depo3],
+    ['Deposito 6 Bulan', depo6],
+    ['Deposito 12 Bulan', depo12],
+  ];
+
+  const hilang: string[] = [];
+  for (const [nama, nilai] of rincian) {
+    if (nilai === null) { hilang.push(nama); continue; }
+    breakdown.run(periode, nama, nilai);
+  }
+
+  console.log(`Neraca ${periode}: laba=${laba ?? '-'} aset=${aset ?? '-'}, ${rincian.length - hilang.length}/${rincian.length} rincian simpanan tersimpan.`);
+  if (hilang.length) console.warn('⚠️  Neraca: baris tidak ditemukan ->', hilang.join(', '));
+}
+
+/* ------------------------------------------------------------------ REKAP KREDIT */
+
+/**
+ * Peran berkas: sumber resmi NPL dan Repayment Rate.
+ *
+ * RR = persentase kredit Lancar (kolom Persen pada baris "L"). Sebelumnya RR
+ * ditulis tetap 71.84 di dalam kode — kebetulan sama dengan isi berkas Juni
+ * 2026, sehingga tidak pernah berubah walau laporan bulan lain diunggah.
+ *
+ * NPL dihitung dari NOMINAL baki debet (KL+D+M dibagi total), sesuai cara BPR
+ * melaporkannya ke OJK — bukan dari jumlah rekening.
+ */
+function processRekapKredit(workbook: xlsx.WorkBook) {
+  const sheetName = workbook.SheetNames.find(n => n.toUpperCase().includes('NPL') || n.toUpperCase().includes('REKAP')) || workbook.SheetNames[0];
+  const sheet = workbook.Sheets[sheetName];
+  if (!sheet) return;
+
+  const rows = xlsx.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
+  const periode = bacaPeriode(rows) ?? hariIni();
+
+  // Cari baris header tabel: Kode | Keterangan | Jml Rek | Jumlah Pinjaman | Baki Debet | Persen
+  let kolBaki = -1, kolPersen = -1, kolRek = -1, barisHeader = -1;
+  for (let r = 0; r < Math.min(rows.length, 20); r++) {
+    const row = rows[r] ?? [];
+    const label = row.map(c => teks(c).toLowerCase());
+    const iBaki = label.findIndex(l => l.includes('baki debet'));
+    if (iBaki < 0) continue;
+    barisHeader = r;
+    kolBaki = iBaki;
+    kolPersen = label.findIndex(l => l.startsWith('persen'));
+    kolRek = label.findIndex(l => l.includes('jml rek') || l.includes('jumlah rek'));
+    break;
+  }
+
+  if (barisHeader < 0) {
+    console.warn('⚠️  Rekap kredit: tabel kolektibilitas tidak ditemukan, berkas dilewati.');
+    return;
+  }
+
+  const perKolek: Record<string, { rek: number; baki: number; persen: number }> = {};
+  let totalBaki = 0;
+
+  for (let r = barisHeader + 1; r < rows.length; r++) {
+    const row = rows[r];
+    if (!row) continue;
+    const kode = teks(row[0]).toUpperCase();
+    const ket = teks(row[1]).toLowerCase().replace(/\s+/g, '');
+
+    if (ket.startsWith('jumlah')) {
+      totalBaki = angka(row[kolBaki]);
+      break;
+    }
+    if (!['L', 'DPK', 'KL', 'D', 'M'].includes(kode)) continue;
+
+    perKolek[kode] = {
+      rek: kolRek >= 0 ? angka(row[kolRek]) : 0,
+      baki: angka(row[kolBaki]),
+      persen: kolPersen >= 0 ? angka(row[kolPersen]) : 0,
+    };
+  }
+
+  if (Object.keys(perKolek).length === 0) {
+    console.warn('⚠️  Rekap kredit: tidak ada baris kolektibilitas terbaca.');
+    return;
+  }
+
+  if (!totalBaki) totalBaki = Object.values(perKolek).reduce((s, v) => s + v.baki, 0);
+
+  const bakiNpl = ['KL', 'D', 'M'].reduce((s, k) => s + (perKolek[k]?.baki ?? 0), 0);
+  const npl = totalBaki ? (bakiNpl / totalBaki) * 100 : 0;
+
+  // RR = persentase kredit lancar. Pakai kolom Persen bila ada; kalau tidak,
+  // hitung sendiri dari baki debet Lancar.
+  const rr = perKolek.L?.persen || (totalBaki ? ((perKolek.L?.baki ?? 0) / totalBaki) * 100 : 0);
+
+  simpanMacro(periode, {
+    total_outstanding: totalBaki,
+    npl_percentage: Number(npl.toFixed(2)),
+    repayment_rate: Number(rr.toFixed(2)),
+  });
+
+  const ringkas = Object.entries(perKolek).map(([k, v]) => `${k}:${v.rek}`).join(' ');
+  console.log(`Rekap kredit ${periode}: baki=${Math.round(totalBaki)} NPL=${npl.toFixed(2)}% RR=${rr.toFixed(2)}% (${ringkas})`);
+}
+
+/* ------------------------------------------------------------------ NOMINATIF TABUNGAN */
+
+/**
+ * Peran berkas: total tabungan, dan daftar rekening tabungan.
+ * Sebelumnya totalnya hanya dicetak ke log dan tidak pernah disimpan.
+ */
+function processNomTab(workbook: xlsx.WorkBook) {
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  if (!sheet) return;
+
+  const rows = xlsx.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
+  const periode = bacaPeriode(rows) ?? hariIni();
+  const { header, kolom } = petakanKolomSimpanan(rows, 'TABUNGAN');
+  if (kolom.saldo === undefined) {
+    console.warn('⚠️  Nominatif tabungan: kolom saldo tidak ditemukan.');
+    return;
+  }
+
+  const insert = db.prepare(`
+    INSERT INTO savings (account_number, customer_name, interest_rate, balance, officer_name, updated_at)
+    VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(account_number) DO UPDATE SET
+      customer_name = excluded.customer_name, interest_rate = excluded.interest_rate,
+      balance = excluded.balance, officer_name = excluded.officer_name,
+      updated_at = CURRENT_TIMESTAMP
+  `);
+
+  let total = 0, n = 0;
+  db.transaction(() => {
+    for (let r = header + 1; r < rows.length; r++) {
+      const row = rows[r];
+      if (!row) continue;
+      const rek = teks(row[kolom.rekening]);
+      const nama = teks(row[kolom.nama]);
+      if (!rek || !nama) continue;
+
+      const saldo = angka(row[kolom.saldo]);
+      insert.run(rek, nama, kolom.bunga !== undefined ? angka(row[kolom.bunga]) : null,
+        saldo, kolom.ao !== undefined ? teks(row[kolom.ao]) : null);
+      total += saldo;
+      n++;
+    }
+  })();
+
+  simpanMacro(periode, { total_tabungan: total });
+  console.log(`Nominatif tabungan ${periode}: ${n} rekening, total ${Math.round(total)}`);
+}
+
+/* ------------------------------------------------------------------ NOMINATIF DEPOSITO */
+
+/** Peran berkas: total deposito, dan daftar rekening deposito. */
+function processNomDepo(workbook: xlsx.WorkBook) {
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  if (!sheet) return;
+
+  const rows = xlsx.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
+  const periode = bacaPeriode(rows) ?? hariIni();
+  const { header, kolom } = petakanKolomSimpanan(rows, 'DEPOSITO');
+  if (kolom.saldo === undefined) {
+    console.warn('⚠️  Nominatif deposito: kolom nominal tidak ditemukan.');
+    return;
+  }
+
+  const insert = db.prepare(`
+    INSERT INTO deposits (account_number, customer_name, term, start_date, maturity_date,
+                          interest_rate, balance, officer_name, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(account_number) DO UPDATE SET
+      customer_name = excluded.customer_name, term = excluded.term,
+      start_date = excluded.start_date, maturity_date = excluded.maturity_date,
+      interest_rate = excluded.interest_rate, balance = excluded.balance,
+      officer_name = excluded.officer_name, updated_at = CURRENT_TIMESTAMP
+  `);
+
+  let total = 0, n = 0;
+  db.transaction(() => {
+    for (let r = header + 1; r < rows.length; r++) {
+      const row = rows[r];
+      if (!row) continue;
+      const rek = teks(row[kolom.rekening]);
+      const nama = teks(row[kolom.nama]);
+      if (!rek || !nama) continue;
+
+      const saldo = angka(row[kolom.saldo]);
+      insert.run(
+        rek, nama,
+        kolom.jangka !== undefined ? teks(row[kolom.jangka]) : null,
+        kolom.tglMulai !== undefined ? teks(row[kolom.tglMulai]) : null,
+        kolom.tglJatuhTempo !== undefined ? teks(row[kolom.tglJatuhTempo]) : null,
+        kolom.bunga !== undefined ? angka(row[kolom.bunga]) : null,
+        saldo,
+        kolom.ao !== undefined ? teks(row[kolom.ao]) : null,
+      );
+      total += saldo;
+      n++;
+    }
+  })();
+
+  simpanMacro(periode, { total_deposito: total });
+  console.log(`Nominatif deposito ${periode}: ${n} rekening, total ${Math.round(total)}`);
+}
+
+/* ------------------------------------------------------------------ REKENING BARU */
+
+/**
+ * Peran kedua berkas "baru": pertumbuhan simpanan pada periode berjalan.
+ *
+ * processTabBaru sebelumnya menulis ke tabel ao_performance (pencapaian AO),
+ * bukan ke pertumbuhan simpanan — dan processDepoBaru masih kerangka kosong,
+ * sehingga laporan deposito baru tidak pernah menghasilkan apa pun.
+ */
+function prosesRekeningBaru(workbook: xlsx.WorkBook, jenis: 'TABUNGAN' | 'DEPOSITO') {
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  if (!sheet) return;
+
+  const rows = xlsx.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
+  const periode = bacaPeriode(rows) ?? hariIni();
+  const { header, kolom } = petakanKolomSimpanan(rows, jenis);
+  if (kolom.saldo === undefined) {
+    console.warn(`⚠️  ${jenis} baru: kolom nominal/saldo tidak ditemukan.`);
+    return;
+  }
+
+  const insert = db.prepare(`
+    INSERT INTO funding_growth (account_number, account_type, customer_name, open_date, balance, officer_name, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(account_number) DO UPDATE SET
+      account_type = excluded.account_type, customer_name = excluded.customer_name,
+      open_date = excluded.open_date, balance = excluded.balance,
+      officer_name = excluded.officer_name, updated_at = CURRENT_TIMESTAMP
+  `);
+
+  let total = 0, n = 0;
+  db.transaction(() => {
+    for (let r = header + 1; r < rows.length; r++) {
+      const row = rows[r];
+      if (!row) continue;
+      const rek = teks(row[kolom.rekening]);
+      const nama = teks(row[kolom.nama]);
+      if (!rek || !nama) continue;
+
+      const saldo = angka(row[kolom.saldo]);
+      insert.run(rek, jenis, nama,
+        kolom.tglMulai !== undefined ? teks(row[kolom.tglMulai]) : periode,
+        saldo, kolom.ao !== undefined ? teks(row[kolom.ao]) : null);
+      total += saldo;
+      n++;
+    }
+  })();
+
+  console.log(`${jenis} baru ${periode}: ${n} rekening, total ${Math.round(total)}`);
+}
+
+function processTabBaru(workbook: xlsx.WorkBook) {
+  prosesRekeningBaru(workbook, 'TABUNGAN');
+}
+
+function processDepoBaru(workbook: xlsx.WorkBook) {
+  prosesRekeningBaru(workbook, 'DEPOSITO');
+}
+
+/**
+ * Pemetaan kolom untuk berkas simpanan (tabungan/deposito, lama maupun baru).
+ * Judul kolomnya berbeda-beda antar laporan: "Saldo Akhir", "Jml Deposito",
+ * "Saldo", "Nominal" — semuanya menunjuk nominal simpanan.
+ */
+function petakanKolomSimpanan(
+  rows: any[][],
+  jenis: 'TABUNGAN' | 'DEPOSITO',
+): { header: number; kolom: Record<string, number> } {
+  const POLA: Record<string, RegExp> = {
+    rekening: /^(no\.?\s*)?rek(ening)?\.?$/i,
+    nama: /^nama\s*(nasabah|peminjam|debitur)?$/i,
+    saldo: jenis === 'DEPOSITO'
+      ? /^(jml deposito|jumlah deposito|nominal|saldo( akhir)?)$/i
+      : /^(saldo( akhir)?|nominal)$/i,
+    bunga: /^suku bunga/i,
+    ao: /^(ao|account officer|petugas)$/i,
+    jangka: /^(jkw|jangka waktu)$/i,
+    tglMulai: /^(tgl\.? (mulai|registrasi|register|valuta|trans)|tanggal (mulai|registrasi))/i,
+    tglJatuhTempo: /^(tgl\.? (jth tempo|jt|jatuh tempo)|tanggal jatuh tempo)/i,
+  };
+
+  for (let r = 0; r < Math.min(rows.length, 20); r++) {
+    const row = rows[r];
+    if (!row) continue;
+    const kolom: Record<string, number> = {};
+    for (let c = 0; c < row.length; c++) {
+      const sel = teks(row[c]);
+      if (!sel) continue;
+      for (const [nama, pola] of Object.entries(POLA)) {
+        if (kolom[nama] === undefined && pola.test(sel)) kolom[nama] = c;
+      }
+    }
+    if (kolom.rekening !== undefined && kolom.nama !== undefined && kolom.saldo !== undefined) {
+      return { header: r, kolom };
+    }
+  }
+  return { header: 11, kolom: {} };
+}
 
 /**
  * Cari baris header dan petakan nama kolom -> indeks.

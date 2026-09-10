@@ -35,6 +35,14 @@ const NAMA_WILAYAH: Record<WilayahId, string> = KARESIDENAN_SURAKARTA.reduce(
 
 const pct = (v: number) => `${v.toFixed(1).replace('.', ',')}%`;
 
+/** "2026-06-30" -> "Jun 2026" */
+const periodeSingkat = (iso: string) => {
+  const d = new Date(`${iso}T00:00:00`);
+  return Number.isNaN(d.getTime())
+    ? iso
+    : d.toLocaleDateString('id-ID', { month: 'short', year: 'numeric' });
+};
+
 const rupiahPenuh = (v: number) =>
   `Rp ${v.toLocaleString('id-ID')}`;
 
@@ -124,7 +132,7 @@ const TABS: { id: TabId; label: string }[] = [
 
 export const DashboardHeatMap: React.FC = () => {
   const { openCustomer360 } = useApp();
-  const { data, sumber, memuat, catatan, diagnostik } = useKepatuhanHeatMap();
+  const { data, sumber, memuat, catatan, diagnostik, resmi } = useKepatuhanHeatMap();
 
   const {
     portofolioWilayah: PORTOFOLIO_WILAYAH,
@@ -216,7 +224,21 @@ export const DashboardHeatMap: React.FC = () => {
     { label: 'Total Nasabah', value: kpi.totalNasabah.toLocaleString('id-ID'), icon: UserGroupIcon, trend: TREN_PERIODE_SEBELUMNYA.totalNasabah, baik: true, bg: 'bg-indigo-50 dark:bg-indigo-900/20', color: 'text-indigo-600 dark:text-indigo-400' },
     { label: 'Baki Debet', value: rupiahRingkas(kpi.bakiDebet), icon: DocumentTextIcon, trend: TREN_PERIODE_SEBELUMNYA.bakiDebet, baik: true, bg: 'bg-cyan-50 dark:bg-cyan-900/20', color: 'text-cyan-600 dark:text-cyan-400' },
     { label: 'Nasabah Bermasalah', value: kpi.bermasalah.toLocaleString('id-ID'), icon: ExclamationTriangleIcon, trend: TREN_PERIODE_SEBELUMNYA.nasabahBermasalah, baik: false, bg: 'bg-red-50 dark:bg-red-900/20', color: 'text-red-600 dark:text-red-400' },
-    { label: 'NPL (nominal)', value: pct(kpi.nplNominal), icon: PercentIcon, trend: TREN_PERIODE_SEBELUMNYA.rasioBermasalah, baik: false, bg: 'bg-amber-50 dark:bg-amber-900/20', color: 'text-amber-600 dark:text-amber-400', catatan: `${pct(kpi.rasioJumlah)} dari jumlah nasabah` },
+    // NPL yang ditampilkan diambil dari Laporan Rekap Nominatif Kredit bila
+    // tersedia — itulah angka yang dilaporkan ke OJK. Hasil hitungan dari
+    // nominatif kredit ditaruh sebagai keterangan supaya selisihnya terlihat.
+    {
+      label: resmi && !wilayahFilter ? 'NPL (Rekap resmi)' : 'NPL (nominal)',
+      value: pct(resmi && !wilayahFilter ? resmi.npl : kpi.nplNominal),
+      icon: PercentIcon,
+      trend: TREN_PERIODE_SEBELUMNYA.rasioBermasalah,
+      baik: false,
+      bg: 'bg-amber-50 dark:bg-amber-900/20',
+      color: 'text-amber-600 dark:text-amber-400',
+      catatan: resmi && !wilayahFilter
+        ? `Rekap ${periodeSingkat(resmi.periode)} · RR ${pct(resmi.rr)}`
+        : `${pct(kpi.rasioJumlah)} dari jumlah nasabah`,
+    },
     { label: 'Baki Debet Bermasalah', value: rupiahRingkas(kpi.bakiBermasalah), icon: BanknotesIcon, trend: TREN_PERIODE_SEBELUMNYA.bakiDebetBermasalah, baik: false, bg: 'bg-rose-50 dark:bg-rose-900/20', color: 'text-rose-600 dark:text-rose-400' },
   ];
 
@@ -351,10 +373,19 @@ export const DashboardHeatMap: React.FC = () => {
               <div className="text-base xl:text-lg font-black text-gray-800 dark:text-gray-100 truncate" title={stat.value}>
                 {stat.value}
               </div>
-              <div className={`text-[11px] font-bold flex items-center gap-1 min-w-0 ${bagus ? 'text-emerald-500' : 'text-red-500'}`}>
-                <ArrowTrendingUpIcon className={`w-3.5 h-3.5 shrink-0 ${naik ? '' : 'rotate-180'}`} />
-                <span className="truncate">{pct(Math.abs(stat.trend))} dari periode sebelumnya</span>
-              </div>
+              {/*
+                Persentase tren berasal dari TREN_PERIODE_SEBELUMNYA — angka
+                contoh yang ditulis tetap. Menampilkannya di samping data asli
+                membuat angka karangan tampak seperti hasil perhitungan.
+                Ditampilkan hanya saat dashboard memang sedang memakai data
+                contoh; perbandingan antar periode sungguhan belum dihitung.
+              */}
+              {sumber === 'contoh' && (
+                <div className={`text-[11px] font-bold flex items-center gap-1 min-w-0 ${bagus ? 'text-emerald-500' : 'text-red-500'}`}>
+                  <ArrowTrendingUpIcon className={`w-3.5 h-3.5 shrink-0 ${naik ? '' : 'rotate-180'}`} />
+                  <span className="truncate">{pct(Math.abs(stat.trend))} dari periode sebelumnya</span>
+                </div>
+              )}
               {'catatan' in stat && stat.catatan && (
                 <div className="text-[10px] text-gray-400 truncate" title={stat.catatan}>
                   {stat.catatan}

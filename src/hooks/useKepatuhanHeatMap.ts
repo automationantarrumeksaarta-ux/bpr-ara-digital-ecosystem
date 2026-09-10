@@ -25,6 +25,14 @@ export interface HeatMapDataset {
   totalPembiayaan: number;
 }
 
+/** Angka resmi dari Laporan Rekap Nominatif Kredit (acuan pelaporan OJK). */
+export interface AngkaResmi {
+  periode: string;
+  npl: number;
+  rr: number;
+  outstanding: number;
+}
+
 export interface Diagnostik {
   totalBaris: number;
   tanpaWilayah: number;
@@ -39,6 +47,7 @@ export interface HasilHeatMap {
   /** Alasan jatuh ke data contoh (belum ada upload / gagal ambil). */
   catatan: string | null;
   diagnostik: Diagnostik | null;
+  resmi: AngkaResmi | null;
 }
 
 const IKON_SEKTOR: Record<string, string> = {
@@ -74,6 +83,7 @@ export function useKepatuhanHeatMap(): HasilHeatMap {
     memuat: true,
     catatan: null,
     diagnostik: null,
+    resmi: null,
   });
 
   useEffect(() => {
@@ -95,6 +105,7 @@ export function useKepatuhanHeatMap(): HasilHeatMap {
             memuat: false,
             catatan: json?.alasan ?? 'Belum ada data nominatif kredit yang diunggah.',
             diagnostik: null,
+            resmi: null,
           });
           return;
         }
@@ -104,6 +115,7 @@ export function useKepatuhanHeatMap(): HasilHeatMap {
           memuat: false,
           catatan: null,
           diagnostik: json.diagnostik ?? null,
+          resmi: json.resmi ?? null,
           data: {
             portofolioWilayah: json.portofolioWilayah ?? [],
             portofolioAO: json.portofolioAO ?? [],
@@ -131,6 +143,7 @@ export function useKepatuhanHeatMap(): HasilHeatMap {
           memuat: false,
           catatan: `Gagal mengambil data dari server (${err?.message ?? 'kesalahan tidak diketahui'}). Menampilkan data contoh.`,
           diagnostik: null,
+          resmi: null,
         });
       }
     })();
