@@ -13,7 +13,10 @@ import { WorkflowActionModal } from '../common/WorkflowActionModal';
 import { DocumentViewerModal } from '../common/DocumentViewerModal';
 import { CreditPipelineHeader } from '../ui/CreditPipelineHeader';
 
-const LOGO_URL = 'https://antarrumeksaarta.vittoriaproperti.com/uploads/profile/d96a287d-a983-4e54-8719-b46c7a2f3694.png';
+// Logo diambil dari aset sendiri. Sebelumnya menunjuk ke domain pihak ketiga
+// (antarrumeksaarta.vittoriaproperti.com), sehingga logo pada dokumen kredit
+// ikut hilang bila domain itu mati atau berkasnya dipindah.
+const LOGO_URL = '/logo.png';
 
 const FLOW_STEPS: CreditAppStage[] = [
   'SUBMITTED', 
