@@ -1,7 +1,7 @@
 import React, { Suspense } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { navigationConfig } from '../config/navigationConfig';
+import { firstAccessibleRoute, isPathAllowed } from '../utils/access';
 
 // Import all views
 import { ExecutiveDashboard } from '../components/modules/ExecutiveDashboard';
@@ -48,6 +48,7 @@ import MobileAttendanceData from '../components/mobile/pages/MobileAttendanceDat
 import MobileLiveAttendance from '../components/mobile/pages/MobileLiveAttendance';
 import MobileNotifications from '../components/mobile/pages/MobileNotifications';
 import MobileProfile from '../components/mobile/pages/MobileProfile';
+import { MobileActivities, MobileInfoGaji } from '../components/mobile/pages/MobileComingSoon';
 
 const FallbackLoading = () => (
   <div className="p-6 flex items-center justify-center h-full">
@@ -73,46 +74,10 @@ const PlaceholderView = ({ title }: { title: string }) => (
   </div>
 );
 
-const getFirstAccessibleRoute = (userRole: string, rolePermissions: Record<string, string[]>) => {
-  if (userRole === 'Super Admin' || userRole === 'Master Admin') return '/super-admin';
-  
-  const dynamicPerms = rolePermissions?.[userRole];
-  const hasDynamicPerms = dynamicPerms && dynamicPerms.length > 0;
-
-  for (const group of navigationConfig) {
-    for (const item of group.items) {
-      if (hasDynamicPerms) {
-        if (dynamicPerms.includes(item.title) && item.path) return item.path;
-      } else {
-        if (userRole === 'User') continue;
-        if (!item.allowedRoles || (item.allowedRoles as string[]).includes(userRole)) {
-          if (item.path) return item.path;
-        }
-      }
-    }
-  }
-  return '/dashboard'; // Safe ultimate fallback
-};
-
-const isPathAccessible = (path: string, userRole: string, rolePermissions: Record<string, string[]>) => {
-  if (userRole === 'Super Admin' || userRole === 'Master Admin') return true;
-  
-  const dynamicPerms = rolePermissions?.[userRole];
-  const hasDynamicPerms = dynamicPerms && dynamicPerms.length > 0;
-
-  for (const group of navigationConfig) {
-    for (const item of group.items) {
-      if (item.path && path.startsWith(item.path)) {
-        if (hasDynamicPerms) {
-          return dynamicPerms.includes(item.title);
-        } else {
-          return !item.allowedRoles || (item.allowedRoles as string[]).includes(userRole);
-        }
-      }
-    }
-  }
-  return true; // If not in navigationConfig, allow by default (or we could deny)
-};
+// Aturan akses dipusatkan di src/utils/access.ts agar web dan mobile
+// memakai logika yang sama persis.
+const getFirstAccessibleRoute = firstAccessibleRoute;
+const isPathAccessible = isPathAllowed;
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { currentUser, rolePermissions } = useApp();
@@ -218,6 +183,9 @@ export const AppRouter: React.FC = () => {
           <Route path="/mobile/live-attendance" element={<MobileLiveAttendance />} />
           <Route path="/mobile/notifications" element={<MobileNotifications />} />
           <Route path="/mobile/profile" element={<MobileProfile />} />
+          {/* Modul khusus mobile — belum ada padanannya di web */}
+          <Route path="/mobile/activities" element={<MobileActivities />} />
+          <Route path="/mobile/info-gaji" element={<MobileInfoGaji />} />
         </Route>
         
         {/* 404 Route */}

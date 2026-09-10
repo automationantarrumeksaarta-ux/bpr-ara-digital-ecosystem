@@ -1,104 +1,219 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { 
-  ChevronLeft,
-  ChevronDown,
-  ChevronRight,
-  CheckCircle,
-  XCircle,
-  PlusCircle,
-  FileText,
-  CalendarDays,
-  Clock,
-  AlertCircle,
-  LogOut,
-  Ban
+import React, { useState } from 'react';
+import {
+  CalendarDays, ChevronDown, ChevronLeft, ChevronRight,
+  CalendarX2, FileText, Clock, ClipboardList,
 } from 'lucide-react';
+import { useMobileAttendance, formatJam, keMenit } from '../../../hooks/useMobileAttendance';
+import {
+  AppBar, Card, EmptyState, ListGroup, ListRow, Screen, Section, Skeleton, Stack,
+} from '../ui/primitives';
+import { ink, radius, surface, text, tone, HIT_TARGET, type ToneName } from '../ui/tokens';
+
+/** Batas jam masuk sebelum dihitung terlambat (menit sejak tengah malam). */
+const BATAS_TERLAMBAT_MENIT = 8 * 60 + 15;
+
+const BULAN = [
+  'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
+];
 
 const MobileAttendanceData: React.FC = () => {
-  const navigate = useNavigate();
+  const now = new Date();
+  const [tahun, setTahun] = useState(now.getFullYear());
+  const [bulan, setBulan] = useState(now.getMonth() + 1);
 
-  const stats = [
-    { label: 'Hadir', value: 0, icon: CheckCircle, color: 'text-emerald-500', bg: 'bg-emerald-50 dark:bg-emerald-900/30' },
-    { label: 'Alpa', value: 0, icon: XCircle, color: 'text-slate-400', bg: 'bg-slate-50 dark:bg-slate-800' },
-    { label: 'Sakit', value: 0, icon: PlusCircle, color: 'text-red-500', bg: 'bg-red-50 dark:bg-red-900/30' },
-    { label: 'Izin', value: 0, icon: FileText, color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-900/30' },
-    { label: 'Cuti', value: 0, icon: CalendarDays, color: 'text-yellow-500', bg: 'bg-yellow-50 dark:bg-yellow-900/30' },
-    { label: 'Lembur', value: 0, icon: Clock, color: 'text-purple-500', bg: 'bg-purple-50 dark:bg-purple-900/30' },
-    { label: 'Terlambat', value: 0, icon: AlertCircle, color: 'text-orange-500', bg: 'bg-orange-50 dark:bg-orange-900/30' },
-    { label: 'Pulang Cepat', value: 0, icon: LogOut, color: 'text-rose-500', bg: 'bg-rose-50 dark:bg-rose-900/30' },
-    { label: 'Tidak Absen Pulang', value: 0, icon: Ban, color: 'text-gray-400', bg: 'bg-gray-50 dark:bg-gray-800' },
-  ];
+  const { records, rekap, memuat, error } = useMobileAttendance(tahun, bulan);
 
-  const menus = [
-    { title: 'Pembatalan Cuti / Izin', subtitle: 'Ajukan pembatalan cuti atau izin', icon: CalendarDays },
-    { title: 'Data Absensi', subtitle: 'Lihat riwayat data absensi', icon: CheckCircle },
-    { title: 'Data Izin', subtitle: 'Lihat data izin Anda', icon: FileText },
-    { title: 'Data Lembur', subtitle: 'Lihat data lembur Anda', icon: Clock },
+  const bulanDepanTersedia =
+    tahun < now.getFullYear() || (tahun === now.getFullYear() && bulan < now.getMonth() + 1);
+
+  const geser = (arah: -1 | 1) => {
+    const d = new Date(tahun, bulan - 1 + arah, 1);
+    setTahun(d.getFullYear());
+    setBulan(d.getMonth() + 1);
+  };
+
+  // Hanya nilai yang bukan nol yang diberi warna. Kalau semuanya berwarna,
+  // tidak ada yang menonjol — itulah kenapa grid 9 kotak sebelumnya terasa ramai.
+  const statistik: { label: string; value: number; toneName: ToneName }[] = [
+    { label: 'Hadir', value: rekap.hadir, toneName: 'positive' },
+    { label: 'Alpa', value: rekap.alpa, toneName: 'danger' },
+    { label: 'Sakit', value: rekap.sakit, toneName: 'danger' },
+    { label: 'Izin', value: rekap.izin, toneName: 'primary' },
+    { label: 'Cuti', value: rekap.cuti, toneName: 'primary' },
+    { label: 'Lembur', value: rekap.lembur, toneName: 'primary' },
+    { label: 'Terlambat', value: rekap.terlambat, toneName: 'warning' },
+    { label: 'Pulang cepat', value: rekap.pulangCepat, toneName: 'warning' },
+    // "Tanpa absen pulang" terpotong pada kolom selebar sepertiga layar.
+    { label: 'Tanpa pulang', value: rekap.tidakAbsenPulang, toneName: 'warning' },
   ];
 
   return (
-    <div className="bg-[#f8fafc] dark:bg-gray-900 min-h-screen pb-24">
-      {/* Header */}
-      <div className="bg-white dark:bg-gray-950 px-4 py-4 flex items-center justify-between border-b border-gray-100 dark:border-gray-800 sticky top-0 z-10">
-        <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-gray-700 dark:text-gray-300">
-          <ChevronLeft className="w-5 h-5 font-bold" />
-        </button>
-        <h1 className="text-base font-bold text-gray-800 dark:text-gray-100">Data Absen</h1>
-        <div className="w-9" /> {/* Spacer for centering */}
-      </div>
+    <Screen>
+      <AppBar title="Data Absen" back />
 
-      <div className="p-5 flex flex-col gap-6">
-        
-        {/* Dropdown Month Selection */}
-        <button className="w-full flex items-center justify-between bg-white dark:bg-gray-800 px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
-          <div className="flex items-center gap-2">
-            <CalendarDays className="w-5 h-5 text-gray-400" />
-            <span className="font-bold text-gray-700 dark:text-gray-200 text-sm">Bulan Ini</span>
-          </div>
-          <ChevronDown className="w-4 h-4 text-gray-400" />
-        </button>
+      <Stack>
+        {/* --- Pemilih bulan: sebelumnya hanya tombol mati bertuliskan "Bulan Ini" --- */}
+        <div className={`flex items-center ${surface.card} ${radius.control} border ${surface.divider}`}>
+          <button
+            type="button"
+            onClick={() => geser(-1)}
+            aria-label="Bulan sebelumnya"
+            className={`w-11 ${HIT_TARGET} flex items-center justify-center ${ink.muted} active:opacity-50`}
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
 
-        {/* Stats Grid */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700/50 overflow-hidden">
-          <div className="grid grid-cols-3 divide-x divide-y divide-gray-100 dark:divide-gray-700/50">
-            {stats.map((stat, idx) => (
-              <div key={idx} className="p-4 flex flex-col items-center justify-center gap-1">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <div className={`w-5 h-5 rounded-full ${stat.bg} flex items-center justify-center`}>
-                    <stat.icon className={`w-3 h-3 ${stat.color}`} />
+          <label className={`relative flex-1 ${HIT_TARGET} flex items-center justify-center gap-1.5 cursor-pointer`}>
+            <CalendarDays className={`w-4 h-4 ${ink.muted}`} />
+            <span className={`${text.body} font-semibold ${ink.strong}`}>
+              {BULAN[bulan - 1]} {tahun}
+            </span>
+            <ChevronDown className={`w-4 h-4 ${ink.faint}`} />
+            <select
+              aria-label="Pilih bulan"
+              value={`${tahun}-${bulan}`}
+              onChange={(e) => {
+                const [t, b] = e.target.value.split('-').map(Number);
+                setTahun(t);
+                setBulan(b);
+              }}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            >
+              {Array.from({ length: 18 }, (_, i) => {
+                const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                const t = d.getFullYear();
+                const b = d.getMonth() + 1;
+                return (
+                  <option key={`${t}-${b}`} value={`${t}-${b}`}>
+                    {BULAN[b - 1]} {t}
+                  </option>
+                );
+              })}
+            </select>
+          </label>
+
+          <button
+            type="button"
+            onClick={() => geser(1)}
+            disabled={!bulanDepanTersedia}
+            aria-label="Bulan berikutnya"
+            className={`w-11 ${HIT_TARGET} flex items-center justify-center ${ink.muted} active:opacity-50 disabled:opacity-25`}
+          >
+            <ChevronRight className="w-5 h-5" />
+          </button>
+        </div>
+
+        {error && (
+          <Card className={`${tone.danger.bgSoft} border-0`}>
+            <p className={`${text.footnote} ${tone.danger.text}`}>{error}</p>
+          </Card>
+        )}
+
+        {/* --- Ringkasan --- */}
+        <Section title="Ringkasan">
+          {memuat ? (
+            <Card flush className="p-3 grid grid-cols-3 gap-3">
+              {Array.from({ length: 9 }, (_, i) => <Skeleton key={i} className="h-16" />)}
+            </Card>
+          ) : (
+            <Card flush className="overflow-hidden">
+              <div className={`grid grid-cols-3 divide-x divide-y ${surface.hairline}`}>
+                {statistik.map(s => (
+                  <div key={s.label} className="px-3 py-3.5 min-w-0">
+                    <span className={`block ${text.caption} ${ink.muted} truncate`} title={s.label}>
+                      {s.label}
+                    </span>
+                    <span
+                      className={`block ${text.stat} mt-1 ${s.value > 0 ? tone[s.toneName].text : ink.faint}`}
+                    >
+                      {s.value}
+                    </span>
                   </div>
-                  <span className="text-[9px] font-bold text-gray-500 dark:text-gray-400 leading-none text-center">{stat.label}</span>
-                </div>
-                <span className="text-xl font-black text-gray-800 dark:text-gray-100">{stat.value}</span>
+                ))}
               </div>
-            ))}
-          </div>
-        </div>
+            </Card>
+          )}
+        </Section>
 
-        {/* Menu Lainnya */}
-        <div>
-          <h3 className="text-sm font-bold text-gray-800 dark:text-gray-100 mb-3 ml-1">Menu Lainnya</h3>
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700/50 overflow-hidden divide-y divide-gray-50 dark:divide-gray-700/50">
-            {menus.map((menu, idx) => (
-              <button key={idx} className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 flex items-center justify-center">
-                    <menu.icon className="w-4 h-4 text-gray-400" />
-                  </div>
-                  <div className="text-left">
-                    <p className="text-xs font-bold text-gray-800 dark:text-gray-100">{menu.title}</p>
-                    <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">{menu.subtitle}</p>
-                  </div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-gray-400" />
-              </button>
-            ))}
-          </div>
-        </div>
+        {/* --- Riwayat harian: isi nyata, bukan sekadar angka ringkasan --- */}
+        <Section title="Riwayat">
+          {memuat ? (
+            <Card flush className="p-4 flex flex-col gap-3">
+              {[0, 1, 2].map(i => <Skeleton key={i} className="h-10" />)}
+            </Card>
+          ) : records.length === 0 ? (
+            <Card flush>
+              <EmptyState
+                icon={CalendarX2}
+                title="Belum ada catatan absensi"
+                description={`Tidak ada data absen pada ${BULAN[bulan - 1]} ${tahun}.`}
+              />
+            </Card>
+          ) : (
+            <Card flush className={`overflow-hidden divide-y ${surface.hairline}`}>
+              {[...records]
+                .sort((a, b) => b.date.localeCompare(a.date))
+                .map(r => {
+                  const tgl = new Date(`${r.date}T00:00:00`);
+                  // Perbandingan menit, bukan string: "08.45" > "08:15" bernilai
+                  // false secara leksikal karena '.' < ':'.
+                  const menitMasuk = keMenit(r.clock_in_time);
+                  const terlambat = menitMasuk !== null && menitMasuk > BATAS_TERLAMBAT_MENIT;
+                  return (
+                    <div key={r.id ?? r.date} className="px-4 py-3 flex items-center gap-3">
+                      <div className="w-10 shrink-0 text-center">
+                        <span className={`block ${text.headline} ${ink.strong} tabular-nums`}>
+                          {tgl.getDate()}
+                        </span>
+                        <span className={`block ${text.caption} ${ink.faint}`}>
+                          {tgl.toLocaleDateString('id-ID', { weekday: 'short' })}
+                        </span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        {/*
+                          Hari izin/cuti/sakit tidak punya jam absen. Menampilkan
+                          "--:-- – --:--" membuatnya terlihat seperti data hilang,
+                          padahal statusnya justru informasi yang dicari.
+                        */}
+                        {r.clock_in_time ? (
+                          <span className={`block ${text.body} ${ink.base} tabular-nums`}>
+                            {formatJam(r.clock_in_time)} – {formatJam(r.clock_out_time)}
+                          </span>
+                        ) : (
+                          <span className={`block ${text.body} ${ink.base}`}>
+                            {r.status ?? 'Tanpa catatan'}
+                          </span>
+                        )}
+                        {r.clock_in_location && (
+                          <span className={`block ${text.caption} ${ink.faint} truncate mt-0.5`}>
+                            {r.clock_in_location}
+                          </span>
+                        )}
+                      </div>
+                      {terlambat && (
+                        <span className={`${text.caption} font-semibold ${tone.warning.text} shrink-0`}>
+                          Terlambat
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+            </Card>
+          )}
+        </Section>
 
-      </div>
-    </div>
+        <Section title="Pengajuan">
+          <ListGroup>
+            <ListRow icon={ClipboardList} title="Pembatalan cuti / izin" subtitle="Ajukan pembatalan" onClick={() => {}} />
+            <ListRow icon={FileText} title="Data izin" subtitle="Riwayat pengajuan izin" onClick={() => {}} />
+            <ListRow icon={Clock} title="Data lembur" subtitle="Riwayat lembur Anda" onClick={() => {}} />
+          </ListGroup>
+        </Section>
+
+        <div className="h-2" />
+      </Stack>
+    </Screen>
   );
 };
 

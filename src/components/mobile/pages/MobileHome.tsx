@@ -1,129 +1,233 @@
 import React from 'react';
-import { useApp } from '../../../context/AppContext';
 import { Link, useNavigate } from 'react-router-dom';
-import { 
-  Bell, 
-  CheckCircle,
-  LayoutGrid,
-  FileText,
-  ClipboardList,
-  BadgeCheck,
-  CalendarDays,
-  BarChart2,
-  DollarSign
-} from 'lucide-react';
+import { Bell, ChevronRight, Fingerprint, LogIn, LogOut } from 'lucide-react';
+import { useApp } from '../../../context/AppContext';
+import { useMobileAttendance, formatJam } from '../../../hooks/useMobileAttendance';
+import { useMobileMenu } from '../../../hooks/useMobileMenu';
+import { Avatar, Badge, Card, Screen, Section, Skeleton, Stack } from '../ui/primitives';
+import { ink, radius, surface, text, tone } from '../ui/tokens';
 
-const MobileHome: React.FC = () => {
-  const { currentUser } = useApp();
-  const navigate = useNavigate();
-
-  const mainMenus = [
-    { name: 'Dashboard Utama', icon: LayoutGrid, path: '/dashboard', color: 'text-blue-500' },
-    { name: 'Loan Origination', icon: FileText, path: '/business/credit/los', color: 'text-indigo-500' },
-    { name: 'Task Board', icon: ClipboardList, path: '/operations/tasks', color: 'text-emerald-500' },
-    { name: 'Approval Queue', icon: BadgeCheck, path: '/operations/decision-queue', color: 'text-teal-500' },
-    { name: 'Calendar', icon: CalendarDays, path: '/operations/calendar', color: 'text-purple-500' },
-    { name: 'Activities', icon: BarChart2, path: '#', color: 'text-orange-500' },
-    { name: 'Info Gaji', icon: DollarSign, path: '#', color: 'text-green-600' },
-  ];
-
-  return (
-    <div className="p-5 flex flex-col gap-6">
-      
-      {/* Header Profile */}
-      <div className="flex justify-between items-center mt-2">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center overflow-hidden border border-blue-200">
-            <UserCircleIconSolid className="w-12 h-12 text-blue-300" />
-          </div>
-          <div>
-            <h1 className="text-sm font-bold text-gray-800 dark:text-gray-100">{currentUser?.name || 'Ahmad Wahyu Aji'}</h1>
-            <p className="text-[10px] text-gray-500 dark:text-gray-400">{currentUser?.role || 'Staff'} - BPR ARA</p>
-            <span className="inline-block mt-0.5 px-2 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[8px] font-bold rounded">
-              {currentUser?.role?.toUpperCase() || 'STAFF'}
-            </span>
-          </div>
-        </div>
-        <button onClick={() => navigate('/mobile/notifications')} className="relative p-2">
-          <Bell className="w-6 h-6 text-gray-600 dark:text-gray-300" />
-          <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white dark:border-gray-900"></span>
-        </button>
-      </div>
-
-      {/* Greeting */}
-      <div>
-        <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">Selamat Pagi,</h2>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Semoga hari ini berjalan dengan lancar.</p>
-      </div>
-
-      {/* Rekap Absensi Card */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-700/50">
-        <div className="flex items-center gap-2 mb-4">
-          <CalendarDays className="w-4 h-4 text-gray-500" />
-          <h3 className="text-xs font-bold text-gray-700 dark:text-gray-200">Rekap Absensi Bulan Ini</h3>
-        </div>
-        
-        <div className="grid grid-cols-2 gap-4">
-          {/* Hadir */}
-          <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 dark:border-gray-700/50">
-            <div className="w-8 h-8 rounded-full bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center">
-              <CheckCircle className="w-5 h-5 text-emerald-500" />
-            </div>
-            <div>
-              <p className="text-[10px] text-gray-500 dark:text-gray-400">Hadir</p>
-              <div className="flex items-baseline gap-1">
-                <span className="text-lg font-bold text-gray-800 dark:text-gray-100">0</span>
-                <span className="text-[10px] text-gray-400">/ 22 hari</span>
-              </div>
-            </div>
-          </div>
-          
-          {/* Izin */}
-          <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 dark:border-gray-700/50">
-            <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center">
-              <FileText className="w-5 h-5 text-blue-500" />
-            </div>
-            <div>
-              <p className="text-[10px] text-gray-500 dark:text-gray-400">Izin</p>
-              <div className="flex items-baseline gap-1">
-                <span className="text-lg font-bold text-gray-800 dark:text-gray-100">0</span>
-                <span className="text-[10px] text-gray-400">/ 22 hari</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Menu Utama */}
-      <div>
-        <h3 className="text-sm font-bold text-gray-800 dark:text-gray-100 mb-4">Menu Utama</h3>
-        <div className="grid grid-cols-4 gap-x-2 gap-y-4">
-          {mainMenus.map((menu, idx) => (
-            <Link 
-              key={idx} 
-              to={menu.path}
-              className="flex flex-col items-center gap-2 group"
-            >
-              <div className="w-14 h-14 rounded-2xl bg-white dark:bg-gray-800 shadow-sm border border-gray-100 dark:border-gray-700/50 flex items-center justify-center group-hover:scale-105 transition-transform">
-                <menu.icon className={`w-6 h-6 ${menu.color}`} />
-              </div>
-              <span className="text-[10px] text-center font-medium text-gray-600 dark:text-gray-300 leading-tight px-1">
-                {menu.name}
-              </span>
-            </Link>
-          ))}
-        </div>
-      </div>
-
-    </div>
-  );
+/** Sapaan mengikuti jam perangkat, bukan selalu "Selamat Pagi". */
+const sapaan = (jam: number) => {
+  if (jam < 11) return 'Selamat pagi';
+  if (jam < 15) return 'Selamat siang';
+  if (jam < 18) return 'Selamat sore';
+  return 'Selamat malam';
 };
 
-// Extracted solid icon for profile to avoid extra imports
-const UserCircleIconSolid = (props: any) => (
-  <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
-    <path fillRule="evenodd" d="M18.685 19.097A9.723 9.723 0 0021.75 12c0-5.385-4.365-9.75-9.75-9.75S2.25 6.615 2.25 12a9.723 9.723 0 003.065 7.097A9.716 9.716 0 0012 21.75a9.716 9.716 0 006.685-2.653zm-12.54-1.285A7.486 7.486 0 0112 15a7.486 7.486 0 015.855 2.812A8.224 8.224 0 0112 20.25a8.224 8.224 0 01-5.855-2.438zM15.75 9a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" clipRule="evenodd" />
-  </svg>
-);
+const MobileHome: React.FC = () => {
+  const { currentUser, notifications } = useApp();
+  const navigate = useNavigate();
+  const { rekap, hariIni, memuat } = useMobileAttendance();
+  const { items: menu } = useMobileMenu(8);
+
+  const nama = currentUser?.name || 'Pengguna';
+  const belumDibaca = notifications?.filter(n => !n.read).length ?? 0;
+  const now = new Date();
+
+  const sudahMasuk = !!hariIni?.clock_in_time;
+  const sudahPulang = !!hariIni?.clock_out_time;
+
+  return (
+    <Screen>
+      {/* Kepala halaman menyatu dengan konten — tanpa AppBar terpisah, karena
+          beranda tidak butuh judul yang mengulang nama tab di bawah. */}
+      <div
+        className={`${surface.card} px-4 pb-5 border-b ${surface.divider}`}
+        style={{ paddingTop: 'calc(env(safe-area-inset-top) + 16px)' }}
+      >
+        <div className="flex items-center gap-3">
+          <Avatar name={nama} size={44} />
+          <div className="flex-1 min-w-0">
+            <p className={`${text.body} font-semibold ${ink.strong} truncate`}>{nama}</p>
+            <p className={`${text.caption} ${ink.muted} truncate`}>
+              {currentUser?.unit ? `${currentUser.unit} · ` : ''}BPR ARA
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate('/mobile/notifications')}
+            aria-label={belumDibaca > 0 ? `Notifikasi, ${belumDibaca} belum dibaca` : 'Notifikasi'}
+            className={`relative w-11 h-11 -mr-2 flex items-center justify-center ${ink.base} active:opacity-50`}
+          >
+            <Bell className="w-[22px] h-[22px]" strokeWidth={1.8} />
+            {belumDibaca > 0 && (
+              <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-danger ring-2 ring-white" />
+            )}
+          </button>
+        </div>
+
+        <div className="mt-4">
+          <h1 className={`${text.largeTitle} ${ink.strong}`}>{sapaan(now.getHours())},</h1>
+          <p className={`${text.body} ${ink.muted} mt-0.5`}>
+            {currentUser?.role ? `${currentUser.role}` : 'Semoga hari Anda lancar.'}
+          </p>
+        </div>
+      </div>
+
+      <Stack>
+        {/* --- Status absen hari ini: informasi paling mendesak, jadi paling atas --- */}
+        <Card className="flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <span className={`${text.caption} ${ink.muted} uppercase tracking-wide font-semibold`}>
+              Absen hari ini
+            </span>
+            <span className={`${text.caption} ${ink.faint}`}>
+              {now.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long' })}
+            </span>
+          </div>
+
+          <div className="flex items-stretch gap-3">
+            <div className="flex-1 flex items-center gap-2.5">
+              <span className={`w-8 h-8 ${radius.pill} ${tone.positive.bgSoft} flex items-center justify-center`}>
+                <LogIn className={`w-4 h-4 ${tone.positive.text}`} />
+              </span>
+              <span>
+                <span className={`block ${text.caption} ${ink.muted}`}>Masuk</span>
+                <span className={`block ${text.headline} ${sudahMasuk ? ink.strong : ink.faint} tabular-nums`}>
+                  {formatJam(hariIni?.clock_in_time)}
+                </span>
+              </span>
+            </div>
+            <div className={`w-px ${surface.divider} border-l`} />
+            <div className="flex-1 flex items-center gap-2.5">
+              <span className={`w-8 h-8 ${radius.pill} ${tone.neutral.bgSoft} flex items-center justify-center`}>
+                <LogOut className={`w-4 h-4 ${ink.muted}`} />
+              </span>
+              <span>
+                <span className={`block ${text.caption} ${ink.muted}`}>Pulang</span>
+                <span className={`block ${text.headline} ${sudahPulang ? ink.strong : ink.faint} tabular-nums`}>
+                  {formatJam(hariIni?.clock_out_time)}
+                </span>
+              </span>
+            </div>
+          </div>
+
+          {!sudahPulang && (
+            <Link
+              to="/mobile/live-attendance"
+              className={`${radius.control} ${
+                sudahMasuk ? `${tone.neutral.bgSoft} ${ink.base}` : 'bg-primary text-white'
+              } min-h-[44px] flex items-center justify-center gap-2 ${text.body} font-semibold active:scale-[0.98] transition-transform`}
+            >
+              <Fingerprint className="w-[18px] h-[18px]" />
+              {sudahMasuk ? 'Absen pulang' : 'Absen masuk sekarang'}
+            </Link>
+          )}
+        </Card>
+
+        {/* --- Rekap bulan berjalan --- */}
+        <Section
+          title="Rekap bulan ini"
+          action={
+            <Link to="/mobile/attendance" className={`${text.footnote} font-semibold ${tone.primary.text}`}>
+              Selengkapnya
+            </Link>
+          }
+        >
+          <Card flush className="overflow-hidden">
+            {memuat ? (
+              <div className="p-4 grid grid-cols-3 gap-3">
+                {[0, 1, 2].map(i => <Skeleton key={i} className="h-14" />)}
+              </div>
+            ) : (
+              <div className={`grid grid-cols-3 divide-x ${surface.hairline}`}>
+                <div className="px-3 py-3.5">
+                  <span className={`${text.caption} ${ink.muted}`}>Hadir</span>
+                  <span className="flex items-baseline gap-1 mt-1">
+                    <span className={`${text.stat} ${ink.strong}`}>{rekap.hadir}</span>
+                    <span className={`${text.caption} ${ink.faint}`}>/ {rekap.hariKerja}</span>
+                  </span>
+                </div>
+                <div className="px-3 py-3.5">
+                  <span className={`${text.caption} ${ink.muted}`}>Terlambat</span>
+                  <span className="flex items-baseline mt-1">
+                    <span className={`${text.stat} ${rekap.terlambat > 0 ? tone.warning.text : ink.strong}`}>
+                      {rekap.terlambat}
+                    </span>
+                  </span>
+                </div>
+                <div className="px-3 py-3.5">
+                  <span className={`${text.caption} ${ink.muted}`}>Izin &amp; Cuti</span>
+                  <span className="flex items-baseline mt-1">
+                    <span className={`${text.stat} ${ink.strong}`}>{rekap.izin + rekap.cuti}</span>
+                  </span>
+                </div>
+              </div>
+            )}
+          </Card>
+        </Section>
+
+        {/* --- Menu modul --- */}
+        <Section title="Menu">
+          <Card flush className="p-2">
+            <div className="grid grid-cols-4">
+              {menu.map(item => (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className={`flex flex-col items-center gap-2 px-1 py-3 ${radius.control} active:bg-slate-50 transition-colors`}
+                >
+                  {/*
+                    Ikon monokrom dengan satu latar netral. Versi sebelumnya
+                    memberi warna berbeda pada tiap menu (biru, indigo, emerald,
+                    teal, ungu, oranye, hijau) — pelangi itu tidak menyampaikan
+                    informasi apa pun dan justru menghapus hierarki.
+                  */}
+                  <span
+                    className={`w-11 h-11 ${radius.control} ${tone.neutral.bgSoft} flex items-center justify-center`}
+                  >
+                    <item.icon className={`w-5 h-5 ${ink.base}`} strokeWidth={1.8} />
+                  </span>
+                  <span
+                    className={`${text.caption} text-center font-medium ${ink.base} leading-tight whitespace-pre-line`}
+                  >
+                    {item.label}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </Card>
+        </Section>
+
+        {/* --- Notifikasi terbaru --- */}
+        {notifications && notifications.length > 0 && (
+          <Section
+            title="Terbaru"
+            action={
+              <Link to="/mobile/notifications" className={`${text.footnote} font-semibold ${tone.primary.text}`}>
+                Semua
+              </Link>
+            }
+          >
+            <Card flush className={`overflow-hidden divide-y ${surface.hairline}`}>
+              {notifications.slice(0, 3).map(n => (
+                <button
+                  key={n.id}
+                  type="button"
+                  onClick={() => navigate('/mobile/notifications')}
+                  className="w-full px-4 py-3 flex items-start gap-3 text-left active:bg-slate-50"
+                >
+                  <span
+                    className={`w-1.5 h-1.5 ${radius.pill} mt-1.5 shrink-0 ${
+                      n.read ? 'bg-transparent' : 'bg-primary'
+                    }`}
+                  />
+                  <span className="flex-1 min-w-0">
+                    <span className={`block ${text.body} font-medium ${ink.strong} truncate`}>{n.title}</span>
+                    <span className={`block ${text.caption} ${ink.muted} truncate mt-0.5`}>{n.message}</span>
+                  </span>
+                  <ChevronRight className={`w-4 h-4 shrink-0 mt-0.5 ${ink.faint}`} />
+                </button>
+              ))}
+            </Card>
+          </Section>
+        )}
+
+        <div className="h-2" />
+      </Stack>
+    </Screen>
+  );
+};
 
 export default MobileHome;

@@ -1,222 +1,197 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState } from 'react';
+import { AlertCircle, Check, Clock, LogIn, LogOut, MapPin, RefreshCw } from 'lucide-react';
 import { useApp } from '../../../context/AppContext';
-import { 
-  ChevronLeft,
-  MapPin,
-  Clock,
-  LogOut
-} from 'lucide-react';
+import { useGeolocation } from '../../../hooks/useGeolocation';
+import { useMobileAttendance, formatJam } from '../../../hooks/useMobileAttendance';
+import { AppBar, Card, Screen, Stack } from '../ui/primitives';
+import { MiniMap } from '../ui/MiniMap';
+import { ink, radius, surface, text, tone } from '../ui/tokens';
+
+type Aksi = 'masuk' | 'pulang';
 
 const MobileLiveAttendance: React.FC = () => {
-  const navigate = useNavigate();
   const { currentUser } = useApp();
-  const [loading, setLoading] = useState(false);
-  const [statusMsg, setStatusMsg] = useState<{type: 'success'|'error', text: string} | null>(null);
+  const { posisi, alamat, memuat: memuatLokasi, error: errorLokasi, minta } = useGeolocation();
+  const { hariIni, muatUlang } = useMobileAttendance();
 
-  const [todayRecord, setTodayRecord] = useState<any>(null);
+  const [mengirim, setMengirim] = useState<Aksi | null>(null);
+  const [pesan, setPesan] = useState<{ tipe: 'ok' | 'gagal'; teks: string } | null>(null);
 
-  useEffect(() => {
-    fetchTodayRecord();
-  }, []);
+  const sudahMasuk = !!hariIni?.clock_in_time;
+  const sudahPulang = !!hariIni?.clock_out_time;
+  const lokasiSiap = !!posisi;
 
-  const fetchTodayRecord = async () => {
-    if (!currentUser) return;
+  const kirim = async (aksi: Aksi) => {
+    if (!currentUser?.id || !posisi) return;
+    setMengirim(aksi);
+    setPesan(null);
     try {
-      const d = new Date();
-      const month = d.getMonth() + 1;
-      const year = d.getFullYear();
-      
-      const res = await fetch(`/api/attendances?user_id=${currentUser.id}&month=${month}&year=${year}`);
-      const data = await res.json();
-      if (data.success && data.data && data.data.length > 0) {
-        // Find today's record
-        const todayStr = d.toISOString().split('T')[0];
-        const record = data.data.find((r: any) => r.date === todayStr);
-        if (record) setTodayRecord(record);
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const handleClockIn = async () => {
-    if (!currentUser) return;
-    setLoading(true);
-    setStatusMsg(null);
-    try {
-      const res = await fetch('/api/attendances/clock-in', {
+      const res = await fetch(`/api/attendances/clock-${aksi === 'masuk' ? 'in' : 'out'}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           user_id: currentUser.id,
-          lat: -7.795580,
-          lng: 110.369490,
-          location: "Jl. Melati No. 12, Kec. Gamping, Sleman, Yogyakarta"
-        })
+          lat: posisi.lat,
+          lng: posisi.lng,
+          location: alamat ?? `${posisi.lat.toFixed(5)}, ${posisi.lng.toFixed(5)}`,
+        }),
       });
       const data = await res.json();
-      if (data.success) {
-        setStatusMsg({ type: 'success', text: data.message });
-        setTodayRecord(data.data);
+      if (data?.success) {
+        setPesan({ tipe: 'ok', teks: data.message ?? `Absen ${aksi} berhasil dicatat.` });
+        muatUlang();
       } else {
-        setStatusMsg({ type: 'error', text: data.error });
+        setPesan({ tipe: 'gagal', teks: data?.error ?? 'Gagal mencatat absen.' });
       }
-    } catch (e) {
-      setStatusMsg({ type: 'error', text: 'Koneksi gagal' });
+    } catch {
+      setPesan({ tipe: 'gagal', teks: 'Tidak dapat terhubung ke server.' });
     }
-    setLoading(false);
+    setMengirim(null);
   };
 
-  const handleClockOut = async () => {
-    if (!currentUser) return;
-    setLoading(true);
-    setStatusMsg(null);
-    try {
-      const res = await fetch('/api/attendances/clock-out', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: currentUser.id,
-          lat: -7.795580,
-          lng: 110.369490,
-          location: "Jl. Melati No. 12, Kec. Gamping, Sleman, Yogyakarta"
-        })
-      });
-      const data = await res.json();
-      if (data.success) {
-        setStatusMsg({ type: 'success', text: data.message });
-        setTodayRecord(data.data);
-      } else {
-        setStatusMsg({ type: 'error', text: data.error });
-      }
-    } catch (e) {
-      setStatusMsg({ type: 'error', text: 'Koneksi gagal' });
-    }
-    setLoading(false);
-  };
-
-  const todayStr = new Date().toLocaleDateString('id-ID', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+  const now = new Date();
 
   return (
-    <div className="bg-[#f8fafc] dark:bg-gray-900 min-h-screen pb-24">
-      {/* Header */}
-      <div className="bg-white dark:bg-gray-950 px-4 py-4 flex items-center justify-between border-b border-gray-100 dark:border-gray-800 sticky top-0 z-10">
-        <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-gray-700 dark:text-gray-300">
-          <ChevronLeft className="w-5 h-5 font-bold" />
-        </button>
-        <h1 className="text-base font-bold text-gray-800 dark:text-gray-100">Absen</h1>
-        <div className="w-9" />
-      </div>
+    <Screen>
+      <AppBar title="Absen" back />
 
-      <div className="p-5 flex flex-col gap-5">
-        
-        {/* Status Message */}
-        {statusMsg && (
-          <div className={`p-3 rounded-lg text-xs font-bold ${statusMsg.type === 'success' ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'bg-red-50 text-red-600 border border-red-200'}`}>
-            {statusMsg.text}
+      <Stack>
+        {pesan && (
+          <div
+            className={`${radius.control} px-3.5 py-3 flex items-start gap-2.5 ${
+              pesan.tipe === 'ok' ? tone.positive.bgSoft : tone.danger.bgSoft
+            }`}
+          >
+            {pesan.tipe === 'ok'
+              ? <Check className={`w-4 h-4 shrink-0 mt-px ${tone.positive.text}`} />
+              : <AlertCircle className={`w-4 h-4 shrink-0 mt-px ${tone.danger.text}`} />}
+            <p className={`${text.footnote} ${pesan.tipe === 'ok' ? tone.positive.text : tone.danger.text}`}>
+              {pesan.teks}
+            </p>
           </div>
         )}
 
-        {/* Info Cards */}
-        <div className="grid grid-cols-2 gap-4">
-          {/* Lokasi */}
-          <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700/50 flex flex-col justify-between">
-            <div>
-              <div className="w-7 h-7 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center mb-2">
-                <MapPin className="w-4 h-4 text-blue-500" />
-              </div>
-              <h3 className="text-[10px] font-bold text-gray-500 dark:text-gray-400">Lokasi Saat Ini</h3>
-              <p className="text-[11px] font-semibold text-gray-800 dark:text-gray-200 mt-1 leading-snug">
-                Jl. Melati No. 12<br/>Kec. Gamping, Sleman,<br/>Yogyakarta
+        {/* --- Jam tercatat hari ini --- */}
+        <Card className="flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <span className={`${text.caption} ${ink.muted} uppercase tracking-wide font-semibold`}>
+              Hari ini
+            </span>
+            <span className={`${text.caption} ${ink.faint}`}>
+              {now.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+            </span>
+          </div>
+          <div className="flex items-stretch gap-3">
+            <div className="flex-1 flex items-center gap-2.5">
+              <span className={`w-9 h-9 ${radius.pill} ${tone.positive.bgSoft} flex items-center justify-center`}>
+                <LogIn className={`w-[18px] h-[18px] ${tone.positive.text}`} />
+              </span>
+              <span>
+                <span className={`block ${text.caption} ${ink.muted}`}>Masuk</span>
+                <span className={`block ${text.title} ${sudahMasuk ? ink.strong : ink.faint} tabular-nums`}>
+                  {formatJam(hariIni?.clock_in_time)}
+                </span>
+              </span>
+            </div>
+            <div className={`w-px border-l ${surface.divider}`} />
+            <div className="flex-1 flex items-center gap-2.5">
+              <span className={`w-9 h-9 ${radius.pill} ${tone.neutral.bgSoft} flex items-center justify-center`}>
+                <LogOut className={`w-[18px] h-[18px] ${ink.muted}`} />
+              </span>
+              <span>
+                <span className={`block ${text.caption} ${ink.muted}`}>Pulang</span>
+                <span className={`block ${text.title} ${sudahPulang ? ink.strong : ink.faint} tabular-nums`}>
+                  {formatJam(hariIni?.clock_out_time)}
+                </span>
+              </span>
+            </div>
+          </div>
+        </Card>
+
+        {/* --- Lokasi --- */}
+        <Card flush className="overflow-hidden">
+          <div className="px-4 py-3 flex items-start gap-2.5">
+            <MapPin className={`w-4 h-4 shrink-0 mt-0.5 ${ink.muted}`} />
+            <div className="flex-1 min-w-0">
+              <span className={`block ${text.caption} ${ink.muted} uppercase tracking-wide font-semibold`}>
+                Lokasi Anda
+              </span>
+              {memuatLokasi ? (
+                <span className={`block ${text.body} ${ink.faint} mt-1`}>Mencari lokasi…</span>
+              ) : errorLokasi ? (
+                <span className={`block ${text.footnote} ${tone.danger.text} mt-1`}>{errorLokasi}</span>
+              ) : posisi ? (
+                <>
+                  <span className={`block ${text.body} ${ink.strong} mt-1 leading-snug`}>
+                    {alamat ?? 'Alamat tidak dikenali'}
+                  </span>
+                  <span className={`block ${text.caption} ${ink.faint} mt-1 tabular-nums`}>
+                    {posisi.lat.toFixed(5)}, {posisi.lng.toFixed(5)} · akurasi ±{posisi.akurasi} m
+                  </span>
+                </>
+              ) : null}
+            </div>
+            <button
+              type="button"
+              onClick={minta}
+              aria-label="Perbarui lokasi"
+              className={`w-9 h-9 -mr-1 -mt-1 flex items-center justify-center ${ink.muted} active:opacity-50`}
+            >
+              <RefreshCw className={`w-4 h-4 ${memuatLokasi ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
+
+          {posisi && <MiniMap lat={posisi.lat} lng={posisi.lng} className="mx-3 mb-3" />}
+        </Card>
+
+        {/* --- Tombol aksi --- */}
+        {sudahPulang ? (
+          <Card className="flex items-center gap-2.5">
+            <Check className={`w-4 h-4 shrink-0 ${tone.positive.text}`} />
+            <p className={`${text.body} ${ink.base}`}>Absen hari ini sudah lengkap. Terima kasih.</p>
+          </Card>
+        ) : (
+          <div className="flex flex-col gap-2.5">
+            {/*
+              Satu tombol saja, sesuai tahap berikutnya yang memang bisa
+              dilakukan. Menampilkan dua tombol yang salah satunya selalu
+              mati (seperti desain sebelumnya) hanya menambah keraguan.
+            */}
+            {(() => {
+              const aksi: Aksi = sudahMasuk ? 'pulang' : 'masuk';
+              const Ikon = sudahMasuk ? LogOut : LogIn;
+              return (
+                <button
+                  type="button"
+                  disabled={!lokasiSiap || mengirim !== null}
+                  onClick={() => kirim(aksi)}
+                  className={`min-h-[52px] ${radius.control} flex items-center justify-center gap-2 ${text.headline} text-white transition-transform active:scale-[0.98] disabled:active:scale-100 disabled:bg-slate-300 ${
+                    sudahMasuk ? 'bg-primary' : 'bg-success'
+                  }`}
+                >
+                  <Ikon className="w-5 h-5" />
+                  {mengirim ? 'Mengirim…' : `Absen ${aksi}`}
+                </button>
+              );
+            })()}
+
+            {!lokasiSiap && !memuatLokasi && (
+              <p className={`${text.caption} ${ink.faint} text-center px-4`}>
+                Lokasi diperlukan sebelum absen dapat dikirim.
               </p>
-            </div>
-            <div className="mt-3 flex items-center gap-1.5">
-              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
-              <span className="text-[9px] text-gray-400">Akurasi: 12 m</span>
-            </div>
+            )}
+            {sudahMasuk && (
+              <p className={`${text.caption} ${ink.faint} text-center flex items-center justify-center gap-1`}>
+                <Clock className="w-3 h-3" />
+                Anda sudah absen masuk pukul {formatJam(hariIni?.clock_in_time)}
+              </p>
+            )}
           </div>
+        )}
 
-          {/* Jam */}
-          <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700/50 flex flex-col justify-between">
-            <div>
-              <div className="w-7 h-7 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center mb-2">
-                <Clock className="w-4 h-4 text-blue-500" />
-              </div>
-              <h3 className="text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-2">Jam Masuk & Pulang</h3>
-              
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-[11px] text-gray-600 dark:text-gray-400">Masuk</span>
-                <span className="text-[11px] font-bold text-gray-800 dark:text-gray-200">{todayRecord?.clock_in_time || '--:--'}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-[11px] text-gray-600 dark:text-gray-400">Pulang</span>
-                <span className="text-[11px] font-bold text-gray-800 dark:text-gray-200">{todayRecord?.clock_out_time || '--:--'}</span>
-              </div>
-            </div>
-            <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
-              <span className="text-[9px] text-gray-400">{todayStr}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Map View */}
-        <div className="relative w-full h-48 bg-[#e5e7eb] dark:bg-gray-800 rounded-2xl overflow-hidden shadow-inner border border-gray-200 dark:border-gray-700">
-          <svg className="w-full h-full opacity-60 dark:opacity-30" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice">
-            {/* Simulated streets */}
-            <path d="M -50 50 L 450 150 M -50 100 L 450 200 M 100 -50 L 50 350 M 200 -50 L 250 350 M 300 -50 L 150 350" stroke="#cbd5e1" strokeWidth="4" fill="none" />
-            <path d="M -50 80 L 450 180 M -50 130 L 450 230" stroke="#cbd5e1" strokeWidth="2" fill="none" />
-          </svg>
-          
-          {/* My Location Pin */}
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
-            {/* Tooltip */}
-            <div className="bg-white dark:bg-gray-800 px-3 py-1.5 rounded-lg shadow-lg mb-2 whitespace-nowrap border border-gray-100 dark:border-gray-700 relative">
-              <div className="flex items-start gap-1">
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-1"></div>
-                <div>
-                  <p className="text-[9px] font-bold text-gray-800 dark:text-gray-100">Lokasi Anda saat ini</p>
-                  <p className="text-[8px] text-gray-500">Jl. Melati No. 12, Kec. Gamping...</p>
-                </div>
-              </div>
-              <div className="absolute -bottom-1.5 left-1/2 transform -translate-x-1/2 w-3 h-3 bg-white dark:bg-gray-800 rotate-45 border-r border-b border-gray-100 dark:border-gray-700"></div>
-            </div>
-            
-            {/* Pulsing Dot */}
-            <div className="relative flex justify-center items-center">
-              <div className="absolute w-8 h-8 bg-blue-400 rounded-full opacity-30 animate-ping"></div>
-              <div className="absolute w-4 h-4 bg-white rounded-full flex items-center justify-center shadow">
-                <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex gap-4 mt-2">
-          <button 
-            disabled={loading || !!todayRecord?.clock_in_time}
-            onClick={handleClockIn}
-            className={`flex-1 flex flex-col items-start p-4 rounded-2xl transition-all shadow-md active:scale-95 ${todayRecord?.clock_in_time ? 'bg-gray-100 dark:bg-gray-800 opacity-60' : 'bg-emerald-600 hover:bg-emerald-700 text-white'}`}
-          >
-            <LogOut className={`w-6 h-6 mb-1 ${todayRecord?.clock_in_time ? 'text-gray-400' : 'text-emerald-100'}`} />
-            <span className={`text-xs font-bold ${todayRecord?.clock_in_time ? 'text-gray-500' : 'text-white'}`}>Absen Masuk</span>
-            <span className={`text-[9px] ${todayRecord?.clock_in_time ? 'text-gray-400' : 'text-emerald-200'}`}>Masuk kerja</span>
-          </button>
-
-          <button 
-            disabled={loading || !todayRecord?.clock_in_time || !!todayRecord?.clock_out_time}
-            onClick={handleClockOut}
-            className={`flex-1 flex flex-col items-start p-4 rounded-2xl transition-all shadow-md active:scale-95 ${(!todayRecord?.clock_in_time || todayRecord?.clock_out_time) ? 'bg-gray-100 dark:bg-gray-800 opacity-60' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
-          >
-            <LogOut className={`w-6 h-6 mb-1 rotate-180 ${(!todayRecord?.clock_in_time || todayRecord?.clock_out_time) ? 'text-gray-400' : 'text-blue-100'}`} />
-            <span className={`text-xs font-bold ${(!todayRecord?.clock_in_time || todayRecord?.clock_out_time) ? 'text-gray-500' : 'text-white'}`}>Absen Pulang</span>
-            <span className={`text-[9px] ${(!todayRecord?.clock_in_time || todayRecord?.clock_out_time) ? 'text-gray-400' : 'text-blue-200'}`}>Pulang kerja</span>
-          </button>
-        </div>
-
-      </div>
-    </div>
+        <div className="h-2" />
+      </Stack>
+    </Screen>
   );
 };
 

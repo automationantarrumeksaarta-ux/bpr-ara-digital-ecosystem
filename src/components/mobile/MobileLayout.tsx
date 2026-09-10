@@ -1,18 +1,25 @@
 import React from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import MobileBottomNav from './MobileBottomNav';
+import { surface } from './ui/tokens';
 
 export const MobileLayout: React.FC = () => {
+  const { pathname } = useLocation();
+
   return (
-    <div className="bg-[#f0f2f5] dark:bg-black min-h-screen flex justify-center">
-      {/* Mobile Frame Container */}
-      <div className="w-full max-w-md bg-[#f8fafc] dark:bg-gray-900 min-h-screen relative shadow-2xl flex flex-col overflow-hidden">
-        {/* Main Content Area (Scrollable) */}
-        <div className="flex-1 overflow-y-auto pb-24 scrollbar-hide">
+    // h-dvh, bukan min-h-screen: di browser HP, 100vh termasuk area yang
+    // tertutup bilah URL, sehingga navigasi bawah ikut terdorong keluar layar.
+    <div className={`h-dvh flex justify-center ${surface.page}`}>
+      <div className={`w-full max-w-md h-full flex flex-col ${surface.page} relative overflow-hidden`}>
+        {/*
+          key={pathname} mereset posisi gulir saat berpindah tab. Tanpa ini,
+          membuka tab baru bisa mendarat di tengah halaman karena posisi gulir
+          layar sebelumnya ikut terbawa.
+        */}
+        <main key={pathname} className="flex-1 overflow-y-auto overscroll-contain">
           <Outlet />
-        </div>
-        
-        {/* Bottom Navigation */}
+        </main>
+
         <MobileBottomNav />
       </div>
     </div>

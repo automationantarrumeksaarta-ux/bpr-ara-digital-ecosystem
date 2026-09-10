@@ -1,95 +1,155 @@
-import React from 'react';
-import { 
-  CheckCircle,
-  ClipboardList,
-  Megaphone,
-  FileText,
-  Clock,
-  Settings,
-  SlidersHorizontal
-} from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { BellOff, CheckCheck } from 'lucide-react';
+import { useApp } from '../../../context/AppContext';
+import { AppBar, Card, EmptyState, Screen, Stack } from '../ui/primitives';
+import { ink, radius, surface, text, tone } from '../ui/tokens';
+
+type Saring = 'semua' | 'belum';
+
+/** "2 jam lalu" dari timestamp, tanpa menambah dependensi tanggal. */
+const waktuRelatif = (iso: string): string => {
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return '';
+  const detik = Math.floor((Date.now() - t) / 1000);
+  if (detik < 60) return 'Baru saja';
+  const menit = Math.floor(detik / 60);
+  if (menit < 60) return `${menit} menit lalu`;
+  const jam = Math.floor(menit / 60);
+  if (jam < 24) return `${jam} jam lalu`;
+  const hari = Math.floor(jam / 24);
+  if (hari === 1) return 'Kemarin';
+  if (hari < 7) return `${hari} hari lalu`;
+  return new Date(t).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
+};
+
+/** Prioritas menentukan warna; modul saja tidak cukup untuk menyampaikan urgensi. */
+const warnaPrioritas = (prioritas?: string) => {
+  const p = (prioritas ?? '').toUpperCase();
+  if (p === 'HIGH' || p === 'URGENT' || p === 'TINGGI') return tone.danger;
+  if (p === 'MEDIUM' || p === 'SEDANG') return tone.warning;
+  return tone.primary;
+};
 
 const MobileNotifications: React.FC = () => {
-  const notifications = [
-    {
-      title: 'Pengajuan Cuti Disetujui',
-      message: 'Pengajuan cuti Anda untuk tanggal 21-22 Apr 2025 telah disetujui oleh Bapak/Ibu...',
-      time: '2 jam lalu',
-      icon: CheckCircle,
-      bg: 'bg-emerald-50 dark:bg-emerald-900/30',
-      color: 'text-emerald-500'
-    },
-    {
-      title: 'Task Baru',
-      message: 'Anda mendapat tugas baru: Verifikasi Data Nasabah - Loan Origination',
-      time: '4 jam lalu',
-      icon: ClipboardList,
-      bg: 'bg-blue-50 dark:bg-blue-900/30',
-      color: 'text-blue-500'
-    },
-    {
-      title: 'Pengumuman',
-      message: 'Rapat bulanan seluruh karyawan akan dilaksanakan pada hari Jumat, 25 Apr 2025...',
-      time: '6 jam lalu',
-      icon: Megaphone,
-      bg: 'bg-orange-50 dark:bg-orange-900/30',
-      color: 'text-orange-500'
-    },
-    {
-      title: 'Pengajuan Izin',
-      message: 'Pengajuan izin sakit Anda untuk tanggal 18 Apr 2025 telah disetujui.',
-      time: 'Kemarin',
-      icon: FileText,
-      bg: 'bg-emerald-50 dark:bg-emerald-900/30',
-      color: 'text-emerald-500'
-    },
-    {
-      title: 'Reminder',
-      message: 'Jangan lupa untuk melakukan absen pulang hari ini sebelum pukul 17:00.',
-      time: 'Kemarin',
-      icon: Clock,
-      bg: 'bg-red-50 dark:bg-red-900/30',
-      color: 'text-red-500'
-    },
-    {
-      title: 'Update Sistem',
-      message: 'Maintenance sistem akan dilakukan pada 26 Apr 2025 pukul 22:00 - 24:00.',
-      time: 'Kemarin',
-      icon: Settings,
-      bg: 'bg-slate-100 dark:bg-slate-800',
-      color: 'text-slate-500'
-    }
-  ];
+  const { notifications, markNotificationAsRead } = useApp();
+  const [saring, setSaring] = useState<Saring>('semua');
+
+  const belumDibaca = useMemo(
+    () => (notifications ?? []).filter(n => !n.read).length,
+    [notifications],
+  );
+
+  const daftar = useMemo(() => {
+    const semua = [...(notifications ?? [])].sort(
+      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+    );
+    return saring === 'belum' ? semua.filter(n => !n.read) : semua;
+  }, [notifications, saring]);
 
   return (
-    <div className="bg-[#f8fafc] dark:bg-gray-900 min-h-screen pb-24">
-      {/* Header */}
-      <div className="bg-white dark:bg-gray-950 px-5 py-4 flex items-center justify-between border-b border-gray-100 dark:border-gray-800 sticky top-0 z-10">
-        <h1 className="text-base font-bold text-gray-800 dark:text-gray-100">Notification</h1>
-        <button className="text-gray-500 hover:text-gray-800 transition-colors">
-          <SlidersHorizontal className="w-5 h-5" />
-        </button>
-      </div>
+    <Screen>
+      <AppBar
+        title="Notifikasi"
+        action={
+          belumDibaca > 0 ? (
+            <button
+              type="button"
+              onClick={() => (notifications ?? []).filter(n => !n.read).forEach(n => markNotificationAsRead(n.id))}
+              className={`h-11 px-3 flex items-center gap-1.5 ${text.footnote} font-semibold ${tone.primary.text} active:opacity-50`}
+            >
+              <CheckCheck className="w-4 h-4" />
+              Tandai dibaca
+            </button>
+          ) : undefined
+        }
+      />
 
-      <div className="p-4 flex flex-col gap-3">
-        {notifications.map((notif, idx) => (
-          <div key={idx} className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700/50 flex gap-3">
-            <div className={`w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center ${notif.bg}`}>
-              <notif.icon className={`w-5 h-5 ${notif.color}`} />
-            </div>
-            <div className="flex-1">
-              <div className="flex justify-between items-start mb-1">
-                <h3 className="text-xs font-bold text-gray-800 dark:text-gray-100">{notif.title}</h3>
-                <span className="text-[9px] text-gray-400 font-medium whitespace-nowrap ml-2">{notif.time}</span>
-              </div>
-              <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-snug">
-                {notif.message}
-              </p>
-            </div>
+      <Stack className="gap-4">
+        {/* Penyaring hanya muncul kalau memang ada yang belum dibaca. */}
+        {belumDibaca > 0 && (
+          <div className={`flex gap-1 p-1 ${surface.card} ${radius.control} border ${surface.divider}`}>
+            {([
+              { id: 'semua' as const, label: `Semua (${notifications?.length ?? 0})` },
+              { id: 'belum' as const, label: `Belum dibaca (${belumDibaca})` },
+            ]).map(t => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setSaring(t.id)}
+                className={`flex-1 min-h-[36px] ${radius.control} ${text.footnote} font-semibold transition-colors ${
+                  saring === t.id
+                    ? 'bg-primary text-white'
+                    : `${ink.muted} active:bg-slate-100`
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
           </div>
-        ))}
-      </div>
-    </div>
+        )}
+
+        {daftar.length === 0 ? (
+          <Card flush>
+            <EmptyState
+              icon={BellOff}
+              title={saring === 'belum' ? 'Semua sudah dibaca' : 'Belum ada notifikasi'}
+              description={
+                saring === 'belum'
+                  ? 'Tidak ada notifikasi yang menunggu perhatian Anda.'
+                  : 'Notifikasi tugas, persetujuan, dan pengumuman akan muncul di sini.'
+              }
+            />
+          </Card>
+        ) : (
+          <Card flush className={`overflow-hidden divide-y ${surface.hairline}`}>
+            {daftar.map(n => {
+              const warna = warnaPrioritas(n.priority);
+              return (
+                <button
+                  key={n.id}
+                  type="button"
+                  onClick={() => !n.read && markNotificationAsRead(n.id)}
+                  className={`w-full px-4 py-3.5 flex items-start gap-3 text-left transition-colors active:bg-slate-50 ${
+                    n.read ? '' : 'bg-primary-light/50'
+                  }`}
+                >
+                  {/*
+                    Penanda belum dibaca berupa titik kecil. Versi sebelumnya
+                    memberi setiap notifikasi lingkaran ikon berwarna 40px —
+                    enam lingkaran berbeda warna berjajar tanpa arti apa pun.
+                  */}
+                  <span
+                    className={`w-2 h-2 ${radius.pill} mt-1.5 shrink-0 ${n.read ? 'bg-transparent' : warna.bg}`}
+                  />
+                  <span className="flex-1 min-w-0">
+                    <span className="flex items-baseline gap-2">
+                      <span
+                        className={`flex-1 min-w-0 ${text.body} truncate ${
+                          n.read ? `font-medium ${ink.base}` : `font-semibold ${ink.strong}`
+                        }`}
+                      >
+                        {n.title}
+                      </span>
+                      <span className={`${text.caption} ${ink.faint} shrink-0`}>
+                        {waktuRelatif(n.timestamp)}
+                      </span>
+                    </span>
+                    <span className={`block ${text.footnote} ${ink.muted} mt-1 leading-snug line-clamp-2`}>
+                      {n.message}
+                    </span>
+                    {n.module && (
+                      <span className={`inline-block mt-1.5 ${text.caption} ${ink.faint}`}>{n.module}</span>
+                    )}
+                  </span>
+                </button>
+              );
+            })}
+          </Card>
+        )}
+
+        <div className="h-2" />
+      </Stack>
+    </Screen>
   );
 };
 

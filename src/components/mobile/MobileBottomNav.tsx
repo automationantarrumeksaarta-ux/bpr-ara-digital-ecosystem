@@ -1,47 +1,98 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { 
-  Home, 
-  CalendarDays, 
-  MapPin, 
-  Bell, 
-  UserCircle 
-} from 'lucide-react';
+import { Home, CalendarDays, Fingerprint, Bell, User } from 'lucide-react';
+import { text, ink, surface } from './ui/tokens';
+import { useApp } from '../../context/AppContext';
+
+interface Tab {
+  name: string;
+  path: string;
+  icon: React.ElementType;
+  /** tab tengah tampil sebagai tombol aksi utama, bukan ikon biasa */
+  primary?: boolean;
+}
+
+const TABS: Tab[] = [
+  { name: 'Beranda', path: '/mobile/home', icon: Home },
+  { name: 'Absensi', path: '/mobile/attendance', icon: CalendarDays },
+  { name: 'Absen', path: '/mobile/live-attendance', icon: Fingerprint, primary: true },
+  { name: 'Notifikasi', path: '/mobile/notifications', icon: Bell },
+  { name: 'Profil', path: '/mobile/profile', icon: User },
+];
 
 const MobileBottomNav: React.FC = () => {
-  const location = useLocation();
-  const path = location.pathname;
+  const { pathname } = useLocation();
+  const { notifications } = useApp();
 
-  const navItems = [
-    { name: 'Beranda', path: '/mobile', icon: Home, solidIcon: Home },
-    { name: 'Data Absen', path: '/mobile/attendance', icon: CalendarDays, solidIcon: CalendarDays },
-    { name: 'Absen', path: '/mobile/live-attendance', icon: MapPin, solidIcon: MapPin },
-    { name: 'Notification', path: '/mobile/notifications', icon: Bell, solidIcon: Bell },
-    { name: 'Profile', path: '/mobile/profile', icon: UserCircle, solidIcon: UserCircle },
-  ];
+  const belumDibaca = notifications?.filter(n => !n.read).length ?? 0;
 
   return (
-    <div className="absolute bottom-0 w-full bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 px-2 py-3 flex justify-between items-center z-50 rounded-t-3xl shadow-[0_-10px_20px_rgba(0,0,0,0.03)] dark:shadow-[0_-10px_20px_rgba(0,0,0,0.2)]">
-      {navItems.map((item) => {
-        const isActive = path === item.path || (path === '/mobile' && item.name === 'Beranda');
-        const Icon = isActive ? item.solidIcon : item.icon;
-        
-        return (
-          <Link 
-            key={item.name} 
-            to={item.path} 
-            className="flex flex-col items-center gap-1 w-1/5"
-          >
-            <div className={`transition-all duration-300 ${isActive ? 'text-blue-600 dark:text-blue-400 scale-110' : 'text-gray-400 dark:text-gray-500 scale-100'}`}>
-              <Icon className="w-6 h-6" />
-            </div>
-            <span className={`text-[9px] font-bold transition-all duration-300 ${isActive ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'}`}>
-              {item.name}
-            </span>
-          </Link>
-        );
-      })}
-    </div>
+    <nav
+      className={`shrink-0 ${surface.card} border-t ${surface.divider}`}
+      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+    >
+      <div className="flex items-stretch">
+        {TABS.map(tab => {
+          const aktif = pathname === tab.path || pathname.startsWith(`${tab.path}/`);
+          const Icon = tab.icon;
+
+          if (tab.primary) {
+            // Aksi utama aplikasi ini adalah absen. Diberi bobot visual paling
+            // besar supaya tidak setara dengan tab navigasi biasa.
+            return (
+              <Link
+                key={tab.path}
+                to={tab.path}
+                aria-label={tab.name}
+                aria-current={aktif ? 'page' : undefined}
+                className="flex-1 flex flex-col items-center justify-end pb-1.5 -mt-5"
+              >
+                <span
+                  className={`w-14 h-14 rounded-full flex items-center justify-center shadow-lg shadow-primary/25 transition-transform active:scale-95 ${
+                    aktif ? 'bg-primary-dark' : 'bg-primary'
+                  }`}
+                >
+                  <Icon className="w-7 h-7 text-white" strokeWidth={2} />
+                </span>
+                <span className={`${text.caption} font-semibold mt-1 text-primary`}>
+                  {tab.name}
+                </span>
+              </Link>
+            );
+          }
+
+          return (
+            <Link
+              key={tab.path}
+              to={tab.path}
+              aria-current={aktif ? 'page' : undefined}
+              className="flex-1 min-h-[56px] flex flex-col items-center justify-center gap-1 pt-1.5 pb-1.5 active:opacity-60 transition-opacity"
+            >
+              <span className="relative">
+                <Icon
+                  className={`w-[22px] h-[22px] ${aktif ? 'text-primary' : ink.faint}`}
+                  // Ketebalan garis dipakai untuk menandai tab aktif, bukan
+                  // efek skala yang membuat baris nav bergoyang saat berpindah.
+                  strokeWidth={aktif ? 2.4 : 1.8}
+                />
+                {tab.name === 'Notifikasi' && belumDibaca > 0 && (
+                  <span className="absolute -top-1 -right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-danger text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-white">
+                    {belumDibaca > 9 ? '9+' : belumDibaca}
+                  </span>
+                )}
+              </span>
+              <span
+                className={`${text.caption} ${
+                  aktif ? 'font-semibold text-primary' : `font-medium ${ink.faint}`
+                }`}
+              >
+                {tab.name}
+              </span>
+            </Link>
+          );
+        })}
+      </div>
+    </nav>
   );
 };
 
