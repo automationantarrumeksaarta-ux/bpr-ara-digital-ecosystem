@@ -1,7 +1,8 @@
 import React, { Suspense } from 'react';
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { firstAccessibleRoute, isPathAllowed } from '../utils/access';
+import { isNativeApp, RUTE_AWAL_MOBILE } from '../utils/platform';
 
 // Import all views
 import { ExecutiveDashboard } from '../components/modules/ExecutiveDashboard';
@@ -76,8 +77,22 @@ const PlaceholderView = ({ title }: { title: string }) => (
 
 // Aturan akses dipusatkan di src/utils/access.ts agar web dan mobile
 // memakai logika yang sama persis.
-const getFirstAccessibleRoute = firstAccessibleRoute;
 const isPathAccessible = isPathAllowed;
+
+/**
+ * Tujuan setelah login / saat membuka akar aplikasi.
+ *
+ * APK selalu masuk ke tampilan mobile: aplikasi itu ditujukan untuk aktivitas
+ * lapangan dan absensi. Sebelumnya tidak ada satu pun kode yang mengarahkan
+ * ke /mobile, sehingga APK selalu mendarat di dashboard web dan seluruh layar
+ * mobile praktis tidak pernah terlihat.
+ *
+ * Modul web tetap dapat dibuka dari grid Menu di beranda mobile.
+ */
+const getFirstAccessibleRoute = (
+  role: string | undefined,
+  rolePermissions: Record<string, string[]>,
+): string => (isNativeApp() ? RUTE_AWAL_MOBILE : firstAccessibleRoute(role, rolePermissions));
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { currentUser, rolePermissions } = useApp();
@@ -93,6 +108,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
 export const AppRouter: React.FC = () => {
   const { isAuthenticated, setIsAuthenticated, setCurrentUser, rolePermissions, currentUser, isAuthLoading, flowTasks, updateTask } = useApp();
+  const navigate = useNavigate();
 
   if (isAuthLoading) {
     return <FallbackLoading />;
@@ -104,8 +120,18 @@ export const AppRouter: React.FC = () => {
         <Route path="*" element={<LoginScreen onLoginSuccess={(user) => {
           setCurrentUser(user);
           setIsAuthenticated(true);
-          // Auto-navigate based on first accessible route
-          window.location.href = getFirstAccessibleRoute(user.role || 'User', rolePermissions);
+          /*
+           * Memakai navigate(), bukan window.location.href.
+           *
+           * window.location.href adalah navigasi keras: browser meminta ulang
+           * path itu ke server. Di dalam APK, halaman disajikan oleh server
+           * lokal Capacitor dari berkas bundel — permintaan keras ke path
+           * dalam seperti /mobile/home berisiko tidak terlayani karena tidak
+           * ada berkas dengan nama itu. Navigasi React Router tidak menyentuh
+           * server sama sekali, sekaligus menghilangkan muat-ulang penuh yang
+           * membuang seluruh state aplikasi setiap kali login.
+           */
+          navigate(getFirstAccessibleRoute(user.role || 'User', rolePermissions), { replace: true });
         }} />} />
       </Routes>
     );
