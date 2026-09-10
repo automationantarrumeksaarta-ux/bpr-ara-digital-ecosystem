@@ -9,3 +9,8 @@ coverage/
 # hanya folder database di root, bukan src/data/
 /data/
 *.sqlite
+
+# Perkakas skill agen (dipasang lewat `npx skills add`) — lokal, bukan kode aplikasi
+.agents/
+.claude/
+skills-lock.json

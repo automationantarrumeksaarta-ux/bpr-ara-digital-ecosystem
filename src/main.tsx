@@ -17,24 +17,36 @@ import './index.css';
  * VITE_API_BASE yang ditentukan saat build.
  */
 const API_BASE = (import.meta.env.VITE_API_BASE ?? '').replace(/\/$/, '');
-const isNative = Boolean((window as any).Capacitor?.isNativePlatform?.());
 
-if (isNative) {
-  if (!API_BASE) {
-    console.error(
-      'VITE_API_BASE belum diisi. Aplikasi native tidak tahu alamat server. ' +
-      'Set VITE_API_BASE saat build, contoh: VITE_API_BASE=https://api.bprara.co.id npm run build',
-    );
-  } else {
-    const originalFetch = window.fetch.bind(window);
-    window.fetch = (resource: RequestInfo | URL, config?: RequestInit) => {
-      if (typeof resource === 'string' && resource.startsWith('/api')) {
-        return originalFetch(`${API_BASE}${resource}`, config);
+/**
+ * Diperiksa saat fetch dipanggil, bukan sekali saat modul dimuat: jembatan
+ * Capacitor mengisi window.Capacitor lewat skrip yang disuntikkan WebView, dan
+ * kalau urutannya meleset sedikit saja, pemeriksaan sekali-di-awal akan
+ * menyimpulkan "bukan native" lalu seluruh panggilan API di APK gagal diam-diam.
+ */
+const berjalanDiNative = () =>
+  Boolean((window as any).Capacitor?.isNativePlatform?.());
+
+let sudahMemperingatkan = false;
+
+const originalFetch = window.fetch.bind(window);
+window.fetch = (resource: RequestInfo | URL, config?: RequestInit) => {
+  if (typeof resource === 'string' && resource.startsWith('/api') && berjalanDiNative()) {
+    if (!API_BASE) {
+      if (!sudahMemperingatkan) {
+        sudahMemperingatkan = true;
+        console.error(
+          'VITE_API_BASE kosong. Aplikasi native tidak tahu alamat server, ' +
+          'sehingga panggilan API akan gagal. Isi VITE_API_BASE di .env ' +
+          'sebelum menjalankan `npm run build` lalu `npx cap sync android`.',
+        );
       }
-      return originalFetch(resource, config);
-    };
+    } else {
+      return originalFetch(`${API_BASE}${resource}`, config);
+    }
   }
-}
+  return originalFetch(resource, config);
+};
 
 class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean, error: Error | null, info: any}> {
   state = { hasError: false, error: null, info: null };
