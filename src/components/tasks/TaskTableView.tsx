@@ -281,7 +281,8 @@ export const TaskTableView: React.FC<TaskTableViewProps> = ({
         (t.assignedTo && userNameLower && t.assignedTo.trim().toLowerCase() === userNameLower) ||
         (t.pic && userNameLower && t.pic.trim().toLowerCase() === userNameLower) ||
         (t.createdBy && (t.createdBy.trim() === currentUser.id || t.createdBy.trim() === currentUser.username || t.createdBy.trim() === currentUser.name));
-      if (!isPic) return false;
+      // TEMPORARILY DISABLE UNTUK DEBUG
+      // if (!isPic) return false;
     }
 
     if (filterStatus !== 'ALL' && t.status !== filterStatus) return false;
