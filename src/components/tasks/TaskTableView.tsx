@@ -279,7 +279,8 @@ export const TaskTableView: React.FC<TaskTableViewProps> = ({
         (t.assignedTo && userTabLower && t.assignedTo.trim().toLowerCase() === userTabLower) ||
         (t.pic && userTabLower && t.pic.trim().toLowerCase() === userTabLower) ||
         (t.assignedTo && userNameLower && t.assignedTo.trim().toLowerCase() === userNameLower) ||
-        (t.pic && userNameLower && t.pic.trim().toLowerCase() === userNameLower);
+        (t.pic && userNameLower && t.pic.trim().toLowerCase() === userNameLower) ||
+        (t.createdBy && (t.createdBy === currentUser.id || t.createdBy === currentUser.username || t.createdBy === currentUser.name));
       if (!isPic) return false;
     }
 
@@ -454,6 +455,7 @@ export const TaskTableView: React.FC<TaskTableViewProps> = ({
                 </th>
 
                 {selectedTab === 'REKAP PUSAT' && <th className="py-5 px-4 w-24">PIC</th>}
+                <th className="py-5 px-4 w-28 whitespace-nowrap">Tanggal Dibuat</th>
                 <th className="py-5 px-5">Deskripsi Aktivitas</th>
                 <th className="py-5 px-5 max-w-xs">Arahan Atasan</th>
                 <th className="py-5 px-4 w-20">Prioritas</th>
@@ -481,7 +483,7 @@ export const TaskTableView: React.FC<TaskTableViewProps> = ({
                 ))
               ) : filteredTasks.length === 0 ? (
                 <tr>
-                  <td colSpan={selectedTab === 'REKAP PUSAT' ? 9 : 8} className="py-12 text-center text-gray-400 dark:text-gray-500">
+                  <td colSpan={selectedTab === 'REKAP PUSAT' ? 10 : 9} className="py-12 text-center text-gray-400 dark:text-gray-500">
                     <div className="max-w-xs mx-auto space-y-2">
                       <Sparkles className="w-8 h-8 text-gray-300 mx-auto" />
                       <p className="font-semibold text-gray-700 dark:text-gray-300">Tidak ada aktivitas BEIS ditemukan</p>
@@ -526,6 +528,13 @@ export const TaskTableView: React.FC<TaskTableViewProps> = ({
                           </span>
                         </td>
                       )}
+                      
+                      {/* Tanggal Dibuat */}
+                      <td className="py-3.5 px-4 text-[11px] text-gray-500 whitespace-nowrap">
+                        {new Date(t.createdAt).toLocaleDateString('id-ID', {
+                          day: '2-digit', month: 'short', year: 'numeric'
+                        })}
+                      </td>
 
                       {/* Deskripsi Aktivitas */}
                       <td className="py-3.5 px-4 max-w-sm">

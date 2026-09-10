@@ -89,7 +89,7 @@ export const DecisionQueue: React.FC<DecisionQueueProps> = ({ tasks, currentUser
     
     // If we only strictly follow the matrix, Super Admin might see nothing if they aren't assigned as approver.
     // Let's stick strictly to the matrix unless it's super admin for safety.
-    const isMyTask = isUnderApprover || isEscalatedToMe || isSuperAdmin || isNamedValidator;
+    const isMyTask = isUnderApprover || isEscalatedToMe || isSuperAdmin || isNamedValidator || (t.createdBy && (t.createdBy === currentUser.id || t.createdBy === currentUser.username || t.createdBy === currentUser.name));
     
     if (!isMyTask) return false;
 
@@ -269,6 +269,7 @@ export const DecisionQueue: React.FC<DecisionQueueProps> = ({ tasks, currentUser
                   />
                 </th>
                 <th className="px-4 py-3 w-48">PIC / Unit</th>
+                <th className="px-4 py-3 w-32 whitespace-nowrap">Tanggal Dibuat</th>
                 <th className="px-4 py-3 max-w-sm">Deskripsi & Arahan</th>
                 <th className="px-4 py-3 w-48">Evidence Link/File</th>
                 <th className="px-4 py-3 text-right w-56">Keputusan</th>
@@ -277,7 +278,7 @@ export const DecisionQueue: React.FC<DecisionQueueProps> = ({ tasks, currentUser
             <tbody className="divide-y divide-border text-foreground">
               {filteredTasks.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-muted">
+                  <td colSpan={7} className="py-12 text-center text-muted">
                     <ShieldCheck className="w-8 h-8 mx-auto mb-2 text-muted/50" />
                     <p>Antrean kosong. Tidak ada tugas yang menunggu validasi.</p>
                   </td>
@@ -303,6 +304,11 @@ export const DecisionQueue: React.FC<DecisionQueueProps> = ({ tasks, currentUser
                     <td className="px-4 py-3 align-top pt-4">
                       <p className={`font-bold text-foreground ${approved ? 'line-through' : ''}`}>{t.assignedTo}</p>
                       <p className="text-xs text-muted uppercase">{t.unit}</p>
+                    </td>
+                    <td className="px-4 py-3 align-top pt-4 text-xs text-muted whitespace-nowrap">
+                      {new Date(t.createdAt).toLocaleDateString('id-ID', {
+                        day: '2-digit', month: 'short', year: 'numeric'
+                      })}
                     </td>
                     <td className="px-4 py-4 max-w-sm align-top">
                       <div className="flex flex-col gap-3">
