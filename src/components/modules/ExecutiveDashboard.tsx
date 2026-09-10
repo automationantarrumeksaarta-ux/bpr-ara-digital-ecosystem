@@ -41,30 +41,87 @@ export const ExecutiveDashboard: React.FC = () => {
   const labaBersih = macroMetrics.labaTahunBerjalan || 0;
   const npl = macroMetrics.npl || 0;
 
-  // Synthesize trend data (ending in current metrics)
-  const trendData = [
-    { month: 'Mar', os: Math.round(osKredit * 0.82 / 1000000000), dpk: Math.round(totalDPK * 0.85 / 1000000000) },
-    { month: 'Apr', os: Math.round(osKredit * 0.85 / 1000000000), dpk: Math.round(totalDPK * 0.87 / 1000000000) },
-    { month: 'Mei', os: Math.round(osKredit * 0.89 / 1000000000), dpk: Math.round(totalDPK * 0.90 / 1000000000) },
-    { month: 'Jun', os: Math.round(osKredit * 0.94 / 1000000000), dpk: Math.round(totalDPK * 0.93 / 1000000000) },
-    { month: 'Jul', os: Math.round(osKredit * 0.96 / 1000000000), dpk: Math.round(totalDPK * 0.97 / 1000000000) },
-    { month: 'Agu', os: Math.round(osKredit * 0.98 / 1000000000), dpk: Math.round(totalDPK * 0.99 / 1000000000) },
-    { month: 'Sep', os: Math.round(osKredit / 1000000000), dpk: Math.round(totalDPK / 1000000000) },
-  ];
+  /*
+   * Tren diambil dari periode yang benar-benar tersimpan di database.
+   *
+   * Versi sebelumnya mengarang tujuh bulan dengan mengalikan angka hari ini
+   * (0,82 / 0,85 / 0,89 / 0,94 / 0,96 / 0,98 / 1,0) lalu memberinya label
+   * Mar-Sep. Grafiknya selalu naik mulus karena memang dibuat begitu, bukan
+   * karena bisnisnya tumbuh.
+   */
+  const riwayat: any[] = (macroMetrics as any).riwayat ?? [];
 
-  // Kolektibilitas Data (Simulated based on real NPL & RR)
-  const dpPct = (npl === 0 && macroMetrics.rr === 0) ? 0 : Math.max(0, 100 - (npl + macroMetrics.rr));
-  const klPct = npl * 0.4; // rough estimate breakdown of NPL
-  const dPct = npl * 0.35;
-  const mPct = npl * 0.25;
-  
-  const kolData = [
-    { name: 'Lancar (L)', value: macroMetrics.rr !== undefined ? macroMetrics.rr : 0, color: '#22c55e' },
-    { name: 'Dalam Perhatian (DP)', value: Number(dpPct.toFixed(2)), color: '#eab308' },
-    { name: 'Kurang Lancar (KL)', value: Number(klPct.toFixed(2)), color: '#f97316' },
-    { name: 'Diragukan (D)', value: Number(dPct.toFixed(2)), color: '#ef4444' },
-    { name: 'Macet (M)', value: Number(mPct.toFixed(2)), color: '#991b1b' },
-  ];
+  const miliar = (v: number | null | undefined) =>
+    v === null || v === undefined ? null : Math.round(v / 1_000_000_000);
+
+  const trendData = riwayat.map(r => {
+    const dpk = (r.tabungan ?? null) === null && (r.deposito ?? null) === null
+      ? null
+      : (r.tabungan || 0) + (r.deposito || 0);
+    return {
+      month: new Date(`${r.periode}T00:00:00`).toLocaleDateString('id-ID', { month: 'short', year: '2-digit' }),
+      os: miliar(r.outstanding),
+      dpk: miliar(dpk),
+    };
+  });
+
+  /*
+   * Sebuah garis baru bermakna kalau seri itu punya minimal dua titik.
+   * Nilai yang tidak ada harus null, bukan 0 — kalau dipaksa 0, periode yang
+   * kebetulan tidak memuat metrik itu (Neraca tidak memuat DPK, nominatif
+   * tidak memuat kredit) akan digambar sebagai terjun bebas ke nol.
+   */
+  const titikSeri = (kunci: 'os' | 'dpk') => trendData.filter(t => t[kunci] !== null).length;
+  const trenBisaDitampilkan = titikSeri('os') >= 2 || titikSeri('dpk') >= 2;
+
+  /**
+   * Perubahan antar dua periode terakhir yang benar-benar memuat metrik itu.
+   * Mengembalikan null bila belum ada pembanding.
+   */
+  const perubahan = (kunci: 'outstanding' | 'npl' | 'laba' | 'dpk') => {
+    const nilai = riwayat
+      .map(r => ({
+        periode: r.periode,
+        v: kunci === 'dpk'
+          ? ((r.tabungan ?? null) === null && (r.deposito ?? null) === null ? null : (r.tabungan || 0) + (r.deposito || 0))
+          : (r[kunci] ?? null),
+      }))
+      .filter(x => x.v !== null && x.v !== 0);
+    if (nilai.length < 2) return null;
+    const kini = nilai[nilai.length - 1];
+    const lalu = nilai[nilai.length - 2];
+    const pct = ((kini.v! - lalu.v!) / Math.abs(lalu.v!)) * 100;
+    return {
+      pct: Math.abs(pct),
+      naik: pct >= 0,
+      pembanding: new Date(`${lalu.periode}T00:00:00`).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' }),
+    };
+  };
+
+  /*
+   * Komposisi kolektibilitas apa adanya dari Laporan Rekap Nominatif Kredit.
+   *
+   * Versi sebelumnya menebak porsi KL/D/M dengan mengalikan NPL (0,4 / 0,35 /
+   * 0,25) dan menandainya sendiri sebagai "rough estimate". Pada data Juni
+   * 2026 tebakan itu meleset jauh: KL sebenarnya 2,26% (tebakan 7,96%),
+   * D 4,18% (tebakan 6,97%), M 13,47% (tebakan 4,98%).
+   */
+  const WARNA_KOLEK: Record<string, { nama: string; warna: string }> = {
+    L: { nama: 'Lancar (L)', warna: '#22c55e' },
+    DPK: { nama: 'Dalam Perhatian (DPK)', warna: '#eab308' },
+    KL: { nama: 'Kurang Lancar (KL)', warna: '#f97316' },
+    D: { nama: 'Diragukan (D)', warna: '#ef4444' },
+    M: { nama: 'Macet (M)', warna: '#991b1b' },
+  };
+
+  const kualitasKredit: any[] = (macroMetrics as any).kualitasKredit ?? [];
+  const kolData = kualitasKredit.map(k => ({
+    name: WARNA_KOLEK[k.kolektibilitas]?.nama ?? k.kolektibilitas,
+    value: Number(k.persen ?? 0),
+    color: WARNA_KOLEK[k.kolektibilitas]?.warna ?? '#94a3b8',
+    jmlRekening: k.jmlRekening ?? 0,
+    bakiDebet: k.bakiDebet ?? 0,
+  }));
 
   // Sumber Dana Data
   const dpkData = [
@@ -95,7 +152,13 @@ export const ExecutiveDashboard: React.FC = () => {
   const upcomingEvents = userTasks.filter(t => t.title.toLowerCase().includes('rapat') || t.category === 'MEETING').slice(0, 3);
   
   // Custom Top Metric Card
-  const TopMetricCard = ({ icon: Icon, title, value, trend, isPositive, iconBg, iconColor, period }: any) => (
+  /**
+   * `delta` berisi hasil perubahan() atau null bila belum ada periode
+   * pembanding. `deltaBaikSaatNaik` menentukan arah mana yang dianggap kabar
+   * baik — untuk NPL, naik justru buruk, sedangkan versi sebelumnya menandai
+   * SEMUA kartu isPositive={true} sehingga NPL yang memburuk tampil hijau.
+   */
+  const TopMetricCard = ({ icon: Icon, title, value, delta, deltaBaikSaatNaik = false, iconBg, iconColor }: any) => (
     <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-100 dark:border-slate-800 shadow-sm flex items-start gap-4 hover:shadow-md transition-shadow">
       <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 ${iconBg} ${iconColor}`}>
         <Icon className="w-6 h-6" />
@@ -103,13 +166,20 @@ export const ExecutiveDashboard: React.FC = () => {
       <div>
         <p className="text-xs sm:text-sm text-slate-500 font-bold mb-1">{title}</p>
         <h3 className="text-lg sm:text-xl font-black text-slate-800 dark:text-white mb-2">{value}</h3>
-        <div className="flex items-center gap-1.5">
-          <span className={`text-[10px] sm:text-xs font-bold flex items-center gap-0.5 ${isPositive ? 'text-emerald-500' : 'text-rose-500'}`}>
-            {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-            {trend}%
-          </span>
-          <span className="text-[9px] sm:text-[10px] text-slate-400">vs {period}</span>
-        </div>
+        {delta ? (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className={`text-[10px] sm:text-xs font-bold flex items-center gap-0.5 ${
+              delta.naik === deltaBaikSaatNaik ? 'text-emerald-500' : 'text-rose-500'
+            }`}>
+              {delta.naik ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+              {delta.pct.toFixed(2).replace('.', ',')}%
+            </span>
+            <span className="text-[9px] sm:text-[10px] text-slate-400">vs {delta.pembanding}</span>
+          </div>
+        ) : (
+          // Tanpa periode pembanding, tidak ada perubahan yang bisa dilaporkan.
+          <span className="text-[9px] sm:text-[10px] text-slate-400">Belum ada periode pembanding</span>
+        )}
       </div>
     </div>
   );
@@ -138,19 +208,19 @@ export const ExecutiveDashboard: React.FC = () => {
       {/* 4 Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 animate-in fade-in slide-in-from-bottom-4">
         <TopMetricCard 
-          icon={Building2} title="OS Kredit" value={formatIDR(osKredit)} trend={osKredit === 0 ? "0" : "3,24"} isPositive={true} 
+          icon={Building2} title="OS Kredit" value={formatIDR(osKredit)} delta={perubahan('outstanding')} deltaBaikSaatNaik 
           iconBg="bg-blue-100" iconColor="text-blue-600" period={prevMonthStr} 
         />
         <TopMetricCard 
-          icon={Wallet} title="Dana Pihak Ketiga" value={formatIDR(totalDPK)} trend={totalDPK === 0 ? "0" : "2,81"} isPositive={true} 
+          icon={Wallet} title="Dana Pihak Ketiga" value={formatIDR(totalDPK)} delta={perubahan('dpk')} deltaBaikSaatNaik 
           iconBg="bg-purple-100" iconColor="text-purple-600" period={prevMonthStr} 
         />
         <TopMetricCard 
-          icon={Activity} title="NPL (Gross)" value={`${npl.toFixed(2)}%`} trend={npl === 0 ? "0" : "0,21"} isPositive={true} 
+          icon={Activity} title="NPL (Gross)" value={`${npl.toFixed(2)}%`} delta={perubahan('npl')} 
           iconBg="bg-rose-100" iconColor="text-rose-600" period={prevMonthStr} 
         />
         <TopMetricCard 
-          icon={Target} title="Laba Bersih" value={formatIDR(labaBersih)} trend={labaBersih === 0 ? "0" : "7,42"} isPositive={true} 
+          icon={Target} title="Laba Bersih" value={formatIDR(labaBersih)} delta={perubahan('laba')} deltaBaikSaatNaik 
           iconBg="bg-emerald-100" iconColor="text-emerald-600" period={prevMonthStr} 
         />
       </div>
@@ -164,7 +234,25 @@ export const ExecutiveDashboard: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Trend Kredit & DPK */}
             <Card className="p-5 flex flex-col h-[350px]">
-              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-4">Trend Kredit & DPK</h3>
+              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-4">Trend Kredit &amp; DPK</h3>
+              {/*
+                Grafik garis butuh minimal dua periode untuk berarti. Dengan
+                satu periode saja lebih jujur menyatakannya daripada
+                menampilkan garis datar tanpa keterangan.
+              */}
+              {!trenBisaDitampilkan ? (
+                <div className="flex-1 min-h-0 flex flex-col items-center justify-center text-center gap-2 px-6">
+                  <TrendingUp className="w-7 h-7 text-slate-300" strokeWidth={1.5} />
+                  <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
+                    Tren belum bisa ditampilkan
+                  </p>
+                  <p className="text-xs text-slate-400 max-w-[280px]">
+                    {trendData.length === 0
+                      ? 'Belum ada laporan yang diunggah. Unggah laporan di menu Data Center.'
+                      : 'Setiap metrik baru bisa digambar setelah muncul di minimal dua periode. Unggah laporan bulan berikutnya.'}
+                  </p>
+                </div>
+              ) : (
               <div className="flex-1 min-h-0">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={trendData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
@@ -176,11 +264,12 @@ export const ExecutiveDashboard: React.FC = () => {
                       labelStyle={{ fontWeight: 'bold', color: '#1e293b', marginBottom: '4px' }}
                     />
                     <Legend iconType="circle" wrapperStyle={{ fontSize: '11px', fontWeight: 'bold', paddingTop: '10px' }} />
-                    <Line type="monotone" name="OS Kredit (M)" dataKey="os" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} />
-                    <Line type="monotone" name="DPK (M)" dataKey="dpk" stroke="#a855f7" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} />
+                    <Line type="monotone" name="OS Kredit (M)" dataKey="os" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} connectNulls />
+                    <Line type="monotone" name="DPK (M)" dataKey="dpk" stroke="#a855f7" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} connectNulls />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
+              )}
             </Card>
 
             {/* Kolektibilitas Kredit */}
@@ -205,13 +294,21 @@ export const ExecutiveDashboard: React.FC = () => {
               </div>
               {/* Custom Legend */}
               <div className="mt-2 space-y-1.5">
+                {kolData.length === 0 && (
+                  <p className="text-xs text-slate-400 text-center py-2">
+                    Unggah Laporan Rekap Nominatif Kredit untuk melihat komposisi kolektibilitas.
+                  </p>
+                )}
                 {kolData.map(item => (
                   <div key={item.name} className="flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }}></span>
-                      <span className="text-slate-600 dark:text-slate-400 font-medium">{item.name}</span>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }}></span>
+                      <span className="text-slate-600 dark:text-slate-400 font-medium truncate">{item.name}</span>
                     </div>
-                    <span className="font-bold text-slate-800 dark:text-slate-200">{item.value}%</span>
+                    <div className="flex items-baseline gap-2 shrink-0">
+                      <span className="text-[10px] text-slate-400 tabular-nums">{item.jmlRekening} rek</span>
+                      <span className="font-bold text-slate-800 dark:text-slate-200 tabular-nums">{item.value}%</span>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -224,7 +321,11 @@ export const ExecutiveDashboard: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* 10 Kredit Terbesar */}
             <Card className="p-5 flex flex-col h-[400px]">
-              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-4">10 Kredit Terbesar</h3>
+              {/*
+                Sumber datanya ews_alerts — kredit yang kolektibilitasnya di
+                luar Lancar. Jadi ini "bermasalah terbesar", bukan "terbesar".
+              */}
+              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-4">10 Kredit Bermasalah Terbesar</h3>
               <div className="flex-1 overflow-auto scrollbar-hide">
                 <table className="w-full text-xs">
                   <thead className="sticky top-0 bg-white dark:bg-slate-900 z-10">
@@ -240,12 +341,29 @@ export const ExecutiveDashboard: React.FC = () => {
                     {top10Kredit.map((k, i) => (
                       <tr key={i} className="border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30">
                         <td className="py-2.5 text-slate-400 font-medium">{i + 1}</td>
-                        <td className="py-2.5 text-slate-600 dark:text-slate-300 font-mono text-[10px]">{k.id.split('-').slice(0,2).join('-')}</td>
-                        <td className="py-2.5 font-bold text-slate-800 dark:text-slate-200 truncate max-w-[100px]">{k.applicantName}</td>
-                        <td className="py-2.5 text-right font-medium text-slate-600 dark:text-slate-300">{formatIDR(k.plafon).replace('Rp ', '')}</td>
+                        {/*
+                          Nama field mengikuti /api/metrics: applicationId dan
+                          borrowerName. Sebelumnya dibaca sebagai k.id dan
+                          k.applicantName sehingga k.id.split() melempar error
+                          — tidak pernah terlihat karena tabelnya selalu kosong.
+                        */}
+                        <td className="py-2.5 text-slate-600 dark:text-slate-300 font-mono text-[10px]">{k.applicationId ?? '-'}</td>
+                        <td className="py-2.5 font-bold text-slate-800 dark:text-slate-200 truncate max-w-[100px]">{k.borrowerName ?? '-'}</td>
+                        <td className="py-2.5 text-right font-medium text-slate-600 dark:text-slate-300">{formatIDR(k.plafon || 0).replace('Rp ', '')}</td>
                         <td className="py-2.5 text-center">
-                          <span className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-emerald-100 text-emerald-700 font-bold text-[9px]">
-                            L
+                          {/*
+                            Kolektibilitas asli. Sebelumnya dipatok huruf "L"
+                            untuk semua baris, sehingga kredit macet pun tampil
+                            sebagai Lancar.
+                          */}
+                          <span className={`inline-flex items-center justify-center min-w-[22px] h-5 px-1 rounded-md font-bold text-[9px] ${
+                            k.status === 'M' ? 'bg-red-100 text-red-700'
+                            : k.status === 'D' ? 'bg-orange-100 text-orange-700'
+                            : k.status === 'KL' ? 'bg-amber-100 text-amber-700'
+                            : k.status === 'DPK' ? 'bg-yellow-100 text-yellow-700'
+                            : 'bg-emerald-100 text-emerald-700'
+                          }`}>
+                            {k.status ?? '-'}
                           </span>
                         </td>
                       </tr>
@@ -253,7 +371,7 @@ export const ExecutiveDashboard: React.FC = () => {
                     {top10Kredit.length === 0 && (
                       <tr>
                         <td colSpan={5} className="py-8 text-center text-slate-500 text-sm">
-                          Belum ada data fasilitas kredit
+                          Belum ada data kredit bermasalah. Unggah nominatif kredit di Data Center.
                         </td>
                       </tr>
                     )}

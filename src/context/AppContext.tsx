@@ -269,6 +269,34 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [flowTasks, setFlowTasks] = useState<TaskItem[]>([]);
   const [allUsers, setAllUsers] = useState<User[]>(INITIAL_USERS);
 
+  /*
+   * Ambil metrik keuangan dari data laporan yang sudah diunggah.
+   *
+   * Sebelumnya macroMetrics HANYA terisi tepat setelah pengguna mengunggah
+   * berkas di Data Center pada sesi yang sama. Begitu halaman dimuat ulang,
+   * seluruh angka Dashboard Utama kembali nol — itulah sebabnya kartu
+   * OS Kredit, DPK, NPL, dan Laba Bersih semuanya menampilkan Rp 0 meskipun
+   * datanya sudah ada di database.
+   */
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let batal = false;
+
+    (async () => {
+      try {
+        const res = await fetch('/api/metrics');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (batal || !data) return;
+        setMacroMetrics(prev => ({ ...prev, ...data }));
+      } catch (e) {
+        console.error('Gagal mengambil metrik keuangan', e);
+      }
+    })();
+
+    return () => { batal = true; };
+  }, [isAuthenticated]);
+
   // Fetch users from database on auth
   useEffect(() => {
     const fetchUsers = async () => {

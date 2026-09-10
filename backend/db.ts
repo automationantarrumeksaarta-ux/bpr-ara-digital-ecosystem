@@ -81,6 +81,19 @@ export function initDb() {
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
+    -- Komposisi kualitas kredit per periode, dari Laporan Rekap Nominatif
+    -- Kredit. Sebelumnya komposisi KL/D/M ditebak di frontend dengan
+    -- mengalikan NPL (0,4 / 0,35 / 0,25) padahal angka aslinya ada di laporan.
+    CREATE TABLE IF NOT EXISTS credit_quality (
+      period_date TEXT NOT NULL,
+      kolektibilitas TEXT NOT NULL,
+      jml_rekening INTEGER DEFAULT 0,
+      baki_debet REAL DEFAULT 0,
+      persen REAL DEFAULT 0,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (period_date, kolektibilitas)
+    );
+
     CREATE TABLE IF NOT EXISTS ews_alerts (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       borrower_name TEXT,

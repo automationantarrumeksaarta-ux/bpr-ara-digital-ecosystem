@@ -92,7 +92,28 @@ router.get('/metrics', (req, res) => {
         labaTahunBerjalan: macro.current_year_profit || 0,
         totalAset: macro.total_assets || 0,
         aoProgress: db.prepare('SELECT ao_name as name, (achieved / target) * 100 as progress FROM ao_performance WHERE achieved > 0 ORDER BY progress DESC LIMIT 10').all(),
-        top10Kredit: db.prepare("SELECT borrower_name as borrowerName, outstanding_amount as plafon, kolektibilitas as status, 'LOAN-' || id as applicationId FROM ews_alerts ORDER BY outstanding_amount DESC LIMIT 10").all()
+        top10Kredit: db.prepare("SELECT borrower_name as borrowerName, outstanding_amount as plafon, kolektibilitas as status, 'LOAN-' || id as applicationId FROM ews_alerts ORDER BY outstanding_amount DESC LIMIT 10").all(),
+
+        // Komposisi kualitas kredit sebenarnya, bukan tebakan dari NPL.
+        kualitasKredit: db.prepare(`
+          SELECT kolektibilitas, jml_rekening AS jmlRekening, baki_debet AS bakiDebet, persen
+          FROM credit_quality
+          WHERE period_date = (SELECT MAX(period_date) FROM credit_quality)
+          ORDER BY CASE kolektibilitas
+            WHEN 'L' THEN 1 WHEN 'DPK' THEN 2 WHEN 'KL' THEN 3 WHEN 'D' THEN 4 ELSE 5 END
+        `).all(),
+        periodeKualitas: (db.prepare('SELECT MAX(period_date) AS p FROM credit_quality').get() as any)?.p ?? null,
+
+        // Riwayat antar periode untuk grafik tren. Hanya periode yang benar
+        // benar ada di database; grafik sebelumnya mengarang 7 bulan dengan
+        // mengalikan angka hari ini (0,82 / 0,85 / 0,89 ...).
+        riwayat: db.prepare(`
+          SELECT period_date AS periode, total_outstanding AS outstanding,
+                 total_tabungan AS tabungan, total_deposito AS deposito,
+                 npl_percentage AS npl, current_year_profit AS laba
+          FROM macro_financials
+          ORDER BY period_date
+        `).all()
       });
     } else {
       res.json(null);
@@ -507,6 +528,23 @@ function processRekapKredit(workbook: xlsx.WorkBook) {
     npl_percentage: Number(npl.toFixed(2)),
     repayment_rate: Number(rr.toFixed(2)),
   });
+
+  // Simpan komposisi per kolektibilitas apa adanya. Frontend sebelumnya
+  // menebak porsi KL/D/M dengan mengalikan NPL (0,4 / 0,35 / 0,25) — padahal
+  // angka sebenarnya ada persis di laporan ini.
+  const simpanKualitas = db.prepare(`
+    INSERT INTO credit_quality (period_date, kolektibilitas, jml_rekening, baki_debet, persen, updated_at)
+    VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(period_date, kolektibilitas) DO UPDATE SET
+      jml_rekening = excluded.jml_rekening, baki_debet = excluded.baki_debet,
+      persen = excluded.persen, updated_at = CURRENT_TIMESTAMP
+  `);
+  db.transaction(() => {
+    for (const [kode, v] of Object.entries(perKolek)) {
+      const persen = v.persen || (totalBaki ? (v.baki / totalBaki) * 100 : 0);
+      simpanKualitas.run(periode, kode, Math.round(v.rek), v.baki, Number(persen.toFixed(2)));
+    }
+  })();
 
   const ringkas = Object.entries(perKolek).map(([k, v]) => `${k}:${v.rek}`).join(' ');
   console.log(`Rekap kredit ${periode}: baki=${Math.round(totalBaki)} NPL=${npl.toFixed(2)}% RR=${rr.toFixed(2)}% (${ringkas})`);
