@@ -306,7 +306,7 @@ export const DecisionQueue: React.FC<DecisionQueueProps> = ({ tasks, currentUser
                       <p className="text-xs text-muted uppercase">{t.unit}</p>
                     </td>
                     <td className="px-4 py-3 align-top pt-4 text-xs text-muted whitespace-nowrap">
-                      {new Date(t.createdAt).toLocaleDateString('id-ID', {
+                      {new Date((t.createdAt || '').replace(' ', 'T')).toLocaleDateString('id-ID', {
                         day: '2-digit', month: 'short', year: 'numeric'
                       })}
                     </td>

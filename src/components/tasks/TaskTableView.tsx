@@ -531,7 +531,7 @@ export const TaskTableView: React.FC<TaskTableViewProps> = ({
                       
                       {/* Tanggal Dibuat */}
                       <td className="py-3.5 px-4 text-[11px] text-gray-500 whitespace-nowrap">
-                        {new Date(t.createdAt).toLocaleDateString('id-ID', {
+                        {new Date((t.createdAt || '').replace(' ', 'T')).toLocaleDateString('id-ID', {
                           day: '2-digit', month: 'short', year: 'numeric'
                         })}
                       </td>
