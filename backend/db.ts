@@ -300,6 +300,26 @@ export function initDb() {
     console.error('Error adding columns:', e);
   }
 
+  // Kolom profil pegawai. Dipakai bersama oleh web dan aplikasi — keduanya
+  // membaca dan menulis baris `users` yang sama.
+  try {
+    const userCols = (db.prepare('PRAGMA table_info(users)').all() as any[]).map(c => c.name);
+    const tambahan: Record<string, string> = {
+      avatar_url: 'TEXT',
+      phone: 'TEXT',
+      nik: 'TEXT',
+      updated_at: 'DATETIME',
+    };
+    for (const [nama, tipe] of Object.entries(tambahan)) {
+      if (!userCols.includes(nama)) {
+        db.exec(`ALTER TABLE users ADD COLUMN ${nama} ${tipe}`);
+        console.log(`Added ${nama} column to users table.`);
+      }
+    }
+  } catch (e) {
+    console.error('Error adding users columns:', e);
+  }
+
   // Kolom tambahan pada `loans` untuk Dashboard Heat Map & Risiko Pembiayaan.
   // Diisi oleh parser nominatif kredit (backend/parser.ts).
   try {

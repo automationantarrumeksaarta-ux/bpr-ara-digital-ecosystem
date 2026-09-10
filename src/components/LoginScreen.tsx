@@ -4,6 +4,7 @@ import { INITIAL_USERS } from '../mock/initialData';
 import { BEIS_UNITS } from '../utils/beisUtils';
 import { Lock, User, KeyRound, Shield, AlertCircle, ArrowRight, UserPlus, Building, BadgeCheck, Mail, Users, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { OTPVerification } from './OTPVerification';
+import { ForgotPassword } from './ForgotPassword';
 
 interface LoginScreenProps {
   onLoginSuccess: (user: UserProfile) => void;
@@ -11,6 +12,7 @@ interface LoginScreenProps {
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   const [authStep, setAuthStep] = useState<'form' | 'otp'>('form');
+  const [lupaSandi, setLupaSandi] = useState(false);
   const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
   
   // Login form state
@@ -158,15 +160,22 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
             
             <div className="text-center space-y-1.5">
               <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
-                {authStep === 'otp' ? 'Verifikasi Akses' : 'Selamat Datang'}
+                {lupaSandi ? 'Pemulihan Akun' : authStep === 'otp' ? 'Verifikasi Akses' : 'Selamat Datang'}
               </h2>
               <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">
-                {authStep === 'otp' ? 'Keamanan Dua Tahap (2FA)' : 'Silakan masuk ke akun Anda'}
+                {lupaSandi ? 'Setel ulang kata sandi Anda' : authStep === 'otp' ? 'Keamanan Dua Tahap (2FA)' : 'Silakan masuk ke akun Anda'}
               </p>
             </div>
           </div>
 
-          {authStep === 'form' ? (
+          {/* Alur lupa kata sandi menggantikan seluruh form; menumpuknya di
+              atas form membuat dua kotak isian sekaligus di layar sempit. */}
+          {lupaSandi ? (
+            <ForgotPassword
+              identifierAwal={identifier}
+              onKembali={() => { setLupaSandi(false); setErrorMsg(''); }}
+            />
+          ) : authStep === 'form' ? (
             <>
               {/* Tab Pill Selector */}
               <div className="bg-gray-100 dark:bg-gray-800/80 p-1.5 rounded-2xl flex items-center shadow-inner">
@@ -243,6 +252,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                       </button>
                     </div>
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setLupaSandi(true)}
+                    className="text-xs font-bold text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors self-end"
+                  >
+                    Lupa kata sandi?
+                  </button>
 
                   {errorMsg && (
                     <div className="p-3 bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800 rounded-xl text-xs font-bold text-red-600 dark:text-red-400 flex items-center gap-2">

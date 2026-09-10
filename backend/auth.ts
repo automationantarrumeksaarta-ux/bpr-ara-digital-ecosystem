@@ -222,7 +222,12 @@ router.post('/login', async (req, res) => {
         role: user.role,
         roleTier: user.roleTier,
         unit: user.unit,
-        status: user.status
+        status: user.status,
+        // Disamakan dengan /me supaya layar profil langsung terisi tanpa
+        // menunggu permintaan kedua.
+        phone: user.phone,
+        nik: user.nik,
+        avatar_url: user.avatar_url
       }
     });
   } catch (error) {
@@ -243,7 +248,16 @@ router.get('/me', (req, res) => {
     
     try {
       const decoded = jwt.verify(token, JWT_SECRET) as any;
-      const user = db.prepare('SELECT id, username, email, name, role, roleTier, unit, status FROM users WHERE id = ?').get(decoded.id);
+      /*
+       * phone, nik, dan avatar_url ikut dikembalikan.
+       *
+       * Tanpa ini, layar profil (web maupun aplikasi) tampil kosong setiap kali
+       * halaman dimuat ulang — datanya ada di tabel users, tapi tidak pernah
+       * sampai ke klien, sehingga terlihat seolah simpanan profilnya gagal.
+       */
+      const user = db.prepare(
+        'SELECT id, username, email, name, role, roleTier, unit, status, phone, nik, avatar_url FROM users WHERE id = ?'
+      ).get(decoded.id);
       
       if (!user) {
         return res.status(401).json({ error: 'User not found' });
@@ -574,6 +588,189 @@ router.delete('/tasks/:taskId', (req, res) => {
   } catch (error) {
     console.error('Delete task error:', error);
     res.status(500).json({ error: 'Failed to delete task' });
+  }
+});
+
+/* ==================== PROFIL & KATA SANDI ====================
+ *
+ * Web dan aplikasi memakai endpoint yang sama dan menulis ke baris `users`
+ * yang sama — tidak ada salinan data profil terpisah di sisi mana pun.
+ */
+
+/** Ambil pengguna dari token; null bila token tidak sah. */
+function penggunaDariToken(req: express.Request) {
+  const header = req.headers.authorization;
+  if (!header?.startsWith('Bearer ')) return null;
+  try {
+    const payload = jwt.verify(header.slice(7), JWT_SECRET) as any;
+    return db.prepare('SELECT * FROM users WHERE id = ?').get(payload.id) as any ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Bentuk pengguna yang aman dikirim ke klien — tanpa password_hash. */
+const tanpaSandi = (u: any) => {
+  if (!u) return null;
+  const { password_hash, ...aman } = u;
+  return aman;
+};
+
+/** Profil pegawai yang boleh diubah sendiri. */
+router.put('/profile', (req, res) => {
+  const pengguna = penggunaDariToken(req);
+  if (!pengguna) return res.status(401).json({ error: 'Unauthorized' });
+
+  try {
+    const { name, phone, nik, email, avatar_url } = req.body;
+
+    if (email && email !== pengguna.email) {
+      const bentrok = db.prepare('SELECT id FROM users WHERE email = ? AND id != ?').get(email, pengguna.id);
+      if (bentrok) return res.status(400).json({ error: 'Email sudah dipakai pengguna lain' });
+    }
+
+    /*
+     * role, roleTier, unit, dan status TIDAK ikut di sini. Data kepegawaian
+     * hanya boleh diubah admin lewat /users/:id/role — pegawai tidak boleh
+     * menaikkan wewenangnya sendiri lewat halaman profil.
+     */
+    db.prepare(`
+      UPDATE users SET
+        name = COALESCE(?, name),
+        phone = COALESCE(?, phone),
+        nik = COALESCE(?, nik),
+        email = COALESCE(?, email),
+        avatar_url = COALESCE(?, avatar_url),
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(
+      name ?? null, phone ?? null, nik ?? null,
+      email ?? null, avatar_url ?? null, pengguna.id,
+    );
+
+    const baru = db.prepare('SELECT * FROM users WHERE id = ?').get(pengguna.id);
+    res.json({ success: true, user: tanpaSandi(baru), message: 'Profil diperbarui' });
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({ error: 'Gagal memperbarui profil' });
+  }
+});
+
+/** Ganti kata sandi sendiri — wajib menyertakan kata sandi lama. */
+router.put('/password', async (req, res) => {
+  const pengguna = penggunaDariToken(req);
+  if (!pengguna) return res.status(401).json({ error: 'Unauthorized' });
+
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Kata sandi lama dan baru wajib diisi' });
+    }
+    if (String(newPassword).length < 8) {
+      return res.status(400).json({ error: 'Kata sandi baru minimal 8 karakter' });
+    }
+
+    const cocok = await bcrypt.compare(currentPassword, pengguna.password_hash);
+    if (!cocok) return res.status(400).json({ error: 'Kata sandi lama tidak sesuai' });
+
+    const hash = await bcrypt.hash(newPassword, await bcrypt.genSalt(10));
+    db.prepare('UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+      .run(hash, pengguna.id);
+
+    res.json({ success: true, message: 'Kata sandi berhasil diganti' });
+  } catch (error) {
+    console.error('Change password error:', error);
+    res.status(500).json({ error: 'Gagal mengganti kata sandi' });
+  }
+});
+
+/* ==================== LUPA KATA SANDI ==================== */
+
+/**
+ * Kirim kode OTP ke email terdaftar.
+ *
+ * Jawaban dibuat SAMA baik email terdaftar maupun tidak. Membedakannya
+ * membuat siapa pun bisa menebak alamat email mana yang punya akun.
+ */
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { identifier } = req.body;
+    if (!identifier) return res.status(400).json({ error: 'Email atau username wajib diisi' });
+
+    const jawabanSeragam = {
+      message: 'Bila akun terdaftar, kode verifikasi telah dikirim ke emailnya.',
+    };
+
+    const user = db.prepare('SELECT * FROM users WHERE username = ? OR email = ?')
+      .get(identifier, identifier) as any;
+    if (!user?.email) return res.json(jawabanSeragam);
+
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+
+    db.prepare(`
+      INSERT INTO otp_verifications (email, otp_code, expires_at)
+      VALUES (?, ?, ?)
+      ON CONFLICT(email) DO UPDATE SET
+        otp_code = excluded.otp_code, expires_at = excluded.expires_at,
+        created_at = CURRENT_TIMESTAMP
+    `).run(user.email, otpCode, expiresAt);
+
+    /*
+     * Pengiriman email TIDAK ditunggu. Kode sudah tersimpan di database
+     * sebelum ini, dan jawaban ke klien memang seragam apa pun hasil
+     * pengirimannya — menunggu SMTP hanya menambah ~3 detik pengguna
+     * menatap tombol "Mengirim…" tanpa manfaat.
+     */
+    sendOtpEmail(user.email, otpCode, user.name ?? user.username)
+      .catch(e => console.error('Gagal mengirim email lupa sandi:', e));
+
+    /*
+     * Sengaja TIDAK mengembalikan alamat email yang tersamar. Ada-tidaknya
+     * field itu sendiri sudah membocorkan akun mana yang terdaftar, meski
+     * pesannya seragam. Petunjuk inbox mana yang harus dibuka disampaikan di
+     * layar sebagai kalimat umum.
+     */
+    res.json(jawabanSeragam);
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({ error: 'Gagal mengirim kode verifikasi' });
+  }
+});
+
+/** Setel ulang kata sandi memakai kode OTP. */
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { identifier, otpCode, newPassword } = req.body;
+    if (!identifier || !otpCode || !newPassword) {
+      return res.status(400).json({ error: 'Data tidak lengkap' });
+    }
+    if (String(newPassword).length < 8) {
+      return res.status(400).json({ error: 'Kata sandi baru minimal 8 karakter' });
+    }
+
+    const user = db.prepare('SELECT * FROM users WHERE username = ? OR email = ?')
+      .get(identifier, identifier) as any;
+    if (!user?.email) return res.status(400).json({ error: 'Kode verifikasi tidak valid' });
+
+    const verifikasi = db.prepare('SELECT * FROM otp_verifications WHERE email = ? AND otp_code = ?')
+      .get(user.email, otpCode) as any;
+    if (!verifikasi) return res.status(400).json({ error: 'Kode verifikasi tidak valid' });
+    if (new Date() > new Date(verifikasi.expires_at)) {
+      return res.status(400).json({ error: 'Kode verifikasi sudah kedaluwarsa' });
+    }
+
+    const hash = await bcrypt.hash(newPassword, await bcrypt.genSalt(10));
+    db.prepare('UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+      .run(hash, user.id);
+
+    // Kode sekali pakai — dibuang setelah berhasil.
+    db.prepare('DELETE FROM otp_verifications WHERE email = ?').run(user.email);
+
+    res.json({ success: true, message: 'Kata sandi berhasil disetel ulang. Silakan masuk kembali.' });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({ error: 'Gagal menyetel ulang kata sandi' });
   }
 });
 

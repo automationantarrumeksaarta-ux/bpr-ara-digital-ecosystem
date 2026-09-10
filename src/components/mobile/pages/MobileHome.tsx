@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Bell, ChevronRight, Fingerprint, LogIn, LogOut } from 'lucide-react';
+import { ChevronRight, Fingerprint, LogIn, LogOut } from 'lucide-react';
 import { useApp } from '../../../context/AppContext';
 import { useMobileAttendance, formatJam } from '../../../hooks/useMobileAttendance';
 import { useMobileMenu } from '../../../hooks/useMobileMenu';
@@ -22,7 +22,6 @@ const MobileHome: React.FC = () => {
   const { items: menu } = useMobileMenu();
 
   const nama = currentUser?.name || 'Pengguna';
-  const belumDibaca = notifications?.filter(n => !n.read).length ?? 0;
   const now = new Date();
 
   const sudahMasuk = !!hariIni?.clock_in_time;
@@ -44,17 +43,6 @@ const MobileHome: React.FC = () => {
               {currentUser?.unit ? `${currentUser.unit} · ` : ''}BPR ARA
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => navigate('/mobile/notifications')}
-            aria-label={belumDibaca > 0 ? `Notifikasi, ${belumDibaca} belum dibaca` : 'Notifikasi'}
-            className={`relative w-11 h-11 -mr-2 flex items-center justify-center ${ink.base} active:opacity-50`}
-          >
-            <Bell className="w-[22px] h-[22px]" strokeWidth={1.8} />
-            {belumDibaca > 0 && (
-              <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-danger ring-2 ring-white" />
-            )}
-          </button>
         </div>
 
         <div className="mt-4">

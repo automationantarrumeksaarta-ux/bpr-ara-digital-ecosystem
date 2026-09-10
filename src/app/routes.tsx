@@ -39,6 +39,7 @@ import { TargetBungaView } from '../components/modules/TargetBungaView';
 import { PencapaianBisnisView } from '../components/modules/PencapaianBisnisView';
 import { ProjectManagementView } from '../components/modules/ProjectManagementView';
 import { CBSDataCenterView } from '../components/modules/CBSDataCenterView';
+import { ProfileView } from '../components/modules/ProfileView';
 import { AppShell } from '../components/layout/AppShell';
 import { LoginScreen } from '../components/LoginScreen';
 
@@ -152,6 +153,13 @@ export const AppRouter: React.FC = () => {
           {/* Default Redirect */}
           <Route path="/" element={<Navigate to={defaultRoute} replace />} />
           
+          {/*
+           * Profil pengguna. Sengaja di luar navigationConfig: setiap orang
+           * yang sudah masuk berhak mengubah datanya sendiri, tanpa perlu
+           * diberi izin menu oleh Super Admin.
+           */}
+          <Route path="/profile" element={<ProfileView />} />
+
           {/* Super Admin Route */}
           <Route path="/super-admin" element={<SuperAdminView />} />
           

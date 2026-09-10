@@ -28,6 +28,9 @@ interface TopbarProps {
   onMobileMenuToggle: () => void;
 }
 
+const inisialNama = (nama?: string) =>
+  (nama ?? '').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase() || '?';
+
 export const Topbar: React.FC<TopbarProps> = ({ onMobileMenuToggle }) => {
   const navigate = useNavigate();
   const {
@@ -47,6 +50,7 @@ export const Topbar: React.FC<TopbarProps> = ({ onMobileMenuToggle }) => {
 
   const [isRoleMenuOpen, setIsRoleMenuOpen] = useState(false);
   const [isOrgModalOpen, setIsOrgModalOpen] = useState(false);
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
 
   const redAlertsCount = ewsAlerts.filter((a) => a.severity === 'RED' && a.status !== 'RESOLVED').length;
   
@@ -119,6 +123,53 @@ export const Topbar: React.FC<TopbarProps> = ({ onMobileMenuToggle }) => {
 
         {/* Notifications */}
         <NotificationInboxPopover />
+
+        {/*
+          Pintu masuk profil. Sebelumnya tidak ada satu pun jalan menuju data
+          diri sendiri dari web — hanya ikon organisasi, notifikasi, dan keluar.
+        */}
+        <div className="relative">
+          <button
+            onClick={() => setIsProfileMenuOpen(v => !v)}
+            className="flex items-center gap-2 h-10 pl-1 pr-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+            title="Profil saya"
+          >
+            {currentUser?.avatar_url ? (
+              <img src={currentUser.avatar_url} alt={currentUser?.name ?? 'Profil'} className="w-8 h-8 rounded-full object-cover" />
+            ) : (
+              <span className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-xs font-bold">
+                {inisialNama(currentUser?.name)}
+              </span>
+            )}
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+          </button>
+
+          {isProfileMenuOpen && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setIsProfileMenuOpen(false)} />
+              <div className="absolute right-0 top-12 z-50 w-60 bg-white dark:bg-[#18181B] border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg overflow-hidden">
+                <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800">
+                  <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{currentUser?.name}</p>
+                  <p className="text-xs text-slate-500 truncate">{currentUser?.roleTitle ?? currentUser?.role}</p>
+                </div>
+                <button
+                  onClick={() => { setIsProfileMenuOpen(false); navigate('/profile'); }}
+                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                >
+                  <UserCheck className="w-4 h-4 text-slate-400" />
+                  Profil saya
+                </button>
+                <button
+                  onClick={() => { setIsProfileMenuOpen(false); navigate('/profile#sandi'); }}
+                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                >
+                  <Shield className="w-4 h-4 text-slate-400" />
+                  Ganti kata sandi
+                </button>
+              </div>
+            </>
+          )}
+        </div>
 
         {/* Logout Button */}
         <button
