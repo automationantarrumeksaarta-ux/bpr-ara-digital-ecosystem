@@ -89,7 +89,7 @@ export const DecisionQueue: React.FC<DecisionQueueProps> = ({ tasks, currentUser
     
     // If we only strictly follow the matrix, Super Admin might see nothing if they aren't assigned as approver.
     // Let's stick strictly to the matrix unless it's super admin for safety.
-    const isMyTask = isUnderApprover || isEscalatedToMe || isSuperAdmin || isNamedValidator || (t.createdBy && (t.createdBy === currentUser.id || t.createdBy === currentUser.username || t.createdBy === currentUser.name));
+    const isMyTask = isUnderApprover || isEscalatedToMe || isSuperAdmin || isNamedValidator;
     
     if (!isMyTask) return false;
 
