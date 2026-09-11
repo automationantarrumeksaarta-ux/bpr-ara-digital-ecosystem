@@ -5,6 +5,7 @@ import {
   Landmark, PiggyBank, ScrollText, TrendingUp, Wallet,
 } from 'lucide-react';
 import { useApp } from '../../../context/AppContext';
+import { saringTugasUntuk } from '../../../utils/hirarki';
 import { AppBar, Card, EmptyState, Screen, Section, Stack } from '../ui/primitives';
 import { ink, radius, surface, text, tone } from '../ui/tokens';
 
@@ -42,7 +43,10 @@ const WARNA_KOLEK: Record<string, { nama: string; warna: string }> = {
 const BATAS_NPL_SEHAT = 5;
 
 const MobileDashboard: React.FC = () => {
-  const { macroMetrics, creditApplications, ewsAlerts, ptpRecords, flowTasks } = useApp() as any;
+  const {
+    macroMetrics, creditApplications, ewsAlerts, ptpRecords, flowTasks,
+    currentUser, taskRoutes, allUsers,
+  } = useApp() as any;
 
   const osKredit = macroMetrics.outstandingKredit || 0;
   const tabungan = macroMetrics.totalTabungan || 0;
@@ -83,7 +87,16 @@ const MobileDashboard: React.FC = () => {
     },
   ];
 
-  const tugasSaya = (flowTasks ?? []).filter((t: any) =>
+  /*
+   * Hitungan ini menyebut dirinya "tugas belum selesai", jadi isinya harus
+   * benar-benar tugas orang ini — miliknya sendiri dan milik bawahannya.
+   *
+   * Sebelumnya seluruh `flowTasks` dihitung tanpa penyaringan, sehingga angka
+   * di beranda menunjukkan tunggakan sekantor dan terbaca seolah tugas pribadi.
+   */
+  const tugasSaya = saringTugasUntuk(
+    flowTasks ?? [], currentUser?.id, currentUser?.name, taskRoutes ?? {}, allUsers ?? [],
+  ).filter((t: any) =>
     !['Validated Closed', 'Improved', 'Accepted', 'Selesai'].includes(t.status)).length;
 
   return (

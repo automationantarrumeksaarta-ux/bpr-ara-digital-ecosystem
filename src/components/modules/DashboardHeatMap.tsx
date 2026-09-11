@@ -1,19 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import {
-  Coins as BanknotesIcon,
-  Users as UserGroupIcon,
-  FileText as DocumentTextIcon,
-  AlertTriangle as ExclamationTriangleIcon,
-  BarChart3 as ChartBarIcon,
-  MapPin as MapPinIcon,
-  Briefcase as BriefcaseIcon,
-  TrendingUp as ArrowTrendingUpIcon,
-  Percent as PercentIcon,
-  CalendarRange,
-  Building2,
-  UserRound,
-  Landmark,
-} from 'lucide-react';
+import { AlertTriangle, AlertTriangle as ExclamationTriangleIcon, BarChart3 as ChartBarIcon, Briefcase as BriefcaseIcon, Building2, CalendarRange, Coins as BanknotesIcon, FileText as DocumentTextIcon, Landmark, MapPin as MapPinIcon, Percent as PercentIcon, TrendingUp as ArrowTrendingUpIcon, UserRound, Users as UserGroupIcon } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { SurakartaHeatMap, RISK_STOPS, riskColor, type TitikPeta } from './kepatuhan/SurakartaHeatMap';
 import { TITIK_KELURAHAN } from '../../data/geo/kelurahanPoints';
@@ -477,7 +463,7 @@ export const DashboardHeatMap: React.FC = () => {
                 </button>
               ))}
             </div>
-            {tingkatPeta === 'DESA' && (
+            {tingkatPeta === 'DESA' && titikDesa.length > 0 && (
               <span className="text-[10px] text-gray-500 dark:text-gray-400">
                 {titikDesa.length} desa dipetakan
                 {desaTanpaTitik > 0 && `, ${desaTanpaTitik} belum berkoordinat`}
@@ -485,6 +471,34 @@ export const DashboardHeatMap: React.FC = () => {
               </span>
             )}
           </div>
+
+          {/*
+            Bila tingkat desa dipilih tetapi datanya kosong, katakan sebabnya.
+            Diam-diam menampilkan "0 desa dipetakan" membuat orang mengira
+            fiturnya rusak, padahal yang kurang adalah kolom Kelurahan pada
+            data kredit yang sudah terunggah.
+          */}
+          {tingkatPeta === 'DESA' && titikDesa.length === 0 && (
+            <div className="mt-3 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 dark:border-amber-900/40 dark:bg-amber-900/20">
+              <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0 text-amber-600" />
+              <p className="text-[10px] leading-relaxed text-amber-800 dark:text-amber-300">
+                {PORTOFOLIO_KELURAHAN.length === 0 ? (
+                  <>
+                    Data kredit yang tersimpan belum memuat kolom <strong>Kelurahan</strong>.
+                    Kolom itu baru ikut disimpan pada pembaruan terakhir, jadi data yang diunggah
+                    sebelumnya tidak memilikinya. Unggah ulang berkas Nominatif Kredit lewat menu
+                    Data Center, lalu peta per desa akan terisi sendiri.
+                  </>
+                ) : (
+                  <>
+                    {PORTOFOLIO_KELURAHAN.length} desa punya data kredit, tetapi belum satu pun
+                    koordinatnya dikenali. Jalankan ulang scripts/build-kelurahan-points.py untuk
+                    menambahkan titik desa yang baru.
+                  </>
+                )}
+              </p>
+            </div>
+          )}
 
           <div className="mt-4 space-y-2">
             <h4 className="text-[10px] font-bold text-gray-700 dark:text-gray-300">Rasio Bermasalah per Kabupaten</h4>

@@ -133,3 +133,26 @@
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(148, 163, 184, 0.5);
 }
+
+/*
+ * Sembunyikan bilah gulir sepenuhnya.
+ *
+ * Kelas ini dipakai di beberapa tempat (rel tahap kredit, sidebar, kerangka
+ * aplikasi) tetapi TIDAK PERNAH didefinisikan, sehingga selama ini tidak
+ * berpengaruh apa pun.
+ *
+ * Akibatnya terlihat di aplikasi Android: bilah gulir selebar 6px di atas
+ * mengambil ruang tata letak, sehingga kepala berwarna di beranda berhenti 6px
+ * sebelum tepi kanan layar dan tampak seperti celah yang tidak presisi.
+ * Di layar sentuh bilah gulir memang tidak diperlukan — arah gulir sudah jelas
+ * dari gerakan jari.
+ */
+.scrollbar-hide {
+  -ms-overflow-style: none;   /* Edge lama */
+  scrollbar-width: none;      /* Firefox */
+}
+.scrollbar-hide::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}

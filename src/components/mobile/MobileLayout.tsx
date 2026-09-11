@@ -63,7 +63,13 @@ export const MobileLayout: React.FC = () => {
           membuka layar baru bisa mendarat di tengah halaman karena posisi
           gulir layar sebelumnya ikut terbawa.
         */}
-        <main key={pathname} className="flex-1 overflow-y-auto overscroll-contain">
+        <main
+          key={pathname}
+          /* scrollbar-hide: tanpa ini bilah gulir 6px memakan lebar dan
+             menyisakan celah di tepi kanan, terlihat jelas pada kepala
+             beranda yang berwarna. */
+          className="flex-1 overflow-y-auto overscroll-contain scrollbar-hide"
+        >
           <Outlet />
         </main>
 

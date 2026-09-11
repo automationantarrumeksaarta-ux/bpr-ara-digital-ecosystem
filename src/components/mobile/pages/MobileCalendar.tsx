@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { CalendarDays, ChevronLeft, ChevronRight, User2 } from 'lucide-react';
 import { useApp } from '../../../context/AppContext';
+import { saringTugasUntuk } from '../../../utils/hirarki';
 import { AppBar, Card, EmptyState, Screen, Stack } from '../ui/primitives';
 import { ink, radius, surface, text, tone, HIT_TARGET } from '../ui/tokens';
 
@@ -28,7 +29,17 @@ const kunciTanggal = (d: Date) => d.toLocaleDateString('sv-SE');
 const mendesak = (p?: string) => ['P1', 'P2'].includes((p ?? '').toUpperCase());
 
 const MobileCalendar: React.FC = () => {
-  const { flowTasks } = useApp() as any;
+  const { flowTasks, currentUser, taskRoutes, allUsers } = useApp() as any;
+
+  /*
+   * Kalender hanya memuat agenda sendiri dan agenda bawahan, berjenjang —
+   * aturan yang sama dengan papan tugas. Sebelumnya `flowTasks` dipakai apa
+   * adanya, sehingga pegawai tanpa bawahan pun melihat agenda seluruh kantor.
+   */
+  const tugasTerlihat = useMemo(
+    () => saringTugasUntuk(flowTasks ?? [], currentUser?.id, currentUser?.name, taskRoutes ?? {}, allUsers ?? []),
+    [flowTasks, currentUser?.id, currentUser?.name, taskRoutes, allUsers],
+  );
   const hariIni = new Date();
 
   const [bulan, setBulan] = useState(hariIni.getMonth());
@@ -38,7 +49,7 @@ const MobileCalendar: React.FC = () => {
   /** Tugas dikelompokkan per tanggal tenggat. */
   const perTanggal = useMemo(() => {
     const peta = new Map<string, any[]>();
-    for (const t of flowTasks ?? []) {
+    for (const t of tugasTerlihat) {
       const tgl = t.tanggalFU || t.tanggal;
       if (!tgl) continue;
       const kunci = String(tgl).slice(0, 10);
@@ -46,7 +57,7 @@ const MobileCalendar: React.FC = () => {
       peta.get(kunci)!.push(t);
     }
     return peta;
-  }, [flowTasks]);
+  }, [tugasTerlihat]);
 
   /** Sel kalender: awal bulan digeser agar jatuh di kolom hari yang benar. */
   const sel = useMemo(() => {

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { TaskItem, UserRole } from '../../types';
 import { AgendaFormModal } from '../common/AgendaFormModal';
 import { useApp } from '../../context/AppContext';
+import { tugasTerlihatOleh } from '../../utils/hirarki';
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -29,7 +30,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   onAddTask,
   onSyncCalendar
 }) => {
-  const { currentUser, createFlowTask, updateTaskStatus, deleteFlowTask, taskRoutes } = useApp();
+  const { currentUser, createFlowTask, updateTaskStatus, deleteFlowTask, taskRoutes, allUsers } = useApp() as any;
   const [currentDate, setCurrentDate] = useState(new Date());
   
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
@@ -88,14 +89,27 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     setCurrentDate(new Date(year, month + 1, 1));
   };
 
-  // Filter tasks based on mentions, PIC, creator, or supervisor
+  /*
+   * Agenda yang boleh dilihat.
+   *
+   * Memakai aturan hirarki yang sama dengan papan tugas lewat utilitas bersama,
+   * supaya kalender web, kalender aplikasi, dan papan tugas tidak pernah
+   * berbeda pendapat tentang siapa boleh melihat apa.
+   *
+   * Penyaring sebelumnya hanya menelusuri SATU tingkat atasan
+   * (`taskRoutes[t.createdBy] === currentUser.id`), sehingga atasan dari atasan
+   * tidak melihat agenda cucunya. Utilitas bersama menelusurinya berjenjang.
+   *
+   * Sebutan (`mentions`) tetap dihormati: orang yang disebut pada sebuah agenda
+   * memang perlu melihatnya walau bukan pemilik maupun atasannya.
+   */
   const visibleTasks = tasks.filter(t => {
-    if (!currentUser) return true; // fallback if no user
-    const isCreator = t.createdBy === currentUser.id || t.createdBy === currentUser.username;
-    const isMentioned = t.mentions?.some(m => m === currentUser.id || m === currentUser.role || m === currentUser.username || m === 'all');
-    const isPic = t.assignedTo === currentUser.id || t.assignedTo === currentUser.username || t.assignedTo === currentUser.name || t.pic === currentUser.name || t.assignedTo === currentUser.role;
-    const isSupervisor = t.createdBy && taskRoutes[t.createdBy] === currentUser.id;
-    return isCreator || isMentioned || isPic || isSupervisor;
+    if (!currentUser) return true; // fallback bila belum ada pengguna
+    const disebut = t.mentions?.some(
+      m => m === currentUser.id || m === currentUser.role || m === currentUser.username || m === 'all');
+    if (disebut) return true;
+    return tugasTerlihatOleh(
+      t as any, currentUser.id, currentUser.name, taskRoutes ?? {}, (allUsers ?? []) as any);
   });
 
   // Helper to find tasks for day
