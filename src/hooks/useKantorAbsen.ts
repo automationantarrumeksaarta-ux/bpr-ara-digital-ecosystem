@@ -49,6 +49,14 @@ interface Hasil {
   petaAtribusi: string | null;
   /** null selama daftar kantor atau posisi belum ada. */
   terdekat: { kantor: Kantor; jarak: number; diDalamRadius: boolean } | null;
+  /**
+   * Jarak ke SEMUA kantor, terdekat lebih dulu.
+   *
+   * Dipakai menelusuri absen yang tertolak: bila kantor tempat pegawai berdiri
+   * ternyata bukan yang terdekat menurut hitungan, berarti koordinat kantor itu
+   * yang meleset — bukan ponselnya.
+   */
+  semuaJarak: { kantor: Kantor; jarak: number }[];
 }
 
 export function useKantorAbsen(posisi: { lat: number; lng: number; akurasi?: number } | null): Hasil {
@@ -110,8 +118,15 @@ export function useKantorAbsen(posisi: { lat: number; lng: number; akurasi?: num
     return { kantor: pilih, jarak, diDalamRadius: terdekatMungkin <= radiusMeter };
   }, [posisi?.lat, posisi?.lng, posisi?.akurasi, kantor, radiusMeter, akurasiMaksMeter]);
 
+  const semuaJarak = useMemo(() => {
+    if (!posisi || kantor.length === 0) return [];
+    return kantor
+      .map(k => ({ kantor: k, jarak: jarakMeter(posisi.lat, posisi.lng, k.lat, k.lng) }))
+      .sort((a, b) => a.jarak - b.jarak);
+  }, [posisi?.lat, posisi?.lng, kantor]);
+
   return {
     memuat, kantor, radiusMeter, akurasiMaksMeter,
-    jamMasuk, jamPulang, petaUbinUrl, petaAtribusi, terdekat,
+    jamMasuk, jamPulang, petaUbinUrl, petaAtribusi, terdekat, semuaJarak,
   };
 }

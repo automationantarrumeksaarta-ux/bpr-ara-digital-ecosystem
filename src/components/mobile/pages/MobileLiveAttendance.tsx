@@ -31,11 +31,11 @@ type Aksi = 'masuk' | 'pulang';
 const MobileLiveAttendance: React.FC = () => {
   const navigate = useNavigate();
   const { currentUser } = useApp();
-  const { posisi, alamat, memuat: memuatLokasi, error: errorLokasi, minta } = useGeolocation();
+  const { posisi, alamat, memuat: memuatLokasi, error: errorLokasi, menajam, minta } = useGeolocation();
   const { hariIni, muatUlang } = useMobileAttendance();
   const {
     radiusMeter, akurasiMaksMeter, jamMasuk, jamPulang,
-    petaUbinUrl, petaAtribusi, terdekat,
+    petaUbinUrl, petaAtribusi, terdekat, semuaJarak,
   } = useKantorAbsen(posisi);
 
   const [mengirim, setMengirim] = useState(false);
@@ -192,6 +192,12 @@ const MobileLiveAttendance: React.FC = () => {
                 {posisi.lat.toFixed(6)}, {posisi.lng.toFixed(6)}
               </span>
             )}
+            {menajam && (
+              <span className={`block ${text.caption} ${tone.primary.text} mt-1 flex items-center gap-1.5`}>
+                <RefreshCw className="w-3 h-3 animate-spin" />
+                Menajamkan sinyal GPS…
+              </span>
+            )}
           </div>
         </div>
 
@@ -240,6 +246,36 @@ const MobileLiveAttendance: React.FC = () => {
             <p className={`${text.caption} ${ink.faint} text-center px-4 leading-relaxed`}>
               {alasanTerkunci ?? 'Anda akan diminta berswafoto sebelum absen dikirim.'}
             </p>
+
+            {/*
+              Jarak ke seluruh kantor, dibuka saat absen tertolak.
+              Bila kantor tempat pegawai berdiri ternyata BUKAN yang terdekat
+              menurut hitungan, berarti koordinat kantor itu yang meleset —
+              dan itu tidak bisa diketahui dari pesan "di luar radius" saja.
+            */}
+            {diLuarRadius && semuaJarak.length > 1 && (
+              <details className={`${surface.card} ${radius.card} shadow-sm px-4 py-3`}>
+                <summary className={`${text.footnote} font-semibold ${ink.base} cursor-pointer`}>
+                  Jarak ke semua kantor
+                </summary>
+                <ul className={`mt-2.5 divide-y ${surface.hairline}`}>
+                  {semuaJarak.map(({ kantor: k, jarak }) => (
+                    <li key={k.id} className="flex items-center justify-between gap-3 py-2">
+                      <span className={`${text.caption} ${ink.base}`}>{k.nama}</span>
+                      <span className={`${text.caption} tabular-nums ${ink.muted}`}>
+                        {jarak >= 1000
+                          ? `${(jarak / 1000).toFixed(1).replace('.', ',')} km`
+                          : `${Math.round(jarak)} m`}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <p className={`${text.caption} ${ink.faint} mt-2.5 leading-relaxed`}>
+                  Bila kantor tempat Anda berdiri bukan yang paling atas, titik kantornya yang
+                  perlu diperbaiki. Kirimkan koordinat di atas kepada admin.
+                </p>
+              </details>
+            )}
           </>
         )}
       </div>
