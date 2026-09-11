@@ -3,7 +3,7 @@ import { AlertTriangle, CalendarDays, ClipboardList, FileText, ImageIcon, Plus, 
 import { useApp } from '../../../context/AppContext';
 import { saringTugasUntuk } from '../../../utils/hirarki';
 import { tugasTertunggak, hariTerlambat } from '../../../utils/tugas';
-import { AppBar, Card, EmptyState, Screen, Stack } from '../ui/primitives';
+import { AppBar, Card, EmptyState, IsianPilihan, IsianTeks, LembarPenuh, Screen, Stack, TombolUtama } from '../ui/primitives';
 import { ink, radius, surface, text, tone, HIT_TARGET, type ToneName } from '../ui/tokens';
 
 /**
@@ -455,131 +455,210 @@ const PRIORITAS = ['P1', 'P2', 'P3', 'P4', 'P5'] as const;
  * Di layar HP, dialog kecil menyisakan sedikit ruang untuk papan ketik dan
  * membuat isian terdorong keluar layar.
  */
+const JENIS_TEKNIS = [
+  'Rutinitas Harian', 'Prospek Calon Debitur', 'Visit Maintenance Debitur',
+  'Kolaborasi', 'Inisiatif', 'Inovasi',
+  'Adaptasi Teknologi Pembelajaran Baru', 'Finding Problem dan Solusi',
+];
+
+const TIMELINE = ['Harian', 'Mingguan', 'Bulanan', '3 Bulanan', 'Aksidental'];
+
+const KATEGORI = [
+  'Bisnis', 'Audit', 'Kepatuhan', 'Staff/Operasional', 'Account Officer',
+  'Senior Account Officer Funding', 'Kepala Kantor Kas', 'Collection', 'Lainnya',
+];
+
+const DOMAIN = [
+  ['CRD', 'Kredit'], ['COL', 'Penagihan'], ['FND', 'Pendanaan'], ['MKT', 'Pemasaran'],
+  ['OPS', 'Operasional'], ['ADM', 'Administrasi'], ['HCM', 'SDM'], ['CRK', 'Kepatuhan & Risiko'],
+  ['ITD', 'TI & Digital'], ['LGL', 'Legal'], ['EXE', 'Eksekutif'], ['KIM', 'Pengetahuan'],
+] as const;
+
+const LEVEL = ['L01','L02','L03','L04','L05','L06','L07','L08','L09','L10','L11','L12'];
+
+/**
+ * Form tugas baru — lembar penuh, bukan dialog.
+ *
+ * Di layar HP, dialog kecil menyisakan sedikit ruang untuk papan ketik dan
+ * membuat isian terdorong keluar layar.
+ *
+ * Isiannya kini sepadan dengan versi web. Sebelumnya hanya ada empat kolom
+ * (deskripsi, prioritas, PIC, tenggat), sehingga tugas yang dibuat dari
+ * aplikasi selalu lahir tanpa unit, kategori, domain BEIS, target keluaran,
+ * maupun validator — dan harus dilengkapi ulang di web sebelum bisa divalidasi.
+ *
+ * Disusun berkelompok dan dapat dilipat: yang wajib terbuka sejak awal, yang
+ * melengkapi disembunyikan supaya lembar ini tidak terasa seperti borang
+ * panjang tanpa ujung di layar sempit.
+ */
 const FormTugas: React.FC<{ onTutup: () => void; onTersimpan: () => void }> = ({ onTutup, onTersimpan }) => {
   const { createFlowTask, currentUser, allUsers } = useApp() as any;
 
-  const [deskripsi, setDeskripsi] = useState('');
-  const [prioritas, setPrioritas] = useState<string>('P3');
-  const [pic, setPic] = useState<string>(currentUser?.name ?? '');
-  const [tenggatTgl, setTenggatTgl] = useState('');
+  const [f, setF] = useState({
+    deskripsi: '',
+    prioritas: 'P3',
+    pic: currentUser?.name ?? '',
+    unit: currentUser?.unit ?? 'BIS',
+    jenisTeknis: 'Rutinitas Harian',
+    timeline: 'Harian',
+    kategori: 'Bisnis',
+    domain: 'CRD',
+    level: 'L03',
+    tenggat: '',
+    outputDoD: '',
+    outputDoD2: '',
+    outcome: '',
+    validator: '',
+    evidenceLink: '',
+    arahan: '',
+  });
+  const [bukaLengkap, setBukaLengkap] = useState(false);
   const [menyimpan, setMenyimpan] = useState(false);
 
+  const ubah = (k: keyof typeof f) => (v: string) => setF(p => ({ ...p, [k]: v }));
+
+  const siap = f.deskripsi.trim() !== '' && f.pic.trim() !== '';
+
   const simpan = () => {
-    if (!deskripsi.trim()) return;
+    if (!siap) return;
     setMenyimpan(true);
     createFlowTask({
-      deskripsiTugas: deskripsi.trim(),
-      prioritas,
-      assignedTo: pic,
-      pic,
-      tanggalFU: tenggatTgl || undefined,
+      deskripsiTugas: f.deskripsi.trim(),
+      prioritas: f.prioritas,
+      assignedTo: f.pic,
+      pic: f.pic,
+      unit: f.unit,
+      jenisTeknis: f.jenisTeknis,
+      timeline: f.timeline,
+      category: f.kategori,
+      beisDomain: f.domain,
+      beisLevel: f.level,
+      tanggalFU: f.tenggat || undefined,
+      deadline: f.tenggat || undefined,
+      outputDoD: f.outputDoD.trim() || undefined,
+      outputDoD2: f.outputDoD2.trim() || undefined,
+      outcome: f.outcome.trim() || undefined,
+      validator: f.validator.trim() || undefined,
+      evidenceLink: f.evidenceLink.trim() || undefined,
+      arahan: f.arahan.trim() || undefined,
       status: 'Planned',
     });
     onTersimpan();
   };
 
+  const namaPegawai: string[] = [
+    ...new Set([
+      currentUser?.name,
+      ...(allUsers ?? []).map((u: any) => u?.name),
+    ].filter(Boolean)),
+  ];
+
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-white">
-      <header
-        className={`shrink-0 border-b ${surface.divider} flex items-center gap-1 h-12 px-1`}
-        style={{ paddingTop: 'env(safe-area-inset-top)' }}
-      >
-        <button
-          type="button"
-          onClick={onTutup}
-          aria-label="Batal"
-          className={`w-11 h-11 flex items-center justify-center ${ink.base} active:opacity-50`}
-        >
-          <X className="w-6 h-6" />
-        </button>
-        <h1 className={`${text.title} ${ink.strong} flex-1`}>Tugas baru</h1>
-      </header>
-
-      <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-5">
-        <label className="flex flex-col gap-1.5">
-          <span className={`${text.caption} ${ink.muted} uppercase tracking-wide font-semibold px-1`}>
-            Deskripsi tugas
-          </span>
-          <textarea
-            value={deskripsi}
-            onChange={e => setDeskripsi(e.target.value)}
-            rows={3}
-            autoFocus
-            placeholder="Mis. Kunjungan penagihan debitur an. Budi Santoso"
-            className={`w-full px-3.5 py-3 ${radius.control} border ${surface.divider} ${text.body} ${ink.strong} placeholder:text-slate-400 outline-none focus:border-blue-500 resize-none`}
-          />
-        </label>
-
-        <div className="flex flex-col gap-1.5">
-          <span className={`${text.caption} ${ink.muted} uppercase tracking-wide font-semibold px-1`}>
-            Prioritas
-          </span>
-          <div className="flex gap-2">
-            {PRIORITAS.map(p => (
-              <button
-                key={p}
-                type="button"
-                onClick={() => setPrioritas(p)}
-                className={`flex-1 min-h-[44px] ${radius.control} ${text.body} font-semibold border transition-colors ${
-                  prioritas === p
-                    ? 'bg-primary text-white border-transparent'
-                    : `${surface.card} ${ink.base} ${surface.divider}`
-                }`}
-              >
-                {p}
-              </button>
-            ))}
-          </div>
-          <span className={`${text.caption} ${ink.faint} px-1`}>P1 paling mendesak, P5 paling longgar</span>
-        </div>
-
-        <label className="flex flex-col gap-1.5">
-          <span className={`${text.caption} ${ink.muted} uppercase tracking-wide font-semibold px-1`}>
-            Penanggung jawab
-          </span>
-          <div className={`relative flex items-center px-3.5 min-h-[44px] ${surface.card} ${radius.control} border ${surface.divider}`}>
-            <span className={`flex-1 ${text.body} ${ink.strong} truncate`}>{pic || 'Pilih'}</span>
-            <User2 className={`w-4 h-4 ${ink.faint}`} />
-            <select
-              value={pic}
-              onChange={e => setPic(e.target.value)}
-              aria-label="Penanggung jawab"
-              className="absolute inset-0 w-full h-full opacity-0"
-            >
-              {[currentUser?.name, ...(allUsers ?? []).map((u: any) => u.name)]
-                .filter((v, i, arr) => v && arr.indexOf(v) === i)
-                .map((n: string) => <option key={n} value={n}>{n}</option>)}
-            </select>
-          </div>
-        </label>
-
-        <label className="flex flex-col gap-1.5">
-          <span className={`${text.caption} ${ink.muted} uppercase tracking-wide font-semibold px-1`}>
-            Tenggat (opsional)
-          </span>
-          <input
-            type="date"
-            value={tenggatTgl}
-            onChange={e => setTenggatTgl(e.target.value)}
-            className={`w-full px-3.5 min-h-[44px] ${radius.control} border ${surface.divider} ${text.body} ${ink.strong} outline-none focus:border-blue-500`}
-          />
-        </label>
-      </div>
-
-      <div
-        className={`shrink-0 border-t ${surface.divider} px-4 py-3`}
-        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 12px)' }}
-      >
-        <button
-          type="button"
-          disabled={!deskripsi.trim() || menyimpan}
+    <LembarPenuh
+      judul="Tugas baru"
+      onTutup={onTutup}
+      aksi={
+        <TombolUtama
+          disabled={!siap}
+          memproses={menyimpan}
           onClick={simpan}
-          className={`w-full min-h-[52px] ${radius.control} ${text.headline} text-white bg-primary disabled:bg-slate-300 transition-transform active:scale-[0.98] disabled:active:scale-100`}
-        >
-          {menyimpan ? 'Menyimpan…' : 'Simpan tugas'}
-        </button>
+          label={siap ? 'Simpan tugas' : 'Isi deskripsi dan penanggung jawab'}
+        />
+      }
+    >
+      {/* -------- yang wajib -------- */}
+      <IsianTeks
+        label="Deskripsi tugas" wajib baris={3}
+        value={f.deskripsi} onChange={ubah('deskripsi')}
+        placeholder="Mis. Kunjungan penagihan debitur an. Budi Santoso"
+      />
+
+      <div className="flex flex-col gap-1.5">
+        <span className={`${text.caption} ${ink.muted} uppercase tracking-wide font-semibold px-1`}>
+          Prioritas
+        </span>
+        <div className="flex gap-2">
+          {PRIORITAS.map(p => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => ubah('prioritas')(p)}
+              className={`flex-1 min-h-[44px] ${radius.control} ${text.body} font-semibold border transition-colors ${
+                f.prioritas === p
+                  ? 'bg-primary text-white border-transparent'
+                  : `${surface.card} ${ink.base} ${surface.divider}`
+              }`}
+            >
+              {p}
+            </button>
+          ))}
+        </div>
       </div>
-    </div>
+
+      <IsianPilihan
+        label="Penanggung jawab" wajib
+        value={f.pic} onChange={ubah('pic')}
+        pilihan={namaPegawai.map(n => ({ nilai: n, label: n }))}
+      />
+
+      <IsianTeks
+        label="Tenggat" type="date"
+        value={f.tenggat} onChange={ubah('tenggat')}
+        catatan="Dipakai menandai tugas yang lewat tenggat."
+      />
+
+      <div className="grid grid-cols-2 gap-3">
+        <IsianPilihan label="Unit" value={f.unit} onChange={ubah('unit')}
+          pilihan={['BIS','PUSAT','MKT','OPS','CRD','ITD','SDM','LGL'].map(u => ({ nilai: u, label: u }))} />
+        <IsianPilihan label="Timeline" value={f.timeline} onChange={ubah('timeline')}
+          pilihan={TIMELINE.map(t => ({ nilai: t, label: t }))} />
+      </div>
+
+      <IsianPilihan label="Jenis teknis" value={f.jenisTeknis} onChange={ubah('jenisTeknis')}
+        pilihan={JENIS_TEKNIS.map(j => ({ nilai: j, label: j }))} />
+
+      {/* -------- pelengkap, dilipat -------- */}
+      <button
+        type="button"
+        onClick={() => setBukaLengkap(v => !v)}
+        className={`min-h-[44px] ${radius.control} border ${surface.divider} ${text.body} font-semibold ${ink.base} flex items-center justify-center gap-2 active:bg-slate-50`}
+      >
+        {bukaLengkap ? 'Sembunyikan isian pelengkap' : 'Isian pelengkap (BEIS, target, validator)'}
+      </button>
+
+      {bukaLengkap && (
+        <>
+          <div className="grid grid-cols-2 gap-3">
+            <IsianPilihan label="Domain BEIS" value={f.domain} onChange={ubah('domain')}
+              pilihan={DOMAIN.map(([k, l]) => ({ nilai: k, label: `${k} · ${l}` }))} />
+            <IsianPilihan label="Level BEIS" value={f.level} onChange={ubah('level')}
+              pilihan={LEVEL.map(l => ({ nilai: l, label: l }))} />
+          </div>
+
+          <IsianPilihan label="Kategori" value={f.kategori} onChange={ubah('kategori')}
+            pilihan={KATEGORI.map(k => ({ nilai: k, label: k }))} />
+
+          <IsianTeks label="Target keluaran" baris={2}
+            value={f.outputDoD} onChange={ubah('outputDoD')}
+            placeholder="Apa yang dianggap selesai" />
+          <IsianTeks label="Target keluaran kedua" baris={2}
+            value={f.outputDoD2} onChange={ubah('outputDoD2')} />
+          <IsianTeks label="Dampak keberhasilan" baris={2}
+            value={f.outcome} onChange={ubah('outcome')}
+            placeholder="Apa yang berubah bila tugas ini berhasil" />
+
+          <IsianPilihan label="Validator" value={f.validator} onChange={ubah('validator')}
+            pilihan={[{ nilai: '', label: 'Belum ditentukan' },
+                      ...namaPegawai.map(n => ({ nilai: n, label: n }))]} />
+
+          <IsianTeks label="Tautan bukti" value={f.evidenceLink} onChange={ubah('evidenceLink')}
+            placeholder="https://…" />
+          <IsianTeks label="Arahan" baris={2} value={f.arahan} onChange={ubah('arahan')} />
+        </>
+      )}
+
+      <div className="h-2" />
+    </LembarPenuh>
   );
 };
 

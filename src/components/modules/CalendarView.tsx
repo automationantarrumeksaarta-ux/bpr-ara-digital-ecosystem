@@ -107,26 +107,52 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     return visibleTasks.filter(t => t.tanggal === dateKey || t.tanggalFU === dateKey);
   };
 
-  // Color generator for users
-  const getUserColor = (username: string) => {
-    const colors = [
-      'bg-blue-50/80 dark:bg-blue-950/50 text-blue-900 dark:text-blue-200 border-blue-200/60 hover:bg-blue-100',
-      'bg-purple-50/80 dark:bg-purple-950/50 text-purple-900 dark:text-purple-200 border-purple-200/60 hover:bg-purple-100',
-      'bg-amber-50/80 dark:bg-amber-950/50 text-amber-900 dark:text-amber-200 border-amber-200/60 hover:bg-amber-100',
-      'bg-emerald-50/80 dark:bg-emerald-950/50 text-emerald-900 dark:text-emerald-200 border-emerald-200/60 hover:bg-emerald-100',
-      'bg-rose-50/80 dark:bg-rose-950/50 text-rose-900 dark:text-rose-200 border-rose-200/60 hover:bg-rose-100',
-      'bg-indigo-50/80 dark:bg-indigo-950/50 text-indigo-900 dark:text-indigo-200 border-indigo-200/60 hover:bg-indigo-100',
-      'bg-cyan-50/80 dark:bg-cyan-950/50 text-cyan-900 dark:text-cyan-200 border-cyan-200/60 hover:bg-cyan-100',
-      'bg-fuchsia-50/80 dark:bg-fuchsia-950/50 text-fuchsia-900 dark:text-fuchsia-200 border-fuchsia-200/60 hover:bg-fuchsia-100'
-    ];
-    // simple hash
+  /*
+   * Warna per orang.
+   *
+   * Palet sebelumnya berisi delapan pilihan yang lima di antaranya kebiruan
+   * (blue, indigo, cyan, fuchsia, purple) sehingga dua orang berbeda kerap
+   * tampak sama. Lebih buruk lagi, salah satu pilihannya emerald — dan di
+   * proyek ini seluruh skala emerald dipetakan menjadi BIRU di index.css,
+   * jadi warna yang dimaksud hijau justru keluar biru dan bertabrakan dengan
+   * pilihan pertama.
+   *
+   * Palet baru memakai nilai heksadesimal langsung supaya tidak tersentuh
+   * pemetaan itu, dan rona-ronanya dipilih berjauhan agar mudah dibedakan
+   * sekali lihat.
+   */
+  const PALET_ORANG = [
+    { latar: '#EAF3FF', teks: '#0B4A9E', garis: '#0756B8' },  // biru
+    { latar: '#F3EEFF', teks: '#5B21B6', garis: '#7C3AED' },  // ungu
+    { latar: '#FFF4E5', teks: '#92400E', garis: '#D97706' },  // jingga
+    { latar: '#FFEEF1', teks: '#9F1239', garis: '#E11D48' },  // merah muda
+    { latar: '#E6F7F1', teks: '#065F46', garis: '#059669' },  // hijau
+    { latar: '#FFF9DB', teks: '#854D0E', garis: '#CA8A04' },  // kuning
+    { latar: '#E8F7FB', teks: '#155E75', garis: '#0891B2' },  // toska
+    { latar: '#F1F0EC', teks: '#44403C', garis: '#78716C' },  // cokelat abu
+  ];
+
+  /** Nomor warna tetap untuk satu nama; sama di mana pun nama itu muncul. */
+  const indeksWarna = (nama: string) => {
+    const teks = (nama || 'tanpa nama').trim().toLowerCase();
     let hash = 0;
-    const nameStr = username || 'unknown';
-    for (let i = 0; i < nameStr.length; i++) {
-      hash = nameStr.charCodeAt(i) + ((hash << 5) - hash);
+    for (let i = 0; i < teks.length; i++) {
+      hash = teks.charCodeAt(i) + ((hash << 5) - hash);
     }
-    return colors[Math.abs(hash) % colors.length];
+    return Math.abs(hash) % PALET_ORANG.length;
   };
+
+  const warnaOrang = (nama: string) => PALET_ORANG[indeksWarna(nama)];
+
+  /** Siapa saja yang punya agenda pada bulan yang sedang dilihat. */
+  const orangBulanIni = React.useMemo(() => {
+    const nama = new Set<string>();
+    for (const t of visibleTasks) {
+      const n = (t.assignedTo || t.pic || '').trim();
+      if (n) nama.add(n);
+    }
+    return [...nama].sort((a, b) => a.localeCompare(b, 'id'));
+  }, [visibleTasks]);
 
   return (
     <div className="flex-1 flex flex-col p-4 sm:p-8 min-w-0 bg-[#F9F9FB] dark:bg-[#121214]">
@@ -174,6 +200,30 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           </button>
         </div>
       </div>
+
+      {/*
+        Legenda warna orang.
+        Tanpa ini warna hanya jadi hiasan — pembaca harus mengarahkan kursor ke
+        tiap agenda untuk tahu itu milik siapa. Hanya menampilkan orang yang
+        memang punya agenda di bulan yang sedang dilihat.
+      */}
+      {orangBulanIni.length > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 shadow-sm">
+          <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+            Pemilik agenda
+          </span>
+          {orangBulanIni.map(nama => (
+            <span key={nama} className="flex items-center gap-1.5">
+              <span
+                aria-hidden
+                className="h-2.5 w-2.5 shrink-0 rounded-full"
+                style={{ backgroundColor: warnaOrang(nama).garis }}
+              />
+              <span className="text-[11px] font-medium text-slate-600">{nama}</span>
+            </span>
+          ))}
+        </div>
+      )}
 
       {/* Days of Week Header */}
       <div className="grid grid-cols-7 gap-2 mb-2 text-center text-[11px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">
@@ -233,15 +283,28 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                           e.stopPropagation();
                           handleEditTaskClick(t);
                         }}
-                      className={`text-[10px] leading-tight px-1.5 py-1 mb-1 rounded-md border cursor-pointer transition-colors shadow-xs font-medium truncate
-                        ${isSelesai
-                          ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border-emerald-200/50 line-through opacity-80'
-                          : getUserColor(t.assignedTo)
-                        }
-                      `}
+                      className={`text-[10px] leading-tight pl-2 pr-1.5 py-1 mb-1 rounded-md cursor-pointer transition-opacity font-medium truncate border-l-[3px] ${
+                        isSelesai ? 'line-through opacity-55' : 'hover:opacity-80'
+                      }`}
+                      /*
+                        Warna orang dibawa lewat style, bukan kelas, karena
+                        nilainya dihitung saat berjalan. Garis kiri tebal dan
+                        latar tipis: rona tetap terbaca walau baris hanya
+                        setinggi 10 piksel, dan teksnya tetap berkontras.
+
+                        Status selesai ditandai coretan dan peredupan, BUKAN
+                        warna hijau — warna dipakai untuk membedakan ORANG di
+                        layar ini, dan memakainya juga untuk status membuat
+                        keduanya saling mengaburkan.
+                      */
+                      style={{
+                        backgroundColor: warnaOrang(t.assignedTo || t.pic).latar,
+                        color: warnaOrang(t.assignedTo || t.pic).teks,
+                        borderLeftColor: warnaOrang(t.assignedTo || t.pic).garis,
+                      }}
                       title={`${t.deskripsiTugas} (${t.assignedTo})`}
                     >
-                      <div className="font-bold truncate">[{t.assignedTo}] {t.deskripsiTugas}</div>
+                      <div className="font-bold truncate">{t.deskripsiTugas}</div>
                     </div>
                   );
                 })}
