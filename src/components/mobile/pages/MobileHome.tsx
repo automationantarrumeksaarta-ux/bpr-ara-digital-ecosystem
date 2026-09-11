@@ -31,33 +31,42 @@ const MobileHome: React.FC = () => {
     <Screen>
       {/* Kepala halaman menyatu dengan konten — tanpa AppBar terpisah, karena
           beranda tidak butuh judul yang mengulang nama tab di bawah. */}
+      {/*
+        Kepala berwarna sebagai zona identitas aplikasi.
+        Warna di sini tidak menyampaikan status apa pun — memang identitas, dan
+        itulah satu-satunya tempat di aplikasi ini yang boleh begitu. Di bawah
+        garis ini, biru kembali hanya dipakai untuk tindakan dan keadaan.
+      */}
       <div
-        className={`${surface.card} px-4 pb-5 border-b ${surface.divider}`}
+        className="px-4 pb-8 bg-gradient-to-b from-primary-navy to-primary text-white"
         style={{ paddingTop: 'calc(env(safe-area-inset-top) + 16px)' }}
       >
         <div className="flex items-center gap-3">
           {/* src wajib diteruskan; tanpa ini foto profil yang sudah diganti
               tidak pernah muncul di beranda dan hanya tampil di layar Profil. */}
-          <Avatar name={nama} size={44} src={(currentUser as any)?.avatar_url} />
+          <span className="rounded-full ring-2 ring-white/30">
+            <Avatar name={nama} size={44} src={(currentUser as any)?.avatar_url} />
+          </span>
           <div className="flex-1 min-w-0">
-            <p className={`${text.body} font-semibold ${ink.strong} truncate`}>{nama}</p>
-            <p className={`${text.caption} ${ink.muted} truncate`}>
+            <p className={`${text.body} font-semibold text-white truncate`}>{nama}</p>
+            <p className={`${text.caption} text-white/70 truncate`}>
               {currentUser?.unit ? `${currentUser.unit} · ` : ''}BPR ARA
             </p>
           </div>
         </div>
 
         <div className="mt-4">
-          <h1 className={`${text.largeTitle} ${ink.strong}`}>{sapaan(now.getHours())},</h1>
-          <p className={`${text.body} ${ink.muted} mt-0.5`}>
+          <h1 className={`${text.largeTitle} text-white`}>{sapaan(now.getHours())},</h1>
+          <p className={`${text.body} text-white/75 mt-0.5`}>
             {currentUser?.role ? `${currentUser.role}` : 'Semoga hari Anda lancar.'}
           </p>
         </div>
       </div>
 
       <Stack>
-        {/* --- Status absen hari ini: informasi paling mendesak, jadi paling atas --- */}
-        <Card className="flex flex-col gap-3">
+        {/* Kartu absen sengaja naik menimpa tepi kepala berwarna: menegaskan
+            bahwa inilah isi terpenting, sekaligus menyambung dua zona warna. */}
+        <Card className="flex flex-col gap-3 -mt-6 shadow-md">
           <div className="flex items-center justify-between">
             <span className={`${text.caption} ${ink.muted} uppercase tracking-wide font-semibold`}>
               Absen hari ini
@@ -125,7 +134,7 @@ const MobileHome: React.FC = () => {
                 <div className="px-3 py-3.5">
                   <span className={`${text.caption} ${ink.muted}`}>Hadir</span>
                   <span className="flex items-baseline gap-1 mt-1">
-                    <span className={`${text.stat} ${ink.strong}`}>{rekap.hadir}</span>
+                    <span className={`${text.stat} ${rekap.hadir > 0 ? tone.primary.text : ink.strong}`}>{rekap.hadir}</span>
                     <span className={`${text.caption} ${ink.faint}`}>/ {rekap.hariKerja}</span>
                   </span>
                 </div>
@@ -159,15 +168,18 @@ const MobileHome: React.FC = () => {
                   className={`flex flex-col items-center gap-2 px-1 py-3 ${radius.control} active:bg-slate-50 transition-colors`}
                 >
                   {/*
-                    Ikon monokrom dengan satu latar netral. Versi sebelumnya
-                    memberi warna berbeda pada tiap menu (biru, indigo, emerald,
-                    teal, ungu, oranye, hijau) — pelangi itu tidak menyampaikan
-                    informasi apa pun dan justru menghapus hierarki.
+                    Satu nuansa biru untuk semua menu, bukan warna berbeda per
+                    menu. Versi paling awal memakai pelangi (biru, indigo,
+                    emerald, teal, ungu, oranye, hijau) yang tidak menyampaikan
+                    informasi apa pun dan menghapus hierarki; versi sesudahnya
+                    memakai abu-abu yang membuat seluruh layar terasa tawar.
+                    Satu warna merek menjaga keduanya: ada identitas, tanpa
+                    mengaku-aku membawa arti.
                   */}
                   <span
-                    className={`w-11 h-11 ${radius.control} ${tone.neutral.bgSoft} flex items-center justify-center`}
+                    className={`w-11 h-11 ${radius.control} bg-primary-light flex items-center justify-center`}
                   >
-                    <item.icon className={`w-5 h-5 ${ink.base}`} strokeWidth={1.8} />
+                    <item.icon className="w-5 h-5 text-primary" strokeWidth={1.9} />
                   </span>
                   <span
                     className={`${text.caption} text-center font-medium ${ink.base} leading-tight whitespace-pre-line`}

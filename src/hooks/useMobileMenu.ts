@@ -38,11 +38,11 @@ interface DefinisiMenu {
 }
 
 const MENU_APK: DefinisiMenu[] = [
-  { id: 'EXECUTIVE_DASHBOARD', label: 'Dashboard\nUmum', icon: LayoutDashboard, path: '/mobile/ringkasan', izinDari: 'EXECUTIVE_DASHBOARD' },
-  { id: 'FLOW_TASKS', label: 'Task Board', icon: ListChecks, path: '/mobile/tugas', izinDari: 'FLOW_TASKS' },
-  { id: 'DECISION_QUEUE', label: 'Approval\nQueue', icon: BadgeCheck, path: '/mobile/persetujuan', izinDari: 'DECISION_QUEUE' },
+  { id: 'EXECUTIVE_DASHBOARD', label: 'Ringkasan', icon: LayoutDashboard, path: '/mobile/ringkasan', izinDari: 'EXECUTIVE_DASHBOARD' },
+  { id: 'FLOW_TASKS', label: 'Papan Tugas', icon: ListChecks, path: '/mobile/tugas', izinDari: 'FLOW_TASKS' },
+  { id: 'DECISION_QUEUE', label: 'Antrean\nPersetujuan', icon: BadgeCheck, path: '/mobile/persetujuan', izinDari: 'DECISION_QUEUE' },
   { id: 'CALENDAR_VIEW', label: 'Kalender', icon: CalendarDays, path: '/mobile/kalender', izinDari: 'CALENDAR_VIEW' },
-  { id: 'LOS_CREDIT', label: 'Loan\nOrigination', icon: FileText, path: '/mobile/kredit', izinDari: 'LOS_CREDIT' },
+  { id: 'LOS_CREDIT', label: 'Pengajuan\nKredit', icon: FileText, path: '/mobile/kredit', izinDari: 'LOS_CREDIT' },
 
   // Modul khusus aplikasi — selalu tersedia, tidak bergantung menu web.
   { id: 'ACTIVITIES', label: 'Aktivitas', icon: Camera, path: '/mobile/aktivitas', mobileOnly: true },
