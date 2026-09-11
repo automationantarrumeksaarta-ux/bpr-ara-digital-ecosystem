@@ -1,5 +1,8 @@
 import express from 'express';
 import { db } from './db.js';
+import {
+  KANTOR, RADIUS_ABSEN_METER, AKURASI_MAKS_METER, periksaLokasiAbsen,
+} from './kantor.js';
 
 const router = express.Router();
 
@@ -40,6 +43,21 @@ const keMenit = (jam: string): number => {
 
 const BATAS_TERLAMBAT = keMenit(process.env.JAM_MASUK_BATAS || '08:30');
 
+/**
+ * Daftar kantor dan aturan jaraknya.
+ *
+ * Diambil aplikasi saat layar absen dibuka. Sengaja dilayani server, bukan
+ * ditanam di dalam APK, supaya menambah atau memindahkan kantor tidak menuntut
+ * pembangunan ulang aplikasi.
+ */
+router.get('/kantor', (_req, res) => {
+  res.json({
+    kantor: KANTOR,
+    radiusMeter: RADIUS_ABSEN_METER,
+    akurasiMaksMeter: AKURASI_MAKS_METER,
+  });
+});
+
 // Get attendance records for a user
 router.get('/', (req, res) => {
   try {
@@ -69,9 +87,21 @@ router.get('/', (req, res) => {
 // Clock In
 router.post('/clock-in', (req, res) => {
   try {
-    const { user_id, lat, lng, location } = req.body;
+    const { user_id, lat, lng, location, akurasi } = req.body;
     if (!user_id) {
       return res.status(400).json({ error: 'user_id is required' });
+    }
+
+    /*
+     * Jarak diperiksa di server, bukan hanya di ponsel.
+     *
+     * Koordinat dikirim dari peramban dan bisa diubah siapa saja dengan alat
+     * pengembang. Pemeriksaan di layar hanya untuk memberi tahu pengguna lebih
+     * awal; yang menentukan diterima atau tidak adalah pemeriksaan di sini.
+     */
+    const lokasi = periksaLokasiAbsen(lat, lng, akurasi);
+    if (!lokasi.boleh) {
+      return res.status(400).json({ error: lokasi.alasan });
     }
 
     const today = tanggalKantor();
@@ -93,7 +123,11 @@ router.post('/clock-in', (req, res) => {
     `).run(id, user_id, today, now, lat || null, lng || null, location || null, status);
 
     const newRecord = db.prepare('SELECT * FROM attendances WHERE id = ?').get(id);
-    res.json({ success: true, data: newRecord, message: 'Berhasil Absen Masuk' });
+    res.json({
+      success: true,
+      data: newRecord,
+      message: `Absen masuk tercatat di ${lokasi.kantor?.nama}, ${Math.round(lokasi.jarak ?? 0)} meter dari titik kantor.`,
+    });
   } catch (error) {
     console.error('Clock in error:', error);
     res.status(500).json({ error: 'Failed to clock in' });
@@ -103,9 +137,14 @@ router.post('/clock-in', (req, res) => {
 // Clock Out
 router.post('/clock-out', (req, res) => {
   try {
-    const { user_id, lat, lng, location } = req.body;
+    const { user_id, lat, lng, location, akurasi } = req.body;
     if (!user_id) {
       return res.status(400).json({ error: 'user_id is required' });
+    }
+
+    const lokasi = periksaLokasiAbsen(lat, lng, akurasi);
+    if (!lokasi.boleh) {
+      return res.status(400).json({ error: lokasi.alasan });
     }
 
     const today = tanggalKantor();
@@ -126,7 +165,11 @@ router.post('/clock-out', (req, res) => {
     `).run(now, lat || null, lng || null, location || null, existing.id);
 
     const updatedRecord = db.prepare('SELECT * FROM attendances WHERE id = ?').get(existing.id);
-    res.json({ success: true, data: updatedRecord, message: 'Berhasil Absen Pulang' });
+    res.json({
+      success: true,
+      data: updatedRecord,
+      message: `Absen pulang tercatat di ${lokasi.kantor?.nama}, ${Math.round(lokasi.jarak ?? 0)} meter dari titik kantor.`,
+    });
   } catch (error) {
     console.error('Clock out error:', error);
     res.status(500).json({ error: 'Failed to clock out' });

@@ -4,7 +4,8 @@ import {
   AlertCircle, Briefcase, Camera, Check, Eye, EyeOff, Lock, LogOut, User, X,
 } from 'lucide-react';
 import { useApp } from '../../../context/AppContext';
-import { Avatar, AppBar, Badge, Card, ListGroup, ListRow, Screen, Section, Stack } from '../ui/primitives';
+import { kecilkanGambar } from '../../../utils/gambar';
+import { AppBar, Avatar, Badge, Card, IsianTeks, LembarPenuh, ListGroup, ListRow, PesanKecil, Screen, Section, Stack, TombolUtama } from '../ui/primitives';
 import { ink, radius, surface, text, tone } from '../ui/tokens';
 
 /**
@@ -111,83 +112,17 @@ const MobileProfile: React.FC = () => {
 
 /* ------------------------------------------------------------------ kerangka lembar */
 
-const KerangkaLembar: React.FC<{
-  judul: string;
-  onTutup: () => void;
-  aksi?: React.ReactNode;
-  children: React.ReactNode;
-}> = ({ judul, onTutup, aksi, children }) => (
-  <div className="fixed inset-0 z-50 flex flex-col bg-white">
-    <header
-      className={`shrink-0 border-b ${surface.divider} flex items-center gap-1 h-12 px-1`}
-      style={{ paddingTop: 'env(safe-area-inset-top)' }}
-    >
-      <button
-        type="button"
-        onClick={onTutup}
-        aria-label="Tutup"
-        className={`w-11 h-11 flex items-center justify-center ${ink.base} active:opacity-50`}
-      >
-        <X className="w-6 h-6" />
-      </button>
-      <h1 className={`${text.title} ${ink.strong} flex-1`}>{judul}</h1>
-    </header>
-    <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-4">{children}</div>
-    {aksi && (
-      <div
-        className={`shrink-0 border-t ${surface.divider} px-4 py-3`}
-        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 12px)' }}
-      >
-        {aksi}
-      </div>
-    )}
-  </div>
-);
-
-const Isian: React.FC<{
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  type?: string;
-  placeholder?: string;
-  inputMode?: 'text' | 'tel' | 'email' | 'numeric';
-  catatan?: string;
-}> = ({ label, value, onChange, type = 'text', placeholder, inputMode, catatan }) => (
-  <label className="flex flex-col gap-1.5">
-    <span className={`${text.caption} ${ink.muted} uppercase tracking-wide font-semibold px-1`}>{label}</span>
-    <input
-      type={type}
-      value={value}
-      inputMode={inputMode}
-      placeholder={placeholder}
-      onChange={e => onChange(e.target.value)}
-      className={`w-full px-3.5 min-h-[48px] ${radius.control} border ${surface.divider} ${text.body} ${ink.strong} placeholder:text-slate-400 outline-none focus:border-blue-500`}
-    />
-    {catatan && <span className={`${text.caption} ${ink.faint} px-1`}>{catatan}</span>}
-  </label>
-);
-
-const Pesan: React.FC<{ teks: string; jenis: 'ok' | 'gagal' }> = ({ teks, jenis }) => (
-  <div className={`${radius.control} px-3.5 py-3 flex items-start gap-2.5 ${jenis === 'ok' ? tone.positive.bgSoft : tone.danger.bgSoft}`}>
-    {jenis === 'ok'
-      ? <Check className={`w-4 h-4 shrink-0 mt-px ${tone.positive.text}`} />
-      : <AlertCircle className={`w-4 h-4 shrink-0 mt-px ${tone.danger.text}`} />}
-    <p className={`${text.footnote} ${jenis === 'ok' ? tone.positive.text : tone.danger.text}`}>{teks}</p>
-  </div>
-);
-
+/*
+ * Kerangka lembar, isian, pesan, dan tombol simpan kini tinggal di
+ * ../ui/primitives karena layar pengajuan kredit memakai bentuk yang sama.
+ * Nama lokal dipertahankan supaya sisa berkas ini tidak perlu diubah.
+ */
+const KerangkaLembar = LembarPenuh;
+const Isian = IsianTeks;
+const Pesan = PesanKecil;
 const TombolSimpan: React.FC<{ disabled: boolean; memproses: boolean; onClick: () => void; label?: string }> = ({
   disabled, memproses, onClick, label = 'Simpan perubahan',
-}) => (
-  <button
-    type="button"
-    disabled={disabled || memproses}
-    onClick={onClick}
-    className={`w-full min-h-[52px] ${radius.control} ${text.headline} text-white bg-primary disabled:bg-slate-300 transition-transform active:scale-[0.98] disabled:active:scale-100`}
-  >
-    {memproses ? 'Menyimpan…' : label}
-  </button>
-);
+}) => <TombolUtama disabled={disabled} memproses={memproses} onClick={onClick} label={label} />;
 
 /** Kirim perubahan profil dan segarkan currentUser dari jawaban server. */
 function useSimpanProfil() {
@@ -241,15 +176,27 @@ const LembarProfil: React.FC<{ onTutup: () => void }> = ({ onTutup }) => {
     setPratinjau(URL.createObjectURL(f));
   };
 
+  const [galatFoto, setGalatFoto] = useState<string | null>(null);
+
+  /*
+   * Foto dikecilkan di ponsel lalu dikirim sebagai data URL lewat endpoint
+   * profil, bukan diunggah sebagai berkas.
+   *
+   * Unggah berkas dari dalam APK tidak pernah berhasil: Capacitor mengambil
+   * alih fetch dan membaca isi permintaan dengan TextDecoder, sehingga byte
+   * gambar rusak diperlakukan sebagai teks. Selain itu alamat balikannya
+   * relatif (/uploads/...) dan di APK menunjuk ke server lokal Capacitor,
+   * bukan ke server BPR, jadi fotonya tidak akan tampil.
+   */
   const simpanFoto = async () => {
     if (!file) return;
     setMengunggah(true);
+    setGalatFoto(null);
     try {
-      const fd = new FormData();
-      fd.append('file', file);
-      const res = await fetch('/api/upload', { method: 'POST', body: fd });
-      const hasil = await res.json();
-      await simpan({ avatar_url: hasil?.data?.url }, onTutup);
+      const dataUrl = await kecilkanGambar(file);
+      await simpan({ avatar_url: dataUrl }, onTutup);
+    } catch (e: any) {
+      setGalatFoto(e?.message ?? 'Gagal menyimpan foto.');
     } finally {
       setMengunggah(false);
     }
@@ -285,6 +232,7 @@ const LembarProfil: React.FC<{ onTutup: () => void }> = ({ onTutup }) => {
         </button>
       </div>
 
+      {galatFoto && <Pesan teks={galatFoto} jenis="gagal" />}
       {pesan && <Pesan teks={pesan.teks} jenis={pesan.jenis} />}
 
       <div className="flex flex-col gap-1.5">

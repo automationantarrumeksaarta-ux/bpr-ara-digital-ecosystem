@@ -28,7 +28,16 @@ const PORT = Number(process.env.PORT) || 3535;
 
 app.use(cors());
 app.use(compression());
-app.use(express.json());
+/*
+ * Batas badan JSON dinaikkan dari bawaan Express (100 KB).
+ *
+ * Foto profil disimpan sebagai data URL supaya bisa bekerja di dalam APK —
+ * unggah berkas biner tidak mungkin di sana karena Capacitor membaca isi
+ * permintaan sebagai teks. Data URL foto yang sudah dikecilkan berukuran
+ * puluhan kilobita, dan dengan batas bawaan permintaannya ditolak dengan
+ * "request entity too large" tanpa penjelasan yang berguna di layar.
+ */
+app.use(express.json({ limit: '5mb' }));
 
 // Set up uploads directory and multer
 const uploadDir = path.join(_dirname, 'uploads');

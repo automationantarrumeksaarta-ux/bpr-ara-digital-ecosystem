@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { AlertCircle, Check, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { text, ink, surface, radius, tone, HIT_TARGET, type ToneName } from './tokens';
 
 /* ------------------------------------------------------------------ AppBar */
@@ -226,4 +226,130 @@ export const EmptyState: React.FC<{
 
 export const Skeleton: React.FC<{ className?: string }> = ({ className = '' }) => (
   <div className={`animate-pulse bg-slate-200 ${radius.control} ${className}`} />
+);
+
+/* ------------------------------------------------------- lembar layar penuh */
+
+/**
+ * Lembar yang menutupi seluruh layar, dengan kepala dan tombol aksi tetap.
+ *
+ * Sebelumnya hidup sebagai komponen lokal di MobileProfile. Dipindahkan ke
+ * sini begitu layar kedua membutuhkannya, supaya kedua layar itu tidak
+ * perlahan menjadi dua bentuk lembar yang berbeda.
+ */
+export const LembarPenuh: React.FC<{
+  judul: string;
+  onTutup: () => void;
+  aksi?: React.ReactNode;
+  children: React.ReactNode;
+}> = ({ judul, onTutup, aksi, children }) => (
+  <div className="fixed inset-0 z-50 flex flex-col bg-white">
+    <header
+      className={`shrink-0 border-b ${surface.divider} flex items-center gap-1 h-12 px-1`}
+      style={{ paddingTop: 'env(safe-area-inset-top)' }}
+    >
+      <button
+        type="button"
+        onClick={onTutup}
+        aria-label="Tutup"
+        className={`w-11 h-11 flex items-center justify-center ${ink.base} active:opacity-50`}
+      >
+        <X className="w-6 h-6" />
+      </button>
+      <h1 className={`${text.title} ${ink.strong} flex-1`}>{judul}</h1>
+    </header>
+    <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-4">{children}</div>
+    {aksi && (
+      <div
+        className={`shrink-0 border-t ${surface.divider} px-4 py-3`}
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 12px)' }}
+      >
+        {aksi}
+      </div>
+    )}
+  </div>
+);
+
+/** Satu isian teks setinggi sasaran sentuh, dengan label di atasnya. */
+export const IsianTeks: React.FC<{
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  type?: string;
+  placeholder?: string;
+  inputMode?: 'text' | 'tel' | 'email' | 'numeric' | 'decimal';
+  catatan?: string;
+  wajib?: boolean;
+  baris?: number;
+}> = ({ label, value, onChange, type = 'text', placeholder, inputMode, catatan, wajib, baris }) => (
+  <label className="flex flex-col gap-1.5">
+    <span className={`${text.caption} ${ink.muted} uppercase tracking-wide font-semibold px-1`}>
+      {label}{wajib && <span className="text-rose-500"> *</span>}
+    </span>
+    {baris ? (
+      <textarea
+        rows={baris}
+        value={value}
+        placeholder={placeholder}
+        onChange={e => onChange(e.target.value)}
+        className={`w-full px-3.5 py-3 ${radius.control} border ${surface.divider} ${text.body} ${ink.strong} placeholder:text-slate-400 outline-none focus:border-blue-500 resize-y`}
+      />
+    ) : (
+      <input
+        type={type}
+        value={value}
+        inputMode={inputMode}
+        placeholder={placeholder}
+        onChange={e => onChange(e.target.value)}
+        className={`w-full px-3.5 min-h-[48px] ${radius.control} border ${surface.divider} ${text.body} ${ink.strong} placeholder:text-slate-400 outline-none focus:border-blue-500`}
+      />
+    )}
+    {catatan && <span className={`${text.caption} ${ink.faint} px-1`}>{catatan}</span>}
+  </label>
+);
+
+/** Satu pilihan dari beberapa nilai tetap. */
+export const IsianPilihan: React.FC<{
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  pilihan: { nilai: string; label: string }[];
+  wajib?: boolean;
+}> = ({ label, value, onChange, pilihan, wajib }) => (
+  <label className="flex flex-col gap-1.5">
+    <span className={`${text.caption} ${ink.muted} uppercase tracking-wide font-semibold px-1`}>
+      {label}{wajib && <span className="text-rose-500"> *</span>}
+    </span>
+    <select
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      className={`w-full px-3.5 min-h-[48px] ${radius.control} border ${surface.divider} ${text.body} ${ink.strong} outline-none focus:border-blue-500 bg-white`}
+    >
+      {pilihan.map(o => <option key={o.nilai} value={o.nilai}>{o.label}</option>)}
+    </select>
+  </label>
+);
+
+/** Pesan berhasil atau gagal di dalam lembar. */
+export const PesanKecil: React.FC<{ teks: string; jenis: 'ok' | 'gagal' }> = ({ teks, jenis }) => (
+  <div className={`${radius.control} px-3.5 py-3 flex items-start gap-2.5 ${jenis === 'ok' ? tone.positive.bgSoft : tone.danger.bgSoft}`}>
+    {jenis === 'ok'
+      ? <Check className={`w-4 h-4 shrink-0 mt-px ${tone.positive.text}`} />
+      : <AlertCircle className={`w-4 h-4 shrink-0 mt-px ${tone.danger.text}`} />}
+    <p className={`${text.footnote} ${jenis === 'ok' ? tone.positive.text : tone.danger.text}`}>{teks}</p>
+  </div>
+);
+
+/** Tombol utama selebar lembar. */
+export const TombolUtama: React.FC<{
+  disabled?: boolean; memproses?: boolean; onClick: () => void; label: string;
+}> = ({ disabled, memproses, onClick, label }) => (
+  <button
+    type="button"
+    disabled={disabled || memproses}
+    onClick={onClick}
+    className={`w-full min-h-[52px] ${radius.control} ${text.headline} text-white bg-primary disabled:bg-slate-300 transition-transform active:scale-[0.98] disabled:active:scale-100`}
+  >
+    {memproses ? 'Menyimpan…' : label}
+  </button>
 );

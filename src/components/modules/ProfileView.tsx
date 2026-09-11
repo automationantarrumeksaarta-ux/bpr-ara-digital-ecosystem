@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { AlertCircle, Briefcase, Camera, Check, Eye, EyeOff, Lock, User } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
+import { kecilkanGambar } from '../../utils/gambar';
 import { PageContainer } from '../ui/PageContainer';
 import { Card } from '../ui/Card';
 
@@ -117,18 +118,29 @@ export const ProfileView: React.FC = () => {
     }
   };
 
+  /*
+   * Foto dikecilkan di peramban lalu disimpan sebagai data URL, sama seperti
+   * di aplikasi Android, supaya keduanya menyimpan bentuk yang sama.
+   *
+   * Unggah sebagai berkas sengaja tidak dipakai: di dalam APK cara itu selalu
+   * gagal karena Capacitor membaca isi permintaan sebagai teks sehingga byte
+   * gambar rusak, dan alamat balikan /uploads/... tidak menunjuk ke server BPR
+   * ketika dibuka dari aplikasi.
+   */
   const unggahFoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
     setMengunggahFoto(true);
+    setPesanProfil(null);
     try {
-      const fd = new FormData();
-      fd.append('file', f);
-      const res = await fetch('/api/upload', { method: 'POST', body: fd });
-      const hasil = await res.json();
-      await kirimProfil({ avatar_url: hasil?.data?.url });
+      const dataUrl = await kecilkanGambar(f);
+      await kirimProfil({ avatar_url: dataUrl });
+    } catch (err: any) {
+      setPesanProfil({ teks: err?.message ?? 'Gagal menyimpan foto.', jenis: 'gagal' });
     } finally {
       setMengunggahFoto(false);
+      // Supaya memilih berkas yang sama dua kali tetap memicu perubahan.
+      e.target.value = '';
     }
   };
 

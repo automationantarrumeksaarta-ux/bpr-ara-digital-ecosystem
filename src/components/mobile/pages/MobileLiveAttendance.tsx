@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { AlertCircle, Check, Clock, LogIn, LogOut, MapPin, RefreshCw } from 'lucide-react';
+import { AlertCircle, Building2, Check, Clock, LogIn, LogOut, MapPin, RefreshCw } from 'lucide-react';
 import { useApp } from '../../../context/AppContext';
 import { useGeolocation } from '../../../hooks/useGeolocation';
 import { useMobileAttendance, formatJam } from '../../../hooks/useMobileAttendance';
+import { useKantorAbsen } from '../../../hooks/useKantorAbsen';
 import { AppBar, Card, Screen, Stack } from '../ui/primitives';
 import { MiniMap } from '../ui/MiniMap';
 import { ink, radius, surface, text, tone } from '../ui/tokens';
@@ -13,13 +14,26 @@ const MobileLiveAttendance: React.FC = () => {
   const { currentUser } = useApp();
   const { posisi, alamat, memuat: memuatLokasi, error: errorLokasi, minta } = useGeolocation();
   const { hariIni, muatUlang } = useMobileAttendance();
+  const { radiusMeter, akurasiMaksMeter, terdekat } = useKantorAbsen(posisi);
 
   const [mengirim, setMengirim] = useState<Aksi | null>(null);
   const [pesan, setPesan] = useState<{ tipe: 'ok' | 'gagal'; teks: string } | null>(null);
 
   const sudahMasuk = !!hariIni?.clock_in_time;
   const sudahPulang = !!hariIni?.clock_out_time;
-  const lokasiSiap = !!posisi;
+
+  /*
+   * Tombol dikunci bila jelas-jelas di luar radius atau sinyalnya masih kasar.
+   *
+   * Ini hanya penjagaan di layar supaya pegawai tidak menekan tombol lalu
+   * ditolak tanpa tahu sebabnya. Keputusan sesungguhnya tetap di server.
+   * Selama daftar kantor belum termuat, tombol dibiarkan hidup — memblokir
+   * absen karena jaringan lambat berarti menghukum orang atas masalah yang
+   * bukan miliknya.
+   */
+  const sinyalKasar = !!posisi && posisi.akurasi > akurasiMaksMeter;
+  const diLuarRadius = !!terdekat && !terdekat.diDalamRadius;
+  const lokasiSiap = !!posisi && !sinyalKasar && !diLuarRadius;
 
   const kirim = async (aksi: Aksi) => {
     if (!currentUser?.id || !posisi) return;
@@ -33,6 +47,7 @@ const MobileLiveAttendance: React.FC = () => {
           user_id: currentUser.id,
           lat: posisi.lat,
           lng: posisi.lng,
+          akurasi: posisi.akurasi,
           location: alamat ?? `${posisi.lat.toFixed(5)}, ${posisi.lng.toFixed(5)}`,
         }),
       });
@@ -141,7 +156,38 @@ const MobileLiveAttendance: React.FC = () => {
             </button>
           </div>
 
-          {posisi && <MiniMap lat={posisi.lat} lng={posisi.lng} className="mx-3 mb-3" />}
+          {/* Kantor terdekat dan jaraknya — alasan tombol hidup atau mati. */}
+          {terdekat && (
+            <div className={`px-4 py-3 border-t ${surface.divider} flex items-start gap-2.5`}>
+              <Building2 className={`w-4 h-4 shrink-0 mt-0.5 ${terdekat.diDalamRadius ? tone.positive.text : tone.danger.text}`} />
+              <div className="flex-1 min-w-0">
+                <span className={`block ${text.caption} ${ink.muted} uppercase tracking-wide font-semibold`}>
+                  Kantor terdekat
+                </span>
+                <span className={`block ${text.body} ${ink.strong} mt-1`}>{terdekat.kantor.nama}</span>
+                <span
+                  className={`block ${text.caption} mt-1 tabular-nums ${
+                    terdekat.diDalamRadius ? tone.positive.text : tone.danger.text
+                  }`}
+                >
+                  {Math.round(terdekat.jarak).toLocaleString('id-ID')} meter
+                  {terdekat.diDalamRadius
+                    ? ` · di dalam radius ${radiusMeter} m`
+                    : ` · di luar radius ${radiusMeter} m`}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {posisi && (
+            <MiniMap
+              lat={posisi.lat}
+              lng={posisi.lng}
+              kantor={terdekat?.kantor}
+              radiusMeter={radiusMeter}
+              className="mx-3 mb-3"
+            />
+          )}
         </Card>
 
         {/* --- Tombol aksi --- */}
@@ -177,7 +223,11 @@ const MobileLiveAttendance: React.FC = () => {
 
             {!lokasiSiap && !memuatLokasi && (
               <p className={`${text.caption} ${ink.faint} text-center px-4`}>
-                Lokasi diperlukan sebelum absen dapat dikirim.
+                {sinyalKasar
+                  ? `Sinyal GPS masih meleset sampai ${Math.round(posisi!.akurasi)} meter. Coba berdiri di tempat terbuka sebentar.`
+                  : diLuarRadius
+                    ? `Absen hanya bisa dilakukan dalam radius ${radiusMeter} meter dari kantor.`
+                    : 'Lokasi diperlukan sebelum absen dapat dikirim.'}
               </p>
             )}
             {sudahMasuk && (

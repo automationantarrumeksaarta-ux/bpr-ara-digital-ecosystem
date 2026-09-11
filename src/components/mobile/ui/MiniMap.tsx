@@ -28,14 +28,29 @@ interface MiniMapProps {
   zoom?: number;
   /** tinggi peta dalam piksel */
   height?: number;
+  /** Titik kantor yang ditampilkan beserta lingkaran radiusnya. */
+  kantor?: { lat: number; lng: number; nama: string };
+  /** Radius absen dalam meter; digambar sebagai lingkaran di sekitar kantor. */
+  radiusMeter?: number;
   className?: string;
 }
+
+/**
+ * Meter per piksel pada suatu lintang dan tingkat perbesaran.
+ *
+ * Dipakai untuk menggambar lingkaran radius dengan ukuran yang benar-benar
+ * sesuai jaraknya di lapangan, bukan lingkaran berukuran tebakan.
+ */
+const meterPerPiksel = (lat: number, zoom: number) =>
+  (156543.03392 * Math.cos((lat * Math.PI) / 180)) / 2 ** zoom;
 
 export const MiniMap: React.FC<MiniMapProps> = ({
   lat,
   lng,
   zoom = 16,
   height = 176,
+  kantor,
+  radiusMeter,
   className = '',
 }) => {
   const [gagal, setGagal] = useState(0);
@@ -92,16 +107,55 @@ export const MiniMap: React.FC<MiniMapProps> = ({
               loading="lazy"
               onError={() => setGagal(n => n + 1)}
               className="absolute max-w-none"
+              /*
+               * Titik asal pembungkus ini berada tepat di tengah bingkai, dan
+               * di tengah bingkai itulah posisi pengguna harus jatuh. Maka
+               * sudut kiri-atas sebuah ubin berjarak (dx*256 - offsetX) piksel
+               * dari titik itu.
+               *
+               * Versi sebelumnya mengurangi setengah ubin lagi di kedua sumbu.
+               * Pada zoom 16 di lintang Karanganyar, satu piksel ≈ 2,4 meter,
+               * sehingga 128 piksel ≈ 300 meter — peta bergeser sekitar 400
+               * meter secara diagonal dari penanda posisi. Itulah sebabnya
+               * petanya terasa tidak akurat.
+               */
               style={{
                 width: UKURAN_UBIN,
                 height: UKURAN_UBIN,
-                left: t.dx * UKURAN_UBIN - offsetX - UKURAN_UBIN / 2,
-                top: t.dy * UKURAN_UBIN - offsetY - UKURAN_UBIN / 2,
+                left: t.dx * UKURAN_UBIN - offsetX,
+                top: t.dy * UKURAN_UBIN - offsetY,
               }}
             />
           ))}
         </div>
       </div>
+
+      {/* Kantor dan radius absennya, digambar relatif terhadap posisi pengguna. */}
+      {kantor && (() => {
+        const k = keUbin(kantor.lat, kantor.lng, zoom);
+        const dx = (k.x - x) * UKURAN_UBIN;
+        const dy = (k.y - y) * UKURAN_UBIN;
+        const r = radiusMeter ? radiusMeter / meterPerPiksel(kantor.lat, zoom) : 0;
+        return (
+          <div
+            className="absolute top-1/2 left-1/2"
+            style={{ transform: `translate(${dx}px, ${dy}px)` }}
+          >
+            {r > 0 && (
+              <span
+                aria-hidden
+                className="block absolute rounded-full border-2 border-primary/70 bg-primary/15"
+                style={{ width: r * 2, height: r * 2, left: -r, top: -r }}
+              />
+            )}
+            <span
+              className="block absolute w-3 h-3 rounded-full bg-white ring-2 ring-primary shadow"
+              style={{ left: -6, top: -6 }}
+              title={kantor.nama}
+            />
+          </div>
+        );
+      })()}
 
       {/* Penanda posisi */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">

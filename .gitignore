@@ -14,3 +14,6 @@ coverage/
 .agents/
 .claude/
 skills-lock.json
+
+# Berkas yang diunggah pengguna, bukan bagian dari kode.
+/uploads/
