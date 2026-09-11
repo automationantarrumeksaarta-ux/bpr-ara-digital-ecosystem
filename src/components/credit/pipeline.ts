@@ -83,6 +83,17 @@ export const rupaStatus = (stage: CreditAppStage | undefined): RupaStatus =>
  * supaya pemanggilnya tidak perlu tahu bentuk mana yang datang.
  */
 export const rupaKolektibilitas = (kol: number | string | undefined): RupaStatus => {
+  /*
+   * Tiga bentuk penulisan dipakai di sistem ini dan ketiganya harus dikenali:
+   * angka (1..5), bentuk `KOL_3` dari tipe Collectibility, dan huruf
+   * L/DPK/KL/D/M dari kolom Kolek pada berkas nominatif. Sebelumnya huruf
+   * tidak tertangani, sehingga seluruh kredit lancar tampil sebagai "—".
+   */
+  const HURUF: Record<string, number> = { L: 1, DPK: 2, KL: 3, D: 4, M: 5 };
+  if (typeof kol === 'string') {
+    const huruf = HURUF[kol.trim().toUpperCase()];
+    if (huruf) kol = huruf;
+  }
   const n = typeof kol === 'string' ? Number(kol.replace(/^KOL[_-]?/i, '')) : Number(kol);
   if (n === 1) return { label: 'Kol 1 · Lancar',           nada: 'success' };
   if (n === 2) return { label: 'Kol 2 · Perhatian Khusus', nada: 'warning' };
