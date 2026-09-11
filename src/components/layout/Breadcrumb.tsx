@@ -30,7 +30,7 @@ export const Breadcrumb: React.FC = () => {
     <nav className="flex items-center text-xs text-slate-500 font-medium">
       <span className="hidden sm:inline">{currentGroup.label}</span>
       <ChevronRight className="hidden sm:block w-3.5 h-3.5 mx-1 text-slate-300" />
-      <span className="text-slate-800 dark:text-slate-200">{currentItem.title}</span>
+      <span className="text-slate-800 dark:text-slate-200">{currentItem.label ?? currentItem.title}</span>
     </nav>
   );
 };

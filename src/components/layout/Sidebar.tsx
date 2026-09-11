@@ -110,7 +110,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                 isChildActive ? 'text-white' : 'text-white/70 group-hover:text-white'
                               }`}
                             />
-                            <span className="truncate">{item.title}</span>
+                            <span className="truncate">{item.label ?? item.title}</span>
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
                             <ChevronRight
@@ -152,7 +152,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                             isActive ? 'text-white' : 'text-white/50 group-hover:text-white'
                                           }`}
                                         />
-                                        <span className="truncate">{child.title}</span>
+                                        <span className="truncate">{child.label ?? child.title}</span>
                                       </div>
                                       {childBadgeCount > 0 && (
                                         <span
@@ -195,7 +195,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                 isActive ? 'text-white' : 'text-white/70 group-hover:text-white'
                               }`}
                             />
-                            <span className="truncate">{item.title}</span>
+                            <span className="truncate">{item.label ?? item.title}</span>
                           </div>
 
                           <div className="flex items-center gap-1.5 shrink-0">

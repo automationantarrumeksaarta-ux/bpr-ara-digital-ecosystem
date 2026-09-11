@@ -1,30 +1,68 @@
-import React, { useState } from 'react';
-import {
-  CheckSquare,
-  ShieldCheck,
-  UserCheck,
-  CheckCircle2,
-  XCircle,
-  AlertCircle,
-  Lock,
-  Fingerprint,
-  FileText,
-  DollarSign,
-  ArrowRight,
-  Sparkles,
-} from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { AlertTriangle, FileText, Gavel, Inbox, ShieldCheck } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { WorkflowActionModal } from '../common/WorkflowActionModal';
 import { DocumentViewerModal } from '../common/DocumentViewerModal';
-import { CreditAppStage } from '../../types';
-import { CreditPipelineHeader } from '../ui/CreditPipelineHeader';
+import { CreditApplication, CreditAppStage } from '../../types';
+import { StageShell } from '../credit/StageShell';
+import {
+  BarisAntrean, BelumAdaPilihan, Kosong, Panel, StageWorkbench, StatusPill,
+} from '../credit/StageParts';
+import { desimal, rupiah, rupiahRingkas } from '../credit/pipeline';
+import { Button } from '../ui/Button';
+import { Badge } from '../ui/Badge';
+import { cn } from '../../lib/utils';
+
+/**
+ * Tahap 5 — Putusan Komite Kredit.
+ *
+ * Empat perbaikan di luar tampilan, semuanya soal kebenaran angka:
+ *
+ * 1. `CreditApplication` dipakai di tipe state tapi tidak pernah diimpor.
+ * 2. Kepala halaman menampilkan "Kewenangan: Rp NaN Juta" bila peran yang masuk
+ *    tidak punya `approvalLimit` — dan itu terlihat di layar.
+ * 3. Ringkasan berkas yang dibaca komite sebelum memutus berisi nilai karangan
+ *    yang ditulis mati di dalam kode: "Rekomendasi Analis: DISETUJUI",
+ *    "Rasio DSCR: 2.4x (Sangat Aman)", dan skor survei yang jatuh ke 88 bila
+ *    kosong. Komite bisa menyetujui kredit berdasarkan rasio yang tidak pernah
+ *    dihitung siapa pun. Sekarang keempat kotak itu membaca berkas sungguhan
+ *    dan menulis "belum ada" bila memang belum ada.
+ * 4. Pilihan "Disetujui Bersyarat" tidak pernah sampai ke basis data: apa pun
+ *    yang dipilih, `decideCreditApproval` selalu dipanggil dengan 'APPROVED'.
+ *    Sekarang pilihan pemutus diteruskan apa adanya. Tahap berkas tetap
+ *    'APPROVED' seperti sebelumnya, karena kredit bersyarat pun lanjut ke legal.
+ *
+ * Pertimbangan dan syarat akad juga tidak lagi terisi kalimat persetujuan yang
+ * sudah jadi sebelum komite memutus apa pun.
+ */
+
+const isian =
+  'w-full rounded-xl border border-border bg-surface px-3 py-2 text-xs text-foreground ' +
+  'placeholder:text-muted outline-none transition-colors focus:border-primary focus-visible:ring-2 focus-visible:ring-ring';
+
+const isianAngka = isian + ' font-bold tabular-nums';
+
+const Label: React.FC<{ children: React.ReactNode; untuk?: string }> = ({ children, untuk }) => (
+  <label htmlFor={untuk} className="mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-muted">
+    {children}
+  </label>
+);
+
+/** Kotak ringkasan berkas. Menuliskan ketiadaan data, bukan menambalnya. */
+const Ringkas: React.FC<{ label: string; nilai: React.ReactNode; ada: boolean }> = ({ label, nilai, ada }) => (
+  <div className="rounded-xl bg-surface-muted px-3 py-2.5">
+    <p className="text-[10px] font-bold uppercase tracking-wide text-muted">{label}</p>
+    <p className={cn('mt-1 text-xs font-bold tabular-nums', ada ? 'text-foreground' : 'text-muted')}>
+      {ada ? nilai : 'Belum ada'}
+    </p>
+  </div>
+);
 
 export const CreditApprovalView: React.FC = () => {
   const {
     creditApplications,
     decideCreditApproval,
     currentUser,
-    openCustomer360,
     setActiveModule,
     updateCreditAppStage,
   } = useApp();
@@ -36,52 +74,56 @@ export const CreditApprovalView: React.FC = () => {
   const [selectedAppId, setSelectedAppId] = useState<string>(
     pendingApps.length > 0 ? pendingApps[0].id : ''
   );
-
   const [viewerModal, setViewerModal] = useState<{ isOpen: boolean; app: CreditApplication | null }>({ isOpen: false, app: null });
+  const [isActionModalOpen, setIsActionModalOpen] = useState(false);
 
   const activeApp = creditApplications.find((a) => a.id === selectedAppId);
 
-  // Approval Form
   const [decisionForm, setDecisionForm] = useState({
     decision: 'APPROVED' as 'APPROVED' | 'REJECTED' | 'CONDITIONAL',
-    approvedPlafon: activeApp?.requestedPlafon || 150000000,
-    comment: 'Plafond disetujui penuh sesuai rekomendasi komite kredit dengan mempertimbangkan integritas debitur dan agunan SHM yang kuat.',
-    conditionNotes: 'Wajib menyerahkan bukti asli sertifikat SHM dan tanda tangan Surat Kuasa Membebankan Hak Tanggungan (SKMHT) di hadapan Notaris Rekanan BPR ARA.',
+    approvedPlafon: 0,
+    comment: '',
+    conditionNotes: '',
   });
 
-  const [isActionModalOpen, setIsActionModalOpen] = useState(false);
+  useEffect(() => {
+    if (pendingApps.length === 0) { if (selectedAppId) setSelectedAppId(''); return; }
+    if (!pendingApps.some(a => a.id === selectedAppId)) setSelectedAppId(pendingApps[0].id);
+  }, [pendingApps, selectedAppId]);
 
-  const handleOpenActionModal = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedAppId) return;
-    setIsActionModalOpen(true);
-  };
+  // Plafon awal mengikuti usulan analis bila ada, kalau tidak permohonan nasabah.
+  useEffect(() => {
+    if (!activeApp) return;
+    setDecisionForm(f => ({
+      ...f,
+      approvedPlafon: activeApp.analysis?.proposedPlafon ?? activeApp.requestedPlafon ?? 0,
+    }));
+  }, [activeApp?.id]);
+
+  const limit = Number(currentUser?.approvalLimit);
+  const adaLimit = Number.isFinite(limit) && limit > 0;
+  const lampauiLimit = adaLimit && decisionForm.approvedPlafon > limit;
+
+  const analisis = activeApp?.analysis as any;
+  const skorSurvei = activeApp?.survey?.surveyScore;
 
   const handleWorkflowSubmit = (action: string, nextStage: CreditAppStage, notes: string, fileUrl?: string, fileName?: string) => {
     if (!selectedAppId) return;
 
     if (action === 'PROCEED') {
-      // Setujui
+      // Pilihan pemutus diteruskan apa adanya; sebelumnya selalu 'APPROVED'.
       decideCreditApproval(
         selectedAppId,
-        'APPROVED',
+        decisionForm.decision === 'REJECTED' ? 'APPROVED' : decisionForm.decision,
         decisionForm.approvedPlafon,
         notes,
         decisionForm.conditionNotes
       );
       updateCreditAppStage(selectedAppId, 'APPROVED', notes, fileUrl, fileName);
     } else if (action === 'REJECT') {
-      // Tolak
-      decideCreditApproval(
-        selectedAppId,
-        'REJECTED',
-        decisionForm.approvedPlafon,
-        notes,
-        decisionForm.conditionNotes
-      );
+      decideCreditApproval(selectedAppId, 'REJECTED', decisionForm.approvedPlafon, notes, decisionForm.conditionNotes);
       updateCreditAppStage(selectedAppId, 'REJECTED', notes, fileUrl, fileName);
     } else {
-      // Return
       updateCreditAppStage(selectedAppId, nextStage, notes, fileUrl, fileName);
     }
 
@@ -89,227 +131,217 @@ export const CreditApprovalView: React.FC = () => {
     setActiveModule('LEGAL_DOCUMENTS');
   };
 
+  const perluSyarat = decisionForm.decision === 'CONDITIONAL';
+  const siapPutus =
+    decisionForm.approvedPlafon > 0 &&
+    decisionForm.comment.trim().length > 0 &&
+    (!perluSyarat || decisionForm.conditionNotes.trim().length > 0);
+
   return (
-    <div className="space-y-5 animate-in fade-in">
-      <CreditPipelineHeader currentStage="Committee Approval" />
-      {/* Header */}
-      <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] font-bold text-amber-800 uppercase tracking-wider">
-              CREDIT COMMITTEE APPROVAL ENGINE
-            </span>
-            <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[10px] font-mono border border-blue-200 font-semibold">
-              Kewenangan: Rp {(currentUser.approvalLimit / 1000000).toLocaleString('id-ID')} Juta
-            </span>
-          </div>
-          <h1 className="text-xl font-bold text-slate-900 mt-1">Ruang Sidang & Pemutusan Komite Kredit</h1>
-          <p className="text-xs text-slate-500 mt-1">
-            Penetapan keputusan pembiayaan, validasi limit kewenangan pemutus, dan penandatanganan digital sah OJK.
-          </p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        {/* Left Side: Pending Apps */}
-        <div className="space-y-3">
-          <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-            Berkas Masuk Komite ({pendingApps.length})
-          </h3>
-          <div className="space-y-2">
-            {pendingApps.map((app) => (
-              <div
-                key={app.id}
-                onClick={() => {
-                  setSelectedAppId(app.id);
-                  setDecisionForm((prev) => ({
-                    ...prev,
-                    approvedPlafon: app.requestedPlafon,
-                  }));
-                }}
-                className={`p-3.5 rounded-xl border text-xs cursor-pointer transition-all ${
-                  selectedAppId === app.id
-                    ? 'bg-amber-50/70 border-amber-300 text-slate-900 shadow-xs ring-1 ring-amber-400/30'
-                    : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 shadow-xs'
-                }`}
-              >
-                <div className="flex items-start justify-between">
-                  <span className="font-bold text-sm text-slate-900">{app.customerName}</span>
-                  <span
-                    className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold border ${
-                      app.currentStage === 'APPROVED'
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                        : app.currentStage === 'REJECTED'
-                        ? 'bg-red-50 text-red-700 border-red-200'
-                        : 'bg-amber-50 text-amber-800 border-amber-200'
-                    }`}
-                  >
-                    {app.currentStage}
-                  </span>
-                </div>
-                <div className="text-[11px] text-slate-500 mt-1">
-                  Permohonan: Rp {app.requestedPlafon.toLocaleString('id-ID')} • Tenor: {app.requestedTenorMonths} Bln
-                </div>
-                <div className="mt-2 text-[10px] text-amber-800 font-mono font-semibold">{app.applicationNumber}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Right Side: Decision Terminal */}
-        <div className="lg:col-span-2 space-y-4">
-          {activeApp ? (
-            <form onSubmit={(e) => e.preventDefault()} className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-5 text-xs">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-                <div>
-                  <h3 className="text-base font-bold text-slate-900">
-                    Pemutusan Kredit: {activeApp.customerName}
-                  </h3>
-                  <p className="text-slate-500 text-[11px]">
-                    No. LOS: {activeApp.applicationNumber} • AO: {activeApp.accountOfficerName}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <span className="text-[11px] text-slate-500 block">Pemutus Aktif</span>
-                  <span className="text-xs font-bold text-amber-800">
-                    {currentUser.roleTitle} ({currentUser.name})
-                  </span>
-                </div>
-              </div>
-
-              {/* Dossier Summary Badge */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
-                  <span className="text-slate-500 text-[10px]">Plafon Dimohon</span>
-                  <p className="font-bold text-slate-900 font-mono text-xs">
-                    Rp {activeApp.requestedPlafon.toLocaleString('id-ID')}
-                  </p>
-                </div>
-                <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
-                  <span className="text-slate-500 text-[10px]">Rekomendasi Analis</span>
-                  <p className="font-bold text-emerald-700 text-xs">DISETUJUI</p>
-                </div>
-                <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
-                  <span className="text-slate-500 text-[10px]">Skor Survey OTS</span>
-                  <p className="font-bold text-blue-700 font-mono text-xs">
-                    {activeApp.survey?.surveyScore || 88}/100
-                  </p>
-                </div>
-                <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
-                  <span className="text-slate-500 text-[10px]">Rasio DSCR Arus Kas</span>
-                  <p className="font-bold text-emerald-700 font-mono text-xs">2.4x (Sangat Aman)</p>
-                </div>
-              </div>
-
-              {/* Decision Options */}
-              <div className="space-y-2">
-                <label className="text-slate-700 font-medium">Keputusan Pemutus Kredit</label>
-                <div className="grid grid-cols-3 gap-3">
-                  {[
-                    { id: 'APPROVED', label: 'Disetujui Penuh', color: 'border-emerald-300 bg-emerald-50 text-emerald-800 ring-1 ring-emerald-400/30' },
-                    { id: 'CONDITIONAL', label: 'Disetujui Bersyarat', color: 'border-amber-300 bg-amber-50 text-amber-800 ring-1 ring-amber-400/30' },
-                    { id: 'REJECTED', label: 'Ditolak', color: 'border-red-300 bg-red-50 text-red-800 ring-1 ring-red-400/30' },
-                  ].map((opt) => (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      onClick={() => setDecisionForm({ ...decisionForm, decision: opt.id as any })}
-                      className={`p-3 rounded-xl border font-bold text-xs transition-all cursor-pointer ${
-                        decisionForm.decision === opt.id ? opt.color : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 shadow-xs'
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Approved Plafon */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-slate-700 font-medium">Plafon yang Disetujui (Rp)</label>
-                  <input
-                    type="number"
-                    value={decisionForm.approvedPlafon}
-                    onChange={(e) => setDecisionForm({ ...decisionForm, approvedPlafon: Number(e.target.value) })}
-                    className="w-full mt-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-emerald-700 font-bold font-mono text-base focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="text-slate-700 font-medium">Suku Bunga Disetujui (% p.a.)</label>
-                  <input
-                    type="text"
-                    disabled
-                    value="0% p.a. (Anuitas Efektif)"
-                    className="w-full mt-1 p-2.5 bg-slate-100 border border-slate-200 rounded-xl text-slate-600 font-mono"
-                  />
-                </div>
-              </div>
-
-              {/* Notes & Conditions */}
-              <div>
-                <label className="text-slate-700 font-medium">Pertimbangan & Catatan Pemutus</label>
-                <textarea
-                  rows={2}
-                  required
-                  value={decisionForm.comment}
-                  onChange={(e) => setDecisionForm({ ...decisionForm, comment: e.target.value })}
-                  className="w-full mt-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="text-slate-700 font-medium">Syarat Penarikan / Syarat Akad (Conditions Precedent)</label>
-                <textarea
-                  rows={2}
-                  value={decisionForm.conditionNotes}
-                  onChange={(e) => setDecisionForm({ ...decisionForm, conditionNotes: e.target.value })}
-                  className="w-full mt-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              {/* Digital Signature Confirmation Badge */}
-              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2">
-                  <Fingerprint className="w-5 h-5 text-emerald-600" />
-                  <div>
-                    <div className="font-semibold text-slate-900">Tanda Tangan Digital Tersertifikasi (Digital Signature)</div>
-                    <div className="text-[10px] text-slate-500">Hash SHA-256 Otentik BPR ARA Secure Enclave</div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setViewerModal({ isOpen: true, app: activeApp })}
-                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold flex items-center gap-1.5 transition-colors shadow-xs"
-                  >
-                    <FileText className="w-4 h-4 text-blue-600" /> Buka Master Dossier
-                  </button>
-                  <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 font-mono text-xs font-bold border border-emerald-200">
-                    Menunggu Keputusan Komite
-                  </span>
-                </div>
-              </div>
-
-              {/* Submit */}
-              <div className="pt-3 border-t border-slate-200 flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={handleOpenActionModal}
-                  className="px-6 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold flex items-center gap-2 shadow-xs cursor-pointer text-xs transition-colors"
-                >
-                  <ShieldCheck className="w-4 h-4 text-white" /> Putusan Komite Kredit &rarr;
-                </button>
-              </div>
-            </form>
+    <StageShell
+      stage="Committee Approval"
+      judul="Putusan Komite Kredit"
+      keterangan="Menetapkan plafon yang disetujui beserta syarat penarikannya, dalam batas kewenangan pemutus."
+      lencana={
+        adaLimit ? (
+          <Badge variant="info">Kewenangan {rupiahRingkas(limit)}</Badge>
+        ) : (
+          <Badge variant="neutral">Kewenangan belum ditetapkan</Badge>
+        )
+      }
+    >
+      <StageWorkbench
+        judulAntrean="Berkas komite"
+        jumlah={pendingApps.length}
+        antrean={
+          pendingApps.length === 0 ? (
+            <Kosong
+              rapat
+              icon={Inbox}
+              judul="Tidak ada berkas menunggu putusan"
+              keterangan="Berkas masuk ke sini setelah analis meneruskan hasil analisisnya."
+            />
           ) : (
-            <div className="p-12 text-center text-slate-500 bg-white border border-slate-200 rounded-2xl shadow-xs">
-              Pilih berkas pengajuan kredit di bilah kiri untuk memberikan putusan komite.
-            </div>
-          )}
-        </div>
-      </div>
-      
+            pendingApps.map(app => (
+              <BarisAntrean
+                key={app.id}
+                terpilih={selectedAppId === app.id}
+                onClick={() => setSelectedAppId(app.id)}
+                utama={app.customerName}
+                kedua={`${rupiah(app.requestedPlafon)} · ${app.requestedTenorMonths} bln`}
+                kanan={<StatusPill stage={app.currentStage} />}
+              />
+            ))
+          )
+        }
+      >
+        {!activeApp ? (
+          <BelumAdaPilihan
+            icon={Gavel}
+            judul="Pilih berkas untuk memutus"
+            keterangan="Klik salah satu nama di antrean sebelah kiri. Ringkasan analisis dan lembar putusan akan terbuka di sini."
+            antreanKosong={pendingApps.length === 0}
+          />
+        ) : (
+          <form onSubmit={e => e.preventDefault()} className="space-y-5">
+            <Panel
+              judul={`Putusan · ${activeApp.customerName}`}
+              alat={
+                <Button
+                  type="button" variant="secondary" size="sm"
+                  onClick={() => setViewerModal({ isOpen: true, app: activeApp })}
+                >
+                  <FileText className="mr-1.5 h-3.5 w-3.5" /> Berkas lengkap
+                </Button>
+              }
+            >
+              <p className="-mt-1 mb-5 text-[11px] tabular-nums text-slate-500">
+                No. {activeApp.applicationNumber} · AO: {activeApp.accountOfficerName} · Pemutus: {currentUser?.name}
+              </p>
+
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <Ringkas label="Plafon dimohon" nilai={rupiah(activeApp.requestedPlafon)} ada />
+                <Ringkas
+                  label="Usulan analis"
+                  nilai={rupiah(analisis?.proposedPlafon)}
+                  ada={Number.isFinite(Number(analisis?.proposedPlafon)) && Number(analisis?.proposedPlafon) > 0}
+                />
+                <Ringkas
+                  label="DSCR"
+                  nilai={`${desimal(analisis?.dscrRatio, 2)}x`}
+                  ada={Number.isFinite(Number(analisis?.dscrRatio)) && Number(analisis?.dscrRatio) > 0}
+                />
+                <Ringkas
+                  label="Skor survei"
+                  nilai={`${skorSurvei}/100`}
+                  ada={Number.isFinite(Number(skorSurvei))}
+                />
+              </div>
+
+              {analisis?.analystSummary && (
+                <div className="mt-3 rounded-xl bg-surface-muted px-3.5 py-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-muted">Kesimpulan analis</p>
+                  <p className="mt-1 text-xs leading-relaxed text-foreground">{analisis.analystSummary}</p>
+                </div>
+              )}
+            </Panel>
+
+            <Panel judul="Keputusan">
+              <fieldset>
+                <legend className="mb-2 text-[11px] font-bold uppercase tracking-wide text-muted">
+                  Bentuk persetujuan
+                </legend>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {[
+                    { id: 'APPROVED' as const, label: 'Disetujui penuh', ket: 'Tanpa syarat tambahan sebelum akad' },
+                    { id: 'CONDITIONAL' as const, label: 'Disetujui bersyarat', ket: 'Ada syarat yang wajib dipenuhi dulu' },
+                  ].map(opt => {
+                    const aktif = decisionForm.decision === opt.id;
+                    return (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        aria-pressed={aktif}
+                        onClick={() => setDecisionForm(f => ({ ...f, decision: opt.id }))}
+                        className={cn(
+                          'rounded-xl border px-3.5 py-3 text-left transition-colors',
+                          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                          aktif
+                            ? 'border-primary bg-primary-light'
+                            : 'border-border bg-surface hover:bg-surface-muted',
+                        )}
+                      >
+                        <span className={cn('block text-xs font-bold', aktif ? 'text-primary-dark' : 'text-foreground')}>
+                          {opt.label}
+                        </span>
+                        <span className="mt-0.5 block text-[10px] leading-snug text-slate-500">{opt.ket}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="mt-2 text-[10px] leading-snug text-slate-500">
+                  Menolak berkas dilakukan lewat tombol Putuskan di bawah, bersama pilihan mengembalikan ke analis.
+                </p>
+              </fieldset>
+
+              <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <Label untuk="plafon-setuju">Plafon yang disetujui</Label>
+                  <input
+                    id="plafon-setuju" type="number" min={0}
+                    value={decisionForm.approvedPlafon}
+                    onChange={e => setDecisionForm(f => ({ ...f, approvedPlafon: Number(e.target.value) || 0 }))}
+                    aria-invalid={lampauiLimit}
+                    className={cn(isianAngka, lampauiLimit && 'border-danger')}
+                  />
+                  {/* Kotak angka tidak bisa menampilkan pemisah ribuan, jadi
+                      nilainya dieja ulang di bawahnya agar tidak salah baca. */}
+                  <p className="mt-1 text-[10px] tabular-nums text-slate-500">
+                    {rupiah(decisionForm.approvedPlafon)}
+                  </p>
+                  {lampauiLimit && (
+                    <p className="mt-1.5 flex items-start gap-1.5 text-[11px] font-bold text-danger">
+                      <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" />
+                      <span>
+                        Melampaui kewenangan Anda sebesar {rupiahRingkas(limit)}. Berkas ini perlu dinaikkan ke
+                        pemutus dengan limit lebih tinggi.
+                      </span>
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <Label untuk="bunga">Suku bunga</Label>
+                  <input
+                    id="bunga" type="text" readOnly
+                    value={
+                      Number.isFinite(Number(activeApp.interestRate)) && Number(activeApp.interestRate) > 0
+                        ? `${desimal(activeApp.interestRate, 2)}% per tahun`
+                        : 'Mengikuti ketentuan produk'
+                    }
+                    className={cn(isian, 'cursor-not-allowed bg-surface-muted text-slate-500')}
+                  />
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <Label untuk="pertimbangan">Pertimbangan pemutus</Label>
+                <textarea
+                  id="pertimbangan" rows={3} value={decisionForm.comment}
+                  placeholder="Dasar putusan ini: apa yang meyakinkan, apa yang masih jadi perhatian."
+                  onChange={e => setDecisionForm(f => ({ ...f, comment: e.target.value }))}
+                  className={isian + ' resize-y'}
+                />
+              </div>
+
+              <div className="mt-4">
+                <Label untuk="syarat">
+                  Syarat sebelum akad {perluSyarat && <span className="text-danger">· wajib diisi</span>}
+                </Label>
+                <textarea
+                  id="syarat" rows={3} value={decisionForm.conditionNotes}
+                  placeholder="Misalnya: menyerahkan sertifikat asli, menandatangani SKMHT di hadapan notaris."
+                  onChange={e => setDecisionForm(f => ({ ...f, conditionNotes: e.target.value }))}
+                  className={isian + ' resize-y'}
+                />
+              </div>
+
+              <div className="mt-5 flex flex-col items-stretch gap-2 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-[11px] text-slate-500">
+                  {siapPutus
+                    ? 'Putusan akan tercatat atas nama Anda beserta batas kewenangannya.'
+                    : perluSyarat && !decisionForm.conditionNotes.trim()
+                      ? 'Persetujuan bersyarat menuntut syaratnya ditulis.'
+                      : 'Isi plafon dan pertimbangan sebelum memutus.'}
+                </p>
+                <Button type="button" disabled={!siapPutus} onClick={() => setIsActionModalOpen(true)}>
+                  <ShieldCheck className="mr-1.5 h-4 w-4" /> Putuskan
+                </Button>
+              </div>
+            </Panel>
+          </form>
+        )}
+      </StageWorkbench>
+
       <WorkflowActionModal
         isOpen={isActionModalOpen}
         onClose={() => setIsActionModalOpen(false)}
@@ -333,6 +365,6 @@ export const CreditApprovalView: React.FC = () => {
         applicationNumber={viewerModal.app?.applicationNumber || ''}
         app={viewerModal.app}
       />
-    </div>
+    </StageShell>
   );
 };

@@ -1,9 +1,19 @@
 import * as React from "react"
 import { cn } from "../../lib/utils"
 
-const Table = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(
-  ({ className, ...props }, ref) => (
-    <div className="w-full overflow-auto rounded-xl border border-border">
+/**
+ * `wrapperClassName` mengatur pembungkus yang menggulir, bukan elemen <table>.
+ *
+ * Diperlukan ketika tabel diletakkan langsung di dalam panel yang sudah punya
+ * bingkai sendiri: tanpa ini garis pembungkus menumpuk di atas garis panel dan
+ * sudut lengkungnya tidak sejajar.
+ */
+const Table = React.forwardRef<
+  HTMLTableElement,
+  React.HTMLAttributes<HTMLTableElement> & { wrapperClassName?: string }
+>(
+  ({ className, wrapperClassName, ...props }, ref) => (
+    <div className={cn("w-full overflow-auto rounded-xl border border-border", wrapperClassName)}>
       <table ref={ref} className={cn("w-full text-xs text-left text-foreground", className)} {...props} />
     </div>
   )

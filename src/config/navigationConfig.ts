@@ -35,7 +35,17 @@ import { UserRole } from '../types';
 
 export interface NavItem {
   id: string;
+  /**
+   * Kunci hak akses, BUKAN teks yang dibaca pengguna.
+   *
+   * Izin dinamis yang diatur Super Admin disimpan sebagai daftar `title`
+   * (`dynamicPerms.includes(item.title)` di Sidebar dan di src/utils/access.ts),
+   * jadi mengubah nilai ini akan mencabut akses peran yang izinnya sudah
+   * tersimpan. Untuk mengganti teks yang tampil, isi `label`.
+   */
   title: string;
+  /** Teks yang ditampilkan. Bila kosong, `title` yang dipakai. */
+  label?: string;
   path?: string;
   icon: React.ElementType;
   allowedRoles?: UserRole[];
@@ -144,11 +154,12 @@ export const navigationConfig: NavGroup[] = [
   },
   {
     id: 'credit',
-    label: 'CREDIT PIPELINE',
+    label: 'PIPELINE KREDIT',
     items: [
       {
         id: 'LOS_CREDIT',
         title: 'Loan Origination',
+        label: 'Pengajuan Kredit',
         path: '/business/credit/los',
         icon: FileText,
         allowedRoles: [...KREDIT, 'Account Officer'],
@@ -156,6 +167,7 @@ export const navigationConfig: NavGroup[] = [
       {
         id: 'OTS_SURVEY',
         title: 'Field Survey',
+        label: 'Survei Lapangan',
         path: '/business/credit/survey',
         icon: Camera,
         allowedRoles: ['Account Officer', 'Marketing Dana (Funding)', 'Surveyor', 'Koordinator Collection', 'Staff Collection'],
@@ -163,6 +175,7 @@ export const navigationConfig: NavGroup[] = [
       {
         id: 'CREDIT_ANALYSIS',
         title: 'Credit Analysis',
+        label: 'Analisis Kredit',
         path: '/business/credit/analysis',
         icon: LineChart,
         allowedRoles: KREDIT,
@@ -170,6 +183,7 @@ export const navigationConfig: NavGroup[] = [
       {
         id: 'COLLATERAL_APPRAISAL',
         title: 'Collateral Appraisal',
+        label: 'Taksasi Agunan',
         path: '/business/credit/appraisal',
         icon: ShieldCheck,
         allowedRoles: [...KREDIT, 'Admin Legal & SDM', 'Admin Legal'],
@@ -177,6 +191,7 @@ export const navigationConfig: NavGroup[] = [
       {
         id: 'CREDIT_APPROVAL',
         title: 'Committee Approval',
+        label: 'Putusan Komite',
         path: '/business/credit/approval',
         icon: CheckSquare,
         badgeType: 'APPROVALS',
@@ -186,6 +201,7 @@ export const navigationConfig: NavGroup[] = [
       {
         id: 'LEGAL_DOCUMENTS',
         title: 'Legal & Documents',
+        label: 'Legal & Akad',
         path: '/business/credit/legal',
         icon: FileBadge,
         allowedRoles: LEGAL_HR,
@@ -193,6 +209,7 @@ export const navigationConfig: NavGroup[] = [
       {
         id: 'DISBURSEMENT_PORTFOLIO',
         title: 'Disbursement',
+        label: 'Pencairan',
         path: '/business/credit/disbursement',
         icon: Send,
         allowedRoles: [...LEGAL_HR, 'Account Officer'],

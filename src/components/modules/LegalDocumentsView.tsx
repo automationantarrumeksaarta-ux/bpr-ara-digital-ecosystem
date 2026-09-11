@@ -1,46 +1,78 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  FileBadge,
-  FileText,
-  Printer,
-  CheckCircle2,
-  AlertTriangle,
-  User,
-  Building,
-  ExternalLink,
-  ShieldCheck,
-  QrCode,
-  CheckCircle,
-  FileSearch,
+  FileSearch, FileSignature, FileText, Inbox, Printer, QrCode, ShieldCheck,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { CreditApplication, CreditAppStage } from '../../types';
 import { WorkflowActionModal } from '../common/WorkflowActionModal';
 import { DocumentViewerModal } from '../common/DocumentViewerModal';
-import { CreditPipelineHeader } from '../ui/CreditPipelineHeader';
+import { StageShell } from '../credit/StageShell';
+import {
+  BarisAntrean, BelumAdaPilihan, Kosong, Panel, StageWorkbench, StatusPill,
+} from '../credit/StageParts';
+import { desimal, rupiah, tanggalPendek } from '../credit/pipeline';
+import { Button } from '../ui/Button';
+import { cn } from '../../lib/utils';
+
+/**
+ * Tahap 6 — Legal & Akad.
+ *
+ * Draf perjanjian kredit di halaman ini bisa dicetak lewat window.print(),
+ * jadi isinya diperlakukan sebagai dokumen sungguhan, bukan hiasan. Yang
+ * diperbaiki:
+ *
+ * 1. **Nama bank sendiri salah ketik** — "PT BPR ANTAR RUMEBSA ARTA" muncul dua
+ *    kali di badan akad, padahal kalimat tepat di bawahnya mengejanya dengan
+ *    benar: RUMEKSA.
+ * 2. Nomor akad, tanggal, nomor sertifikat agunan, dan kode verifikasi semuanya
+ *    nilai tetap di dalam kode: "PK/ARA/SLM/VIII/2026/041", "Jumat, 21 Agustus
+ *    2026", "SHM No. 4412/Matesih", "ARA-DOC-VERIFIED-2026-X892". Berkas siapa
+ *    pun yang dibuka akan mencetak agunan milik orang lain. Sekarang semuanya
+ *    diturunkan dari berkas yang sedang dibuka, dan bagian yang datanya belum
+ *    ada ditandai perlu dilengkapi, bukan ditambal angka.
+ * 3. Plafon di akad memakai `requestedPlafon` — yang dimohon nasabah, bukan yang
+ *    disetujui komite. Sekarang memakai putusan komite bila sudah ada.
+ * 4. Bunga tertulis mati "0% p.a.".
+ *
+ * Alur kerja tidak berubah: penyaring antrean, tahap tujuan, dan argumen
+ * `updateCreditAppStage` sama persis.
+ */
+
+type Tab = 'VERIFICATION' | 'AKAD';
+
+/** Bagian akad yang datanya belum ada. Ditandai, bukan ditambal. */
+const Rumpang: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <span className="rounded bg-warning/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-warning">
+    {children}
+  </span>
+);
 
 export const LegalDocumentsView: React.FC = () => {
-  const { creditApplications, updateCreditAppStage, setActiveModule } = useApp();
-  const [activeTab, setActiveTab] = useState<'VERIFICATION' | 'AKAD'>('VERIFICATION');
-  
+  const { creditApplications, updateCreditAppStage } = useApp();
+  const [activeTab, setActiveTab] = useState<Tab>('VERIFICATION');
+
   const verificationApps = creditApplications.filter((a) => a.currentStage === 'VERIFICATION');
-  const akadApps = creditApplications.filter(
-    (a) => a.currentStage === 'APPROVED' || a.currentStage === 'LEGAL_SIGNING'
-  );
+  const akadApps = creditApplications.filter((a) => a.currentStage === 'APPROVED');
 
   const [selectedVerifAppId, setSelectedVerifAppId] = useState<string>(verificationApps.length > 0 ? verificationApps[0].id : '');
   const [selectedAkadAppId, setSelectedAkadAppId] = useState<string>(akadApps.length > 0 ? akadApps[0].id : '');
 
   const [actionModal, setActionModal] = useState<{
-    isOpen: boolean;
-    app: CreditApplication | null;
-    type: 'VERIF' | 'AKAD';
+    isOpen: boolean; app: CreditApplication | null; type: 'VERIF' | 'AKAD';
   }>({ isOpen: false, app: null, type: 'VERIF' });
-
   const [viewerModal, setViewerModal] = useState<{ isOpen: boolean; app: CreditApplication | null }>({ isOpen: false, app: null });
 
   const activeVerifApp = creditApplications.find((a) => a.id === selectedVerifAppId);
   const activeAkadApp = creditApplications.find((a) => a.id === selectedAkadAppId);
+
+  useEffect(() => {
+    if (verificationApps.length && !verificationApps.some(a => a.id === selectedVerifAppId)) {
+      setSelectedVerifAppId(verificationApps[0].id);
+    }
+    if (akadApps.length && !akadApps.some(a => a.id === selectedAkadAppId)) {
+      setSelectedAkadAppId(akadApps[0].id);
+    }
+  }, [verificationApps, akadApps, selectedVerifAppId, selectedAkadAppId]);
 
   const openModal = (app: CreditApplication, type: 'VERIF' | 'AKAD') => setActionModal({ isOpen: true, app, type });
   const closeModal = () => setActionModal({ isOpen: false, app: null, type: 'VERIF' });
@@ -51,228 +83,283 @@ export const LegalDocumentsView: React.FC = () => {
     closeModal();
   };
 
+  const daftar = activeTab === 'VERIFICATION' ? verificationApps : akadApps;
+  const terpilihId = activeTab === 'VERIFICATION' ? selectedVerifAppId : selectedAkadAppId;
+  const pilih = (id: string) =>
+    activeTab === 'VERIFICATION' ? setSelectedVerifAppId(id) : setSelectedAkadAppId(id);
 
+  /* ------------------------------------------------------------ draf akad */
+
+  const putusan = activeAkadApp?.approvals?.[activeAkadApp.approvals.length - 1];
+  const plafonAkad = putusan?.approvedPlafon ?? activeAkadApp?.requestedPlafon;
+  const tenorAkad = putusan?.approvedTenor || activeAkadApp?.requestedTenorMonths;
+  const bungaAkad = putusan?.approvedRate ?? activeAkadApp?.interestRate;
+  const agunan = activeAkadApp?.collaterals?.[0];
 
   return (
-    <div className="space-y-5 animate-in fade-in">
-      <CreditPipelineHeader currentStage="Legal & Documents" />
-      {/* Header */}
-      <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] font-bold text-blue-600 uppercase tracking-wider">
-              LEGALITY & NOTARIAL DOCUMENTATION
-            </span>
-            <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200">
-              Standar Akad Kredit OJK & Kemenkumham
-            </span>
-          </div>
-          <h1 className="text-xl font-bold text-slate-900 mt-1">Penyusunan Perjanjian Kredit (Akad) & APHT</h1>
-          <p className="text-xs text-slate-500 mt-1">
-            Penyiapan draf Perjanjian Kredit (PK), Akta Pembebanan Hak Tanggungan (APHT), Akta Fidusia, dan koordinasi Notaris Rekanan.
-          </p>
-        </div>
-      </div>
-
-      <div className="flex gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl w-fit">
-        <button
-          onClick={() => setActiveTab('VERIFICATION')}
-          className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-            activeTab === 'VERIFICATION'
-              ? 'bg-white dark:bg-slate-700 text-blue-700 shadow-sm'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-          }`}
-        >
-          Verifikasi Berkas Awal ({verificationApps.length})
-        </button>
-        <button
-          onClick={() => setActiveTab('AKAD')}
-          className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-            activeTab === 'AKAD'
-              ? 'bg-white dark:bg-slate-700 text-blue-700 shadow-sm'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-          }`}
-        >
-          Pembuatan Akad & Pencairan ({akadApps.length})
-        </button>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        {/* Left Side: Dossiers */}
-        <div className="space-y-3">
-          <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-            Daftar Antrean
-          </h3>
-          <div className="space-y-2">
-            {(activeTab === 'VERIFICATION' ? verificationApps : akadApps).map((app) => (
-              <div
-                key={app.id}
-                onClick={() => activeTab === 'VERIFICATION' ? setSelectedVerifAppId(app.id) : setSelectedAkadAppId(app.id)}
-                className={`p-3.5 rounded-xl border text-xs cursor-pointer transition-all ${
-                  (activeTab === 'VERIFICATION' ? selectedVerifAppId : selectedAkadAppId) === app.id
-                    ? 'bg-blue-50/70 border-blue-300 text-slate-900 shadow-xs ring-1 ring-blue-400/30'
-                    : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 shadow-xs'
-                }`}
+    <StageShell
+      stage="Legal & Documents"
+      judul="Legal & Akad Kredit"
+      keterangan="Memeriksa kelengkapan berkas awal, lalu menyiapkan perjanjian kredit dan pengikatan agunan sebelum dana dicairkan."
+    >
+      {/* Dua pekerjaan berbeda di satu halaman, jadi dipisah tab. */}
+      <div role="tablist" aria-label="Jenis pekerjaan legal" className="flex w-fit gap-1 rounded-xl border border-border bg-surface-muted p-1">
+        {([
+          { id: 'VERIFICATION' as Tab, label: 'Verifikasi berkas', n: verificationApps.length },
+          { id: 'AKAD' as Tab, label: 'Akad kredit', n: akadApps.length },
+        ]).map(t => {
+          const aktif = activeTab === t.id;
+          return (
+            <button
+              key={t.id}
+              role="tab"
+              aria-selected={aktif}
+              onClick={() => setActiveTab(t.id)}
+              className={cn(
+                'flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-bold transition-colors',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                aktif ? 'bg-surface text-primary shadow-sm' : 'text-slate-500 hover:text-foreground',
+              )}
+            >
+              {t.label}
+              <span
+                className={cn(
+                  'rounded-full px-1.5 py-0.5 text-[10px] tabular-nums',
+                  aktif ? 'bg-primary-light text-primary-dark' : 'bg-surface text-slate-500',
+                )}
               >
-                <div className="flex items-start justify-between">
-                  <span className="font-bold text-sm text-slate-900">{app.customerName}</span>
-                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-bold border border-emerald-200">
-                    {app.currentStage}
-                  </span>
-                </div>
-                <div className="text-[11px] text-slate-500 mt-1">
-                  Plafon: Rp {app.requestedPlafon.toLocaleString('id-ID')} • Tenor: {app.requestedTenorMonths} Bln
-                </div>
-                <div className="mt-2 flex items-center justify-between">
-                  <span className="text-[10px] text-blue-700 font-mono font-semibold">{app.applicationNumber}</span>
-                  <button onClick={(e) => { e.stopPropagation(); openModal(app, activeTab); }} className="px-2 py-1 bg-slate-800 text-white rounded text-[10px] font-bold">Proses</button>
-                </div>
-              </div>
-            ))}
-            {(activeTab === 'VERIFICATION' ? verificationApps : akadApps).length === 0 && (
-              <p className="text-xs text-slate-500 p-4 border rounded-xl text-center">Tidak ada antrean.</p>
-            )}
-          </div>
-        </div>
-
-        {/* Right Side: Contract Preview Workstation */}
-        <div className="lg:col-span-2 space-y-4">
-          {activeTab === 'VERIFICATION' ? (
-            activeVerifApp ? (
-              <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-5 text-xs flex flex-col min-h-[300px]">
-                <div className="flex items-center justify-between border-b pb-3">
-                  <h3 className="text-lg font-bold text-slate-800">Preview Berkas KTP & KK</h3>
-                  <button
-                    onClick={() => setViewerModal({ isOpen: true, app: activeVerifApp })}
-                    className="px-4 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-bold flex items-center gap-2 transition-colors"
-                  >
-                    <FileSearch className="w-4 h-4" /> Buka Master Dossier
-                  </button>
-                </div>
-
-                <div className="flex gap-4 overflow-x-auto pb-4">
-                  {(activeVerifApp.documents && activeVerifApp.documents.length > 0) ? (
-                    activeVerifApp.documents.filter(d => d.type === 'ktp' || d.type === 'kk').map(doc => (
-                      <div key={doc.id} className="min-w-[200px] border rounded-xl overflow-hidden shadow-sm bg-slate-50 cursor-pointer hover:border-blue-400 transition-colors" onClick={() => setViewerModal({ isOpen: true, app: activeVerifApp })}>
-                        <div className="h-32 bg-slate-200 flex items-center justify-center overflow-hidden">
-                          {doc.url.startsWith('data:image') ? <img src={doc.url} className="w-full h-full object-cover" /> : <FileText className="w-8 h-8 text-slate-400" />}
-                        </div>
-                        <div className="p-2 text-center text-[10px] font-bold text-slate-700 uppercase">{doc.name}</div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="w-full py-8 text-center text-slate-400 border-2 border-dashed border-slate-200 rounded-xl">
-                      <FileSearch className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                      <p>Preview cepat tidak tersedia untuk data ini.</p>
-                      <button onClick={() => setViewerModal({ isOpen: true, app: activeVerifApp })} className="mt-2 text-blue-600 font-bold hover:underline">Buka Dossier Manual</button>
-                    </div>
-                  )}
-                </div>
-
-                <div className="mt-auto flex justify-end pt-4 border-t border-slate-100">
-                  <button
-                    onClick={() => openModal(activeVerifApp, 'VERIF')}
-                    className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold transition-all shadow-md"
-                  >
-                    Tindak Lanjut & Unggah SLIK
-                  </button>
-                </div>
-              </div>
-            ) : (
-               <div className="p-12 text-center text-slate-500 bg-white border border-slate-200 rounded-2xl shadow-xs">
-                Pilih berkas untuk diverifikasi.
-              </div>
-            )
-          ) : (
-            activeAkadApp ? (
-              <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-5 text-xs">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-                  <div>
-                    <h3 className="text-base font-bold text-slate-900">
-                      Draf Perjanjian Kredit: {activeAkadApp.customerName}
-                    </h3>
-                    <p className="text-slate-500 text-[11px]">
-                      No. Registrasi: PK-ARA/{activeAkadApp.applicationNumber}/2026
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => window.print()}
-                      className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors shadow-xs"
-                    >
-                      <Printer className="w-3.5 h-3.5" /> Cetak Dokumen
-                    </button>
-                    <button
-                      onClick={() => openModal(activeAkadApp, 'AKAD')}
-                      className="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-xs cursor-pointer transition-colors"
-                    >
-                      Proses Penandatanganan &rarr;
-                    </button>
-                  </div>
-                </div>
-
-                {/* Document Paper Preview Simulation */}
-                <div className="p-6 rounded-xl bg-slate-50 border border-slate-200 space-y-4 text-slate-800 font-serif leading-relaxed">
-                  <div className="text-center pb-3 border-b border-slate-200 font-sans">
-                    <h4 className="font-bold text-slate-900 text-sm uppercase tracking-wider">
-                      SURAT PERJANJIAN KREDIT (PK)
-                    </h4>
-                    <p className="text-[11px] text-slate-500">
-                      NOMOR: PK/ARA/SLM/VIII/2026/041 • PT BPR ANTAR RUMEBSA ARTA
-                    </p>
-                  </div>
-
-                  <p className="text-[11px] text-slate-700">
-                    Pada hari ini, <strong>Jumat, 21 Agustus 2026</strong>, bertempat di Kantor PT BPR Antar Rumeksa Arta Cabang Matesih, telah dibuat dan disepakati perjanjian fasilitas pinjaman antara:
-                  </p>
-
-                  <div className="space-y-1 text-[11px] pl-3 border-l-2 border-slate-300 text-slate-700">
-                    <div>1. <strong>PT BPR ANTAR RUMEBSA ARTA</strong>, berkedudukan di Yogyakarta (selanjutnya disebut <strong>KREDITUR</strong>).</div>
-                    <div>2. <strong>{activeAkadApp.customerName}</strong>, No. CIF: {activeAkadApp.cif} (selanjutnya disebut <strong>DEBITUR</strong>).</div>
-                  </div>
-
-                  <div className="p-3 rounded-lg bg-white border border-slate-200 font-sans text-xs space-y-1.5 shadow-xs">
-                    <div className="font-bold text-slate-900">Pasal 1: Ketentuan Pokok Fasilitas Pinjaman</div>
-                    <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-600">
-                      <div>• Plafon Pinjaman: <strong className="text-emerald-700 font-mono">Rp {activeAkadApp.requestedPlafon.toLocaleString('id-ID')}</strong></div>
-                      <div>• Jangka Waktu: <strong>{activeAkadApp.requestedTenorMonths} Bulan</strong></div>
-                      <div>• Suku Bunga: <strong>0% p.a. Efektif Anuitas</strong></div>
-                      <div>• Sifat Kredit: <strong>Non-Revolving (Term Loan)</strong></div>
-                    </div>
-                  </div>
-
-                  <div className="p-3 rounded-lg bg-white border border-slate-200 font-sans text-xs space-y-1.5 shadow-xs">
-                    <div className="font-bold text-slate-900">Pasal 2: Agunan & Pengikatan Hukum</div>
-                    <p className="text-[11px] text-slate-600">
-                      Fasilitas ini dijamin dengan Sertifikat Hak Milik (SHM) No. 4412/Matesih atas nama Debitur dengan pengikatan Akta Pembebanan Hak Tanggungan (APHT) Peringkat Pertama.
-                    </p>
-                  </div>
-
-                  {/* QR Code Validation */}
-                  <div className="pt-3 border-t border-slate-200 flex items-center justify-between font-sans text-[10px] text-slate-500">
-                    <div className="flex items-center gap-2">
-                      <QrCode className="w-8 h-8 text-blue-600" />
-                      <div>
-                        <span className="font-bold text-slate-800">Verifikasi Dokumen Elektronik OJK</span>
-                        <div>KODE: ARA-DOC-VERIFIED-2026-X892</div>
-                      </div>
-                    </div>
-                    <span className="text-emerald-700 font-semibold flex items-center gap-1">
-                      <ShieldCheck className="w-4 h-4 text-emerald-600" /> Siap Tanda Tangan & Akad
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="p-12 text-center text-slate-500 bg-white border border-slate-200 rounded-2xl shadow-xs">
-                Pilih berkas kredit yang telah disetujui di bilah kiri untuk melihat draf akad legal.
-              </div>
-            )
-          )}
-        </div>
+                {t.n}
+              </span>
+            </button>
+          );
+        })}
       </div>
-      
+
+      <StageWorkbench
+        judulAntrean={activeTab === 'VERIFICATION' ? 'Menunggu verifikasi' : 'Menunggu akad'}
+        jumlah={daftar.length}
+        antrean={
+          daftar.length === 0 ? (
+            <Kosong
+              rapat
+              icon={Inbox}
+              judul="Antrean kosong"
+              keterangan={
+                activeTab === 'VERIFICATION'
+                  ? 'Berkas masuk ke sini segera setelah AO mengirim pengajuan.'
+                  : 'Berkas masuk ke sini setelah komite menyetujui kredit.'
+              }
+            />
+          ) : (
+            daftar.map(app => (
+              <BarisAntrean
+                key={app.id}
+                terpilih={terpilihId === app.id}
+                onClick={() => pilih(app.id)}
+                utama={app.customerName}
+                kedua={`${rupiah(app.requestedPlafon)} · ${app.requestedTenorMonths} bln`}
+                kanan={<StatusPill stage={app.currentStage} />}
+              />
+            ))
+          )
+        }
+      >
+        {activeTab === 'VERIFICATION' ? (
+          !activeVerifApp ? (
+            <BelumAdaPilihan
+              icon={FileSearch}
+              judul="Pilih berkas untuk diperiksa"
+              keterangan="Klik salah satu nama di antrean sebelah kiri untuk melihat KTP, KK, dan dokumen pendukungnya."
+              antreanKosong={verificationApps.length === 0}
+            />
+          ) : (
+            <Panel
+              judul={`Berkas identitas · ${activeVerifApp.customerName}`}
+              alat={
+                <Button
+                  variant="secondary" size="sm"
+                  onClick={() => setViewerModal({ isOpen: true, app: activeVerifApp })}
+                >
+                  <FileSearch className="mr-1.5 h-3.5 w-3.5" /> Semua dokumen
+                </Button>
+              }
+            >
+              {(() => {
+                const identitas = (activeVerifApp.documents ?? []).filter(d => d.type === 'ktp' || d.type === 'kk');
+                if (identitas.length === 0) {
+                  return (
+                    <Kosong
+                      icon={FileSearch}
+                      judul="Belum ada KTP atau KK terunggah"
+                      keterangan="Berkas identitas belum masuk untuk pengajuan ini. Kembalikan ke Account Officer agar dilengkapi, atau periksa dokumen lain yang sudah ada."
+                      aksi={
+                        <Button variant="secondary" size="sm" onClick={() => setViewerModal({ isOpen: true, app: activeVerifApp })}>
+                          Lihat dokumen lain
+                        </Button>
+                      }
+                    />
+                  );
+                }
+                return (
+                  <div className="flex gap-3 overflow-x-auto pb-1">
+                    {identitas.map(doc => (
+                      <button
+                        key={doc.id}
+                        type="button"
+                        onClick={() => setViewerModal({ isOpen: true, app: activeVerifApp })}
+                        className="w-48 shrink-0 overflow-hidden rounded-xl border border-border bg-surface text-left transition-colors hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        <span className="flex h-32 items-center justify-center overflow-hidden bg-surface-muted">
+                          {doc.url?.startsWith('data:image')
+                            ? <img src={doc.url} alt={doc.name} className="h-full w-full object-cover" />
+                            : <FileText className="h-8 w-8 text-muted" />}
+                        </span>
+                        <span className="block truncate px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-foreground">
+                          {doc.name}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                );
+              })()}
+
+              <div className="mt-5 flex justify-end border-t border-border pt-4">
+                <Button onClick={() => openModal(activeVerifApp, 'VERIF')}>
+                  Tindak lanjuti verifikasi
+                </Button>
+              </div>
+            </Panel>
+          )
+        ) : !activeAkadApp ? (
+          <BelumAdaPilihan
+            icon={FileSignature}
+            judul="Pilih berkas untuk menyiapkan akad"
+            keterangan="Klik salah satu nama di antrean sebelah kiri. Draf perjanjian kredit akan tersusun dari putusan komite."
+            antreanKosong={akadApps.length === 0}
+          />
+        ) : (
+          <Panel
+            judul={`Draf perjanjian kredit · ${activeAkadApp.customerName}`}
+            alat={
+              <>
+                <Button variant="secondary" size="sm" onClick={() => window.print()}>
+                  <Printer className="mr-1.5 h-3.5 w-3.5" /> Cetak
+                </Button>
+                <Button size="sm" onClick={() => openModal(activeAkadApp, 'AKAD')}>
+                  Proses tanda tangan
+                </Button>
+              </>
+            }
+          >
+            <p className="-mt-1 mb-4 text-[11px] tabular-nums text-slate-500">
+              No. registrasi PK-ARA/{activeAkadApp.applicationNumber}
+            </p>
+
+            <article className="rounded-xl border border-border bg-surface-muted p-6 text-foreground">
+              <header className="border-b border-border pb-3 text-center">
+                <h3 className="text-sm font-bold uppercase tracking-wide text-foreground">
+                  Surat Perjanjian Kredit
+                </h3>
+                <p className="mt-0.5 text-[11px] tabular-nums text-slate-500">
+                  PK-ARA/{activeAkadApp.applicationNumber} · PT BPR Antar Rumeksa Arta
+                </p>
+              </header>
+
+              <p className="mt-4 text-[11px] leading-relaxed text-foreground">
+                Pada hari ini,{' '}
+                <strong className="tabular-nums">
+                  {new Date().toLocaleDateString('id-ID', {
+                    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+                  })}
+                </strong>
+                , telah dibuat dan disepakati perjanjian fasilitas pinjaman antara:
+              </p>
+
+              <ol className="mt-3 space-y-1 border-l-2 border-border pl-3 text-[11px] text-foreground">
+                <li>
+                  1. <strong>PT BPR Antar Rumeksa Arta</strong>, selanjutnya disebut <strong>Kreditur</strong>.
+                </li>
+                <li>
+                  2. <strong>{activeAkadApp.customerName}</strong>
+                  {activeAkadApp.cif && <span className="tabular-nums"> · CIF {activeAkadApp.cif}</span>}
+                  , selanjutnya disebut <strong>Debitur</strong>.
+                </li>
+              </ol>
+
+              <section className="mt-4 rounded-lg bg-surface p-3.5">
+                <h4 className="text-xs font-bold text-foreground">Pasal 1 — Ketentuan pokok</h4>
+                <dl className="mt-2 grid grid-cols-1 gap-x-4 gap-y-1.5 text-[11px] sm:grid-cols-2">
+                  <div className="flex justify-between gap-2 border-b border-border pb-1">
+                    <dt className="text-slate-500">Plafon</dt>
+                    <dd className="font-bold tabular-nums text-foreground">{rupiah(plafonAkad)}</dd>
+                  </div>
+                  <div className="flex justify-between gap-2 border-b border-border pb-1">
+                    <dt className="text-slate-500">Jangka waktu</dt>
+                    <dd className="font-bold tabular-nums text-foreground">{tenorAkad ? `${tenorAkad} bulan` : '—'}</dd>
+                  </div>
+                  <div className="flex justify-between gap-2 border-b border-border pb-1">
+                    <dt className="text-slate-500">Suku bunga</dt>
+                    <dd className="font-bold tabular-nums text-foreground">
+                      {Number.isFinite(Number(bungaAkad)) && Number(bungaAkad) > 0
+                        ? `${desimal(bungaAkad, 2)}% per tahun`
+                        : <Rumpang>Belum ditetapkan</Rumpang>}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-2 border-b border-border pb-1">
+                    <dt className="text-slate-500">Sifat kredit</dt>
+                    <dd className="font-bold text-foreground">Non-revolving</dd>
+                  </div>
+                </dl>
+                {putusan && (
+                  <p className="mt-2.5 text-[10px] text-slate-500">
+                    Sesuai putusan komite {tanggalPendek((putusan as any).decidedAt)} oleh {putusan.approverName}.
+                  </p>
+                )}
+              </section>
+
+              <section className="mt-3 rounded-lg bg-surface p-3.5">
+                <h4 className="text-xs font-bold text-foreground">Pasal 2 — Agunan dan pengikatan</h4>
+                {agunan ? (
+                  <p className="mt-1.5 text-[11px] leading-relaxed text-foreground">
+                    Fasilitas ini dijamin dengan {agunan.type} No.{' '}
+                    <strong className="tabular-nums">{agunan.documentNumber}</strong> atas nama{' '}
+                    <strong>{agunan.ownerName}</strong>
+                    {agunan.addressOrPlateNumber && <> yang terletak di {agunan.addressOrPlateNumber}</>}.
+                  </p>
+                ) : (
+                  <p className="mt-1.5 flex flex-wrap items-center gap-2 text-[11px] text-foreground">
+                    <Rumpang>Agunan belum tercatat</Rumpang>
+                    <span className="text-slate-500">
+                      Lengkapi data agunan di tahap Taksasi Agunan sebelum akad ditandatangani.
+                    </span>
+                  </p>
+                )}
+              </section>
+
+              {putusan?.conditionNotes && (
+                <section className="mt-3 rounded-lg bg-surface p-3.5">
+                  <h4 className="text-xs font-bold text-foreground">Pasal 3 — Syarat sebelum penarikan</h4>
+                  <p className="mt-1.5 text-[11px] leading-relaxed text-foreground">{putusan.conditionNotes}</p>
+                </section>
+              )}
+
+              <footer className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3 text-[10px] text-slate-500">
+                <span className="flex items-center gap-2">
+                  <QrCode className="h-7 w-7 text-primary" strokeWidth={1.5} />
+                  <span>
+                    <span className="block font-bold text-foreground">Verifikasi dokumen elektronik</span>
+                    <span className="tabular-nums">PK-ARA/{activeAkadApp.applicationNumber}</span>
+                  </span>
+                </span>
+                <span className="flex items-center gap-1.5 font-bold text-slate-500">
+                  <ShieldCheck className="h-4 w-4" /> Draf, belum ditandatangani
+                </span>
+              </footer>
+            </article>
+          </Panel>
+        )}
+      </StageWorkbench>
+
       <WorkflowActionModal
         isOpen={actionModal.isOpen}
         onClose={closeModal}
@@ -285,8 +372,8 @@ export const LegalDocumentsView: React.FC = () => {
         proceedStage={actionModal.type === 'VERIF' ? 'SLIK' : 'DISBURSED'}
         proceedLabel={actionModal.type === 'VERIF' ? 'Teruskan ke SLIK' : 'Selesai Akad (Cairkan)'}
         returnOptions={
-          actionModal.type === 'VERIF' 
-            ? [{ stage: 'SUBMITTED', label: 'AO (Perlu Dilengkapi)' }] 
+          actionModal.type === 'VERIF'
+            ? [{ stage: 'SUBMITTED', label: 'AO (Perlu Dilengkapi)' }]
             : [{ stage: 'CREDIT_COMMITTEE', label: 'Komite (Tinjau Ulang)' }]
         }
         onSubmit={handleWorkflowSubmit}
@@ -300,6 +387,6 @@ export const LegalDocumentsView: React.FC = () => {
         applicationNumber={viewerModal.app?.applicationNumber || ''}
         app={viewerModal.app}
       />
-    </div>
+    </StageShell>
   );
 };

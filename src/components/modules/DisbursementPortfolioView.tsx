@@ -1,25 +1,34 @@
-import React, { useState } from 'react';
-import {
-  Send,
-  CreditCard,
-  CheckCircle2,
-  AlertTriangle,
-  Search,
-  Filter,
-  DollarSign,
-  TrendingUp,
-  Calendar,
-  Layers,
-  ArrowRight,
-  ShieldCheck,
-  Building,
-  FileText,
-} from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { AlertTriangle, FileText, Search, Send, Wallet } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { DocumentViewerModal } from '../common/DocumentViewerModal';
-import { CreditPipelineHeader } from '../ui/CreditPipelineHeader';
 import { CreditApplication } from '../../types';
-import { LoanFacility, Collectibility } from '../../types';
+import { StageShell, DeretAngka } from '../credit/StageShell';
+import { Kosong, KosongKarenaSaringan, KolPill, Panel } from '../credit/StageParts';
+import { persen, rupiah, rupiahRingkas, tanggalPendek } from '../credit/pipeline';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/Table';
+import { Button } from '../ui/Button';
+import { Modal } from '../ui/Modal';
+
+/**
+ * Tahap 7 — Pencairan & portofolio.
+ *
+ * Perbaikan di luar tampilan:
+ *
+ * 1. "NaN% dari Total Portofolio" tampil di layar begitu portofolio kosong,
+ *    karena (kol1/total)*100 dihitung tanpa menjaga pembagi nol — dan nol
+ *    adalah keadaan hari ini. Sekarang lewat helper `persen` yang menulis "—".
+ * 2. "Tingkat Penagihan Tepat Waktu" selalu menampilkan 0% dengan keterangan
+ *    "SLA Jatuh Tempo Terjaga". Angka itu tidak pernah dihitung dari apa pun.
+ *    Diganti jumlah fasilitas menunggak, yang memang bisa dihitung dari data.
+ * 3. Pencairan dana dulu langsung jalan begitu tombol ditekan, lalu memberi
+ *    kabar lewat `alert()` — sesudah uangnya berpindah. Uang keluar tidak bisa
+ *    ditarik kembali, jadi sekarang dikonfirmasi dulu.
+ * 4. Kabar pencairan menyebut `requestedPlafon`, yaitu yang dimohon nasabah,
+ *    bukan yang disetujui komite. Sekarang memakai plafon putusan.
+ * 5. Tabel tidak punya keadaan kosong sama sekali — hanya kepala tabel
+ *    menggantung tanpa isi.
+ */
 
 export const DisbursementPortfolioView: React.FC = () => {
   const {
@@ -27,255 +36,263 @@ export const DisbursementPortfolioView: React.FC = () => {
     creditApplications,
     disburseCreditFacility,
     openCustomer360,
-    currentUser,
-    branches,
     selectedBranchId,
     setActiveModule,
   } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedKolFilter, setSelectedKolFilter] = useState<string>('ALL');
-
-  // Applications pending disbursement
-  const pendingDisbursementApps = creditApplications.filter((a) => a.currentStage === 'APPROVED');
   const [viewerModal, setViewerModal] = useState<{ isOpen: boolean; app: CreditApplication | null }>({ isOpen: false, app: null });
+  const [konfirmasi, setKonfirmasi] = useState<CreditApplication | null>(null);
+
+  const pendingDisbursementApps = creditApplications.filter((a) => a.currentStage === 'APPROVED');
 
   const totalOutstanding = loanFacilities.reduce((acc, f) => acc + f.outstandingPrincipal, 0);
   const totalOriginalPlafon = loanFacilities.reduce((acc, f) => acc + f.originalPlafon, 0);
   const kol1Total = loanFacilities
     .filter((f) => f.collectibility === 'KOL_1')
     .reduce((acc, f) => acc + f.outstandingPrincipal, 0);
+  const menunggak = loanFacilities.filter((f) => (f.dpdDays ?? 0) > 0).length;
 
-  const filteredFacilities = loanFacilities.filter((f) => {
+  const filteredFacilities = useMemo(() => loanFacilities.filter((f) => {
+    const q = searchQuery.toLowerCase();
     const matchesSearch =
-      f.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      f.facilityNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      f.accountNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      f.cif.toLowerCase().includes(searchQuery.toLowerCase());
-
+      f.customerName.toLowerCase().includes(q) ||
+      f.facilityNumber.toLowerCase().includes(q) ||
+      f.accountNumber.toLowerCase().includes(q) ||
+      f.cif.toLowerCase().includes(q);
     const matchesKol = selectedKolFilter === 'ALL' || f.collectibility === selectedKolFilter;
     const matchesBranch = selectedBranchId === 'ALL' || f.branchId === selectedBranchId;
-
     return matchesSearch && matchesKol && matchesBranch;
-  });
+  }), [loanFacilities, searchQuery, selectedKolFilter, selectedBranchId]);
+
+  const adaSaringan = searchQuery.trim() !== '' || selectedKolFilter !== 'ALL';
+  const resetSaringan = () => { setSearchQuery(''); setSelectedKolFilter('ALL'); };
+
+  /** Plafon yang benar-benar disetujui komite; jatuh ke permohonan bila belum ada putusan. */
+  const plafonDisetujui = (app: CreditApplication) =>
+    app.approvals?.[app.approvals.length - 1]?.approvedPlafon ?? app.requestedPlafon;
+
+  const cairkan = () => {
+    if (!konfirmasi) return;
+    disburseCreditFacility(konfirmasi.id);
+    setKonfirmasi(null);
+  };
 
   return (
-    <div className="space-y-5 animate-in fade-in">
-      <CreditPipelineHeader currentStage="Disbursement" />
-      {/* Header Banner */}
-      <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider">
-              LOAN DISBURSEMENT & PORTFOLIO ENGINE
-            </span>
-            <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200">
-              Otorisasi Pencairan Dana Rekening
-            </span>
-          </div>
-          <h1 className="text-xl font-bold text-slate-900 mt-1">Pencairan & Manajemen Portofolio Pinjaman</h1>
-          <p className="text-xs text-slate-500 mt-1">
-            Eksekusi pencairan kredit ke rekening debitur, monitoring baki debet harian, dan pemantauan hari menunggak (DPD).
-          </p>
-        </div>
-      </div>
-
-      {/* Pending Disbursement Action Queue */}
+    <StageShell
+      stage="Disbursement"
+      judul="Pencairan & Portofolio Pinjaman"
+      keterangan="Mencairkan kredit yang sudah berakad ke rekening debitur, lalu memantau baki debet dan hari menunggak."
+    >
+      {/* -------------------- antrean pencairan -------------------- */}
       {pendingDisbursementApps.length > 0 && (
-        <div className="p-5 rounded-2xl bg-emerald-50/70 border border-emerald-200 space-y-3 shadow-xs">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Send className="w-5 h-5 text-emerald-700" />
-              <h3 className="text-sm font-bold text-emerald-950">
-                Antrean Otorisasi Pencairan ({pendingDisbursementApps.length} Berkas Telah Disetujui)
-              </h3>
-            </div>
-            <span className="text-xs text-emerald-800 font-semibold">Siap Eksekusi Dana</span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <Panel judul="Menunggu pencairan" hitungan={pendingDisbursementApps.length} padat>
+          <ul className="divide-y divide-border">
             {pendingDisbursementApps.map((app) => (
-              <div
-                key={app.id}
-                className="p-4 rounded-xl bg-white border border-emerald-200/80 flex items-center justify-between text-xs shadow-xs"
-              >
-                <div>
-                  <h4 className="font-bold text-slate-900 text-sm">{app.customerName}</h4>
-                  <div className="text-[11px] text-slate-500 mt-0.5">
-                    No. LOS: {app.applicationNumber} • Plafon: Rp {app.requestedPlafon.toLocaleString('id-ID')}
-                  </div>
+              <li key={app.id} className="flex flex-col gap-3 px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-bold text-foreground">{app.customerName}</p>
+                  <p className="mt-0.5 text-[11px] tabular-nums text-slate-500">
+                    {app.applicationNumber} · {rupiah(plafonDisetujui(app))} disetujui
+                  </p>
                 </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setViewerModal({ isOpen: true, app })}
-                    className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold flex items-center gap-1.5 shadow-xs cursor-pointer text-xs transition-colors"
-                  >
-                    <FileText className="w-3.5 h-3.5 text-blue-600" /> Buka Dossier
-                  </button>
-                  <button
-                    onClick={() => {
-                      disburseCreditFacility(app.id);
-                      alert(`Pencairan Dana Rp ${app.requestedPlafon.toLocaleString('id-ID')} untuk ${app.customerName} Sukses Diproses ke Rekening Debitur!`);
-                    }}
-                    className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center gap-1.5 shadow-xs cursor-pointer text-xs transition-colors"
-                  >
-                    <Send className="w-3.5 h-3.5" /> Cairkan Dana
-                  </button>
+                <div className="flex shrink-0 items-center gap-2">
+                  <Button variant="secondary" size="sm" onClick={() => setViewerModal({ isOpen: true, app })}>
+                    <FileText className="mr-1.5 h-3.5 w-3.5" /> Berkas
+                  </Button>
+                  <Button size="sm" onClick={() => setKonfirmasi(app)}>
+                    <Send className="mr-1.5 h-3.5 w-3.5" /> Cairkan dana
+                  </Button>
                 </div>
-              </div>
+              </li>
             ))}
-          </div>
-        </div>
+          </ul>
+        </Panel>
       )}
 
-      {/* Top 3 Portfolio Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs">
-          <span className="text-xs text-slate-500 font-medium">Total Baki Debet Dikelola</span>
-          <div className="text-2xl font-bold text-slate-900 mt-1 font-mono">
-            Rp {(totalOutstanding / 1000000000).toFixed(2)} Miliar
-          </div>
-          <div className="text-[11px] text-slate-500 mt-1">
-            Dari Total Plafon Asal Rp {(totalOriginalPlafon / 1000000000).toFixed(2)} M
-          </div>
-        </div>
+      {/* -------------------- angka portofolio -------------------- */}
+      <DeretAngka
+        angka={[
+          {
+            label: 'Baki debet dikelola',
+            nilai: rupiahRingkas(totalOutstanding),
+            konteks: `Dari plafon asal ${rupiahRingkas(totalOriginalPlafon)}`,
+          },
+          {
+            label: 'Portofolio lancar',
+            nilai: rupiahRingkas(kol1Total),
+            konteks: `${persen(kol1Total, totalOutstanding)} dari baki debet`,
+            nada: kol1Total > 0 ? 'success' : 'default',
+          },
+          {
+            label: 'Fasilitas aktif',
+            nilai: loanFacilities.length.toLocaleString('id-ID'),
+            konteks: 'Seluruh cabang terpilih',
+          },
+          {
+            label: 'Menunggak',
+            nilai: menunggak.toLocaleString('id-ID'),
+            konteks: menunggak > 0 ? 'Hari menunggak di atas nol' : 'Tidak ada tunggakan',
+            nada: menunggak > 0 ? 'warning' : 'default',
+          },
+        ]}
+      />
 
-        <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs">
-          <span className="text-xs text-slate-500 font-medium">Portofolio Kol-1 (Lancar)</span>
-          <div className="text-2xl font-bold text-emerald-700 mt-1 font-mono">
-            Rp {(kol1Total / 1000000000).toFixed(2)} Miliar
-          </div>
-          <div className="text-[11px] text-emerald-700 font-medium mt-1">
-            {((kol1Total / totalOutstanding) * 100).toFixed(1)}% dari Total Portofolio
-          </div>
-        </div>
-
-        <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs">
-          <span className="text-xs text-slate-500 font-medium">Tingkat Penagihan Tepat Waktu</span>
-          <div className="text-2xl font-bold text-blue-700 mt-1">0%</div>
-          <div className="text-[11px] text-slate-500 mt-1">SLA Jatuh Tempo Terjaga</div>
-        </div>
-      </div>
-
-      {/* Search & Filter Bar */}
-      <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs flex flex-col sm:flex-row items-center gap-3">
-        <div className="relative flex-1 w-full">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Cari berdasarkan Debitur, Nomor Fasilitas, Nomor Rekening, atau CIF..."
-            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-500"
-          />
-        </div>
-
-        <select
-          value={selectedKolFilter}
-          onChange={(e) => setSelectedKolFilter(e.target.value)}
-          className="bg-slate-50 text-xs text-slate-700 border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-blue-500 cursor-pointer"
-        >
-          <option value="ALL">Semua Kolektibilitas</option>
-          <option value="KOL_1">KOL-1 (Lancar)</option>
-          <option value="KOL_2">KOL-2 (DPK 1-90 Hari)</option>
-          <option value="KOL_3">KOL-3 (Kurang Lancar)</option>
-          <option value="KOL_4">KOL-4 (Diragukan)</option>
-          <option value="KOL_5">KOL-5 (Macet)</option>
-        </select>
-      </div>
-
-      {/* Loan Facilities Master Table */}
-      <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-3">
-        <div className="flex items-center justify-between text-xs text-slate-500">
-          <span>Menampilkan {filteredFacilities.length} Fasilitas Pinjaman Aktif</span>
-          <span>Klik nama nasabah untuk melihat detail 360°</span>
-        </div>
-
-        <div className="overflow-x-auto border border-slate-200 rounded-xl">
-          <table className="w-full text-xs text-left">
-            <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
-              <tr>
-                <th className="p-3">No. Fasilitas & Rekening</th>
-                <th className="p-3">Debitur & CIF</th>
-                <th className="p-3">Plafon Awal</th>
-                <th className="p-3">Baki Debet Saat Ini</th>
-                <th className="p-3">Angsuran / Bln</th>
-                <th className="p-3">Kolektibilitas & DPD</th>
-                <th className="p-3">Jatuh Tempo</th>
-                <th className="p-3 text-right">Aksi Terintegrasi</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 text-slate-800">
+      {/* -------------------- daftar fasilitas -------------------- */}
+      <Panel
+        judul="Fasilitas pinjaman"
+        hitungan={filteredFacilities.length}
+        padat
+        alat={
+          <>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Cari debitur, nomor rekening, atau CIF"
+                aria-label="Cari fasilitas pinjaman"
+                className="w-56 rounded-xl border border-border bg-surface py-2 pl-9 pr-3 text-xs text-foreground placeholder:text-muted outline-none transition-colors focus:border-primary focus-visible:ring-2 focus-visible:ring-ring lg:w-72"
+              />
+            </div>
+            <select
+              value={selectedKolFilter}
+              onChange={(e) => setSelectedKolFilter(e.target.value)}
+              aria-label="Saring kolektibilitas"
+              className="cursor-pointer rounded-xl border border-border bg-surface px-3 py-2 text-xs font-medium text-foreground outline-none transition-colors focus:border-primary focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <option value="ALL">Semua kolektibilitas</option>
+              <option value="KOL_1">Kol 1 · Lancar</option>
+              <option value="KOL_2">Kol 2 · Perhatian khusus</option>
+              <option value="KOL_3">Kol 3 · Kurang lancar</option>
+              <option value="KOL_4">Kol 4 · Diragukan</option>
+              <option value="KOL_5">Kol 5 · Macet</option>
+            </select>
+          </>
+        }
+      >
+        {filteredFacilities.length === 0 ? (
+          adaSaringan ? (
+            <KosongKarenaSaringan onReset={resetSaringan} />
+          ) : (
+            <Kosong
+              icon={Wallet}
+              judul="Belum ada fasilitas pinjaman"
+              keterangan="Fasilitas muncul di sini setelah kredit yang berakad dicairkan. Baki debet, angsuran, dan kolektibilitasnya akan terpantau dari daftar ini."
+            />
+          )
+        ) : (
+          <Table wrapperClassName="border-0 rounded-none">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Fasilitas</TableHead>
+                <TableHead>Debitur</TableHead>
+                <TableHead className="text-right">Plafon awal</TableHead>
+                <TableHead className="text-right">Baki debet</TableHead>
+                <TableHead className="text-right">Angsuran</TableHead>
+                <TableHead>Kolektibilitas</TableHead>
+                <TableHead className="text-right">Jatuh tempo</TableHead>
+                <TableHead className="text-right">Tindakan</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {filteredFacilities.map((fac) => (
-                <tr key={fac.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="p-3 font-mono">
-                    <div className="font-semibold text-slate-900">{fac.facilityNumber}</div>
-                    <div className="text-[10px] text-slate-500">{fac.accountNumber}</div>
-                  </td>
+                <TableRow key={fac.id}>
+                  <TableCell className="py-3">
+                    <span className="block font-bold tabular-nums text-foreground">{fac.facilityNumber}</span>
+                    <span className="block text-[10px] tabular-nums text-slate-500">{fac.accountNumber}</span>
+                  </TableCell>
 
-                  <td className="p-3">
+                  <TableCell className="py-3">
                     <button
                       onClick={() => openCustomer360(fac.cif)}
-                      className="font-bold text-slate-900 hover:text-blue-600 text-left block cursor-pointer"
+                      className="block text-left font-bold text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       {fac.customerName}
                     </button>
-                    <span className="text-[10px] text-slate-500 font-mono">{fac.cif}</span>
-                  </td>
+                    <span className="block text-[10px] tabular-nums text-slate-500">{fac.cif}</span>
+                  </TableCell>
 
-                  <td className="p-3 font-mono font-medium text-slate-700">
-                    Rp {fac.originalPlafon.toLocaleString('id-ID')}
-                  </td>
+                  <TableCell className="py-3 text-right tabular-nums text-slate-600">
+                    {rupiah(fac.originalPlafon)}
+                  </TableCell>
+                  <TableCell className="py-3 text-right font-bold tabular-nums text-foreground">
+                    {rupiah(fac.outstandingPrincipal)}
+                  </TableCell>
+                  <TableCell className="py-3 text-right tabular-nums text-slate-600">
+                    {rupiah(fac.monthlyInstallment)}
+                  </TableCell>
 
-                  <td className="p-3 font-mono font-bold text-emerald-700">
-                    Rp {fac.outstandingPrincipal.toLocaleString('id-ID')}
-                  </td>
+                  <TableCell className="py-3">
+                    <KolPill kol={fac.collectibility} />
+                    {(fac.dpdDays ?? 0) > 0 && (
+                      <span className="mt-1 block text-[10px] font-bold tabular-nums text-danger">
+                        Menunggak {fac.dpdDays} hari
+                      </span>
+                    )}
+                  </TableCell>
 
-                  <td className="p-3 font-mono text-blue-700 font-medium">
-                    Rp {fac.monthlyInstallment.toLocaleString('id-ID')}
-                  </td>
+                  <TableCell className="py-3 text-right tabular-nums text-slate-600">
+                    {tanggalPendek(fac.nextDueDate)}
+                  </TableCell>
 
-                  <td className="p-3">
-                    <span
-                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
-                        fac.collectibility === 'KOL_1'
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                          : fac.collectibility === 'KOL_2'
-                          ? 'bg-amber-50 text-amber-800 border-amber-200'
-                          : 'bg-red-50 text-red-700 border-red-200'
-                      }`}
-                    >
-                      {fac.collectibility} (DPD: {fac.dpdDays} Hari)
-                    </span>
-                  </td>
-
-                  <td className="p-3 text-slate-600 font-mono text-[11px]">{fac.nextDueDate}</td>
-
-                  <td className="p-3 text-right">
+                  <TableCell className="py-3">
                     <div className="flex items-center justify-end gap-1.5">
-                      {fac.dpdDays > 0 && (
-                        <button
-                          onClick={() => setActiveModule('PTP_TRACKER')}
-                          className="px-2 py-1 rounded bg-amber-50 hover:bg-amber-100 text-amber-800 text-[10px] font-semibold border border-amber-200 cursor-pointer transition-colors"
-                        >
-                          Catat PTP
-                        </button>
+                      {(fac.dpdDays ?? 0) > 0 && (
+                        <Button variant="ghost" size="sm" onClick={() => setActiveModule('PTP_TRACKER')}>
+                          Catat janji bayar
+                        </Button>
                       )}
-                      <button
-                        onClick={() => openCustomer360(fac.cif)}
-                        className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-600 text-blue-700 hover:text-white text-[11px] font-medium transition-colors border border-blue-200 cursor-pointer"
-                      >
-                        Lihat 360°
-                      </button>
+                      <Button variant="secondary" size="sm" onClick={() => openCustomer360(fac.cif)}>
+                        Lihat nasabah
+                      </Button>
                     </div>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+            </TableBody>
+          </Table>
+        )}
+      </Panel>
+
+      {/* -------------------- konfirmasi pencairan -------------------- */}
+      <Modal
+        isOpen={konfirmasi !== null}
+        onClose={() => setKonfirmasi(null)}
+        title="Cairkan dana ke rekening debitur?"
+        description="Pencairan tercatat langsung dan tidak bisa dibatalkan dari layar ini."
+      >
+        {konfirmasi && (
+          <div className="space-y-4">
+            <dl className="divide-y divide-border rounded-xl border border-border">
+              {[
+                ['Debitur', konfirmasi.customerName],
+                ['No. pengajuan', konfirmasi.applicationNumber],
+                ['Jumlah dicairkan', rupiah(plafonDisetujui(konfirmasi))],
+              ].map(([k, v]) => (
+                <div key={k} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                  <dt className="text-xs text-slate-500">{k}</dt>
+                  <dd className="text-xs font-bold tabular-nums text-foreground">{v}</dd>
+                </div>
+              ))}
+            </dl>
+
+            <p className="flex items-start gap-2 text-[11px] leading-relaxed text-slate-500">
+              <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0 text-warning" />
+              <span>Pastikan akad sudah ditandatangani dan seluruh syarat penarikan terpenuhi.</span>
+            </p>
+
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" onClick={() => setKonfirmasi(null)}>Batal</Button>
+              <Button onClick={cairkan}>
+                <Send className="mr-1.5 h-4 w-4" /> Ya, cairkan
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       <DocumentViewerModal
         isOpen={viewerModal.isOpen}
@@ -285,6 +302,6 @@ export const DisbursementPortfolioView: React.FC = () => {
         applicationNumber={viewerModal.app?.applicationNumber || ''}
         app={viewerModal.app}
       />
-    </div>
+    </StageShell>
   );
 };

@@ -1,471 +1,315 @@
-import React, { useState, useEffect } from 'react';
-import {
-  MapPin,
-  CheckCircle2,
-  ArrowLeft,
-  Briefcase,
-  AlertOctagon,
-  Clock,
-  Calendar,
-  FileText,
-  Camera,
-  Send,
-  Home,
-  User,
-  Fingerprint,
-  Bell,
-  RefreshCcw,
-  ClipboardList,
-  ChevronRight,
-  ShieldAlert,
-  Wallet,
-  Activity,
-  Megaphone
-} from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { ClipboardCheck, Inbox, MapPin, Smartphone } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { CreditPipelineHeader } from '../ui/CreditPipelineHeader';
+import { CreditApplication } from '../../types';
+import { StageShell } from '../credit/StageShell';
+import {
+  BarisAntrean, BelumAdaPilihan, Kosong, NadaPill, Panel, StageWorkbench, StatusPill,
+} from '../credit/StageParts';
+import { rupiah, sisaSla, tanggalPendek } from '../credit/pipeline';
+import { Button } from '../ui/Button';
+import { cn } from '../../lib/utils';
+
+/**
+ * Tahap 2 — Survei Lapangan.
+ *
+ * Halaman ini sebelumnya sama sekali bukan halaman pipeline kredit. Isinya
+ * simulasi ponsel: bingkai perangkat selebar 400px lengkap dengan poni, jam
+ * status bar, dan bilah tab bawah, yang di dalamnya menjalankan layar absensi
+ * dan rekap cuti pegawai. Rel tahap kredit ikut terjepit ke dalam kolom selebar
+ * ponsel itu sehingga terpotong di layar lebar.
+ *
+ * Aktivitas lapangan dan absensi sekarang punya aplikasi Android sendiri, jadi
+ * peniruan ponsel di dalam peramban tidak lagi punya alasan untuk ada. Yang
+ * dibutuhkan di web adalah yang dikerjakan orang di meja: melihat berkas mana
+ * yang menunggu disurvei dan membaca hasil survei yang sudah masuk.
+ *
+ * `submitSurveyReport` tetap dipakai, dengan bentuk data yang sama. Pencatatan
+ * kunjungan penagihan dan absensi tidak lagi dari sini — keduanya milik modul
+ * Penagihan dan aplikasi lapangan, bukan tahap survei kredit.
+ */
+
+const kelasIsian =
+  'w-full rounded-xl border border-border bg-surface px-3 py-2 text-xs font-medium text-foreground ' +
+  'placeholder:text-muted outline-none transition-colors focus:border-primary focus-visible:ring-2 focus-visible:ring-ring';
+
+const Label: React.FC<{ children: React.ReactNode; untuk: string }> = ({ children, untuk }) => (
+  <label htmlFor={untuk} className="mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-muted">
+    {children}
+  </label>
+);
+
+const Baris: React.FC<{ k: string; v: React.ReactNode }> = ({ k, v }) => (
+  <div className="flex items-start justify-between gap-3 border-b border-border py-2 last:border-b-0">
+    <dt className="text-[11px] text-slate-500">{k}</dt>
+    <dd className="text-right text-xs font-bold tabular-nums text-foreground">{v}</dd>
+  </div>
+);
+
+const KONDISI_USAHA = [
+  { nilai: 'AKTIF_RAMAI', label: 'Aktif dan ramai' },
+  { nilai: 'SEDANG', label: 'Sedang' },
+  { nilai: 'SEPI', label: 'Sepi' },
+  { nilai: 'TIDAK_BEROPERASI', label: 'Tidak beroperasi' },
+] as const;
+
+const TANGGAPAN_TETANGGA = [
+  { nilai: 'SANGAT_POSITIF', label: 'Sangat positif' },
+  { nilai: 'POSITIF', label: 'Positif' },
+  { nilai: 'NETRAL', label: 'Netral' },
+  { nilai: 'NEGATIF', label: 'Negatif' },
+] as const;
+
+const KEPEMILIKAN = [
+  { nilai: 'MILIK_SENDIRI', label: 'Milik sendiri' },
+  { nilai: 'SEWA_KONTRAK', label: 'Sewa atau kontrak' },
+  { nilai: 'MILIK_KELUARGA', label: 'Milik keluarga' },
+] as const;
+
+const labelDari = (daftar: readonly { nilai: string; label: string }[], nilai?: string) =>
+  daftar.find(d => d.nilai === nilai)?.label ?? '—';
 
 export const OtsSurveyView: React.FC = () => {
-  const { creditApplications, submitSurveyReport, collectionCases, recordCollectionVisit, recordAttendanceCheckIn, currentUser } = useApp();
+  const { creditApplications, submitSurveyReport, currentUser } = useApp();
 
-  // Mobile App Navigation State
-  const [currentTab, setCurrentTab] = useState<'BERANDA' | 'ABSENSI' | 'DATA_ABSENSI'>('BERANDA');
-  const [activeMenu, setActiveMenu] = useState<'NONE' | 'AKTIVITAS_LIST' | 'AKTIVITAS_FORM'>('NONE');
+  // Berkas yang perlu atau sudah disurvei.
+  const antrean = creditApplications.filter(
+    (a) => a.currentStage === 'SLIK' || a.currentStage === 'SURVEY' || a.survey
+  );
 
-  // Real-time clock
-  const [currentTime, setCurrentTime] = useState(new Date());
+  const [terpilihId, setTerpilihId] = useState<string>(antrean.length > 0 ? antrean[0].id : '');
   useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
+    if (antrean.length === 0) { if (terpilihId) setTerpilihId(''); return; }
+    if (!antrean.some(a => a.id === terpilihId)) setTerpilihId(antrean[0].id);
+  }, [antrean, terpilihId]);
 
-  // Format Dates
-  const formattedDate = new Intl.DateTimeFormat('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(currentTime);
-  const formattedTime = currentTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+  const app = creditApplications.find(a => a.id === terpilihId) as CreditApplication | undefined;
+  const survei = app?.survey;
 
-  // ----------------------------------------------------------------------
-  // ACTIVITY & OTS LOGIC
-  // ----------------------------------------------------------------------
-  const [activityType, setActivityType] = useState<'COLLECTION' | 'LOS'>('COLLECTION');
-  const [selectedId, setSelectedId] = useState<string>('');
+  const [form, setForm] = useState({
+    houseOwnership: 'MILIK_SENDIRI' as string,
+    businessCondition: 'SEDANG' as string,
+    neighborFeedback: 'NETRAL' as string,
+    neighborIntervieweeName: '',
+    neighborIntervieweeRelation: '',
+    locationAddress: '',
+    surveyorSummary: '',
+    surveyScore: 0,
+  });
 
-  const surveyPendingApps = creditApplications.filter(a => a.currentStage === 'SURVEY' || a.currentStage === 'VERIFICATION');
-  const pendingCollectionCases = collectionCases.filter(c => c.dpdDays > 0);
-  
-  const activeCase = collectionCases.find(c => c.id === selectedId);
-  const activeApp = creditApplications.find(a => a.id === selectedId);
+  useEffect(() => {
+    if (!app) return;
+    setForm(f => ({
+      ...f,
+      locationAddress: app.address ?? '',
+      neighborIntervieweeName: '',
+      neighborIntervieweeRelation: '',
+      surveyorSummary: '',
+      surveyScore: 0,
+    }));
+  }, [app?.id]);
 
-  const [formState, setFormState] = useState({ outcome: '', notes: '' });
+  const siapKirim = form.surveyorSummary.trim().length > 0 && form.surveyScore > 0;
 
-  const handleSaveActivity = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (activityType === 'COLLECTION' && activeCase) {
-      if (!formState.outcome) return alert('Pilih hasil kunjungan!');
-      recordCollectionVisit(activeCase.id, {
-        date: currentTime.toISOString().split('T')[0],
-        collectorName: currentUser.name,
-        gpsLocation: `-7.55611, 110.8222 (Akurasi: 4m)`, // Solo coordinates roughly
-        outcome: formState.outcome,
-        nextAction: formState.notes || 'Tidak ada catatan tambahan.',
-      });
-      alert('Laporan Aktivitas Berhasil Dikirim!');
-      setActiveMenu('AKTIVITAS_LIST');
-    } else if (activityType === 'LOS' && activeApp) {
-      submitSurveyReport(activeApp.id, { surveyorSummary: formState.notes, surveyScore: 85 } as any);
-      alert('Laporan Survey Dikirim!');
-      setActiveMenu('AKTIVITAS_LIST');
-    }
+  const kirim = () => {
+    if (!app || !siapKirim) return;
+    submitSurveyReport(app.id, {
+      ...form,
+      surveyorId: currentUser?.id,
+      surveyorName: currentUser?.name,
+      conductedDate: new Date().toISOString(),
+      status: 'COMPLETED',
+    });
   };
-
-  const handleAbsenMasuk = () => {
-    recordAttendanceCheckIn(-7.55611, 110.8222, '', 'Absen Masuk Mobile');
-    alert('Berhasil Absen Masuk!');
-    setCurrentTab('BERANDA');
-  };
-
-  const formatIDR = (val: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
-
-  // ----------------------------------------------------------------------
-  // COMPONENTS FOR SCREENS
-  // ----------------------------------------------------------------------
-
-  const renderBeranda = () => (
-    <div className="pb-24 animate-in fade-in bg-background min-h-full">
-      {/* Blue Header Section */}
-      <div className="bg-primary rounded-b-[40px] pt-12 pb-16 px-6 text-primary-foreground relative shadow-lg">
-        {/* Top Bar */}
-        <div className="flex justify-between items-center mb-6">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-primary-light/20 rounded-full flex items-center justify-center overflow-hidden border-2 border-white/20">
-              <User className="text-white w-6 h-6" />
-            </div>
-            <div>
-              <p className="font-bold text-sm leading-tight text-white">absen ara</p>
-              <p className="text-[10px] font-medium text-white/80">{currentUser.role}</p>
-            </div>
-          </div>
-          <button className="relative">
-            <Bell className="w-5 h-5 text-white" />
-            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-danger rounded-full border border-primary"></span>
-          </button>
-        </div>
-
-        {/* Company Logo Placeholder */}
-        <div className="flex justify-center mb-4">
-          <div className="bg-white/10 px-4 py-2 rounded-xl backdrop-blur-sm border border-white/20">
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 bg-white rounded-full flex items-center justify-center">
-                <Briefcase className="w-3 h-3 text-primary" />
-              </div>
-              <span className="font-black italic text-sm tracking-widest text-white">PT. BPR ARA</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Overlapping Content Box */}
-      <div className="-mt-12 px-5 space-y-4">
-        
-        {/* Attendance Card */}
-        <div className="bg-surface rounded-2xl shadow-lg p-5 border border-border">
-          <div className="flex justify-between items-center pb-4 border-b border-border">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-primary-light flex items-center justify-center text-primary">
-                <Clock className="w-4 h-4" />
-              </div>
-              <div>
-                <p className="text-[11px] text-muted font-bold">Reguler</p>
-                <p className="text-sm font-black text-foreground">08:00 - 17:00</p>
-                <p className="text-[10px] font-bold text-primary mt-0.5">Masuk: -</p>
-              </div>
-            </div>
-            <div className="text-right">
-              <p className="text-[11px] text-muted font-bold">{formattedDate.split(',')[0]}</p>
-              <p className="text-[10px] font-medium text-muted mt-0.5">{formattedDate.split(',')[1]}</p>
-              <p className="text-[10px] font-bold text-muted mt-0.5">Pulang: -</p>
-            </div>
-          </div>
-          
-          <div className="pt-4">
-            <h4 className="text-[11px] font-black text-foreground text-center mb-3">Rekap Absensi Bulan ini</h4>
-            <div className="grid grid-cols-3 gap-2 text-center divide-x divide-border">
-              <div>
-                <p className="text-[10px] font-bold text-muted uppercase">Hadir <ChevronRight className="inline w-3 h-3"/></p>
-                <p className="text-sm font-black text-success mt-0.5">0 Hari</p>
-                <div className="w-full h-1 bg-success mt-2 rounded-full"></div>
-              </div>
-              <div>
-                <p className="text-[10px] font-bold text-muted uppercase">Izin <ChevronRight className="inline w-3 h-3"/></p>
-                <p className="text-sm font-black text-primary mt-0.5">0 Hari</p>
-                <div className="w-full h-1 bg-primary mt-2 rounded-full"></div>
-              </div>
-              <div>
-                <p className="text-[10px] font-bold text-muted uppercase">Saldo Cuti <ChevronRight className="inline w-3 h-3"/></p>
-                <p className="text-sm font-black text-warning mt-0.5">12 Hari</p>
-                <div className="w-full h-1 bg-warning mt-2 rounded-full"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Main Menu Grid */}
-        <div>
-          <h3 className="font-bold text-foreground text-sm mb-3 px-1 mt-6">Menu Utama</h3>
-          <div className="grid grid-cols-4 gap-y-5 gap-x-2">
-            {[
-              { icon: <FileText className="text-primary w-6 h-6"/>, label: 'Izin' },
-              { icon: <Clock className="text-primary w-6 h-6"/>, label: 'Lembur' },
-              { icon: <RefreshCcw className="text-primary w-6 h-6"/>, label: 'Shift' },
-              { icon: <Wallet className="text-primary w-6 h-6"/>, label: 'Reimbursement' },
-              { icon: <Wallet className="text-primary w-6 h-6"/>, label: 'Info Gaji' },
-              { 
-                icon: <ClipboardList className="text-primary w-6 h-6"/>, 
-                label: 'Aktivitas',
-                action: () => setActiveMenu('AKTIVITAS_LIST')
-              },
-              { icon: <Megaphone className="text-primary w-6 h-6"/>, label: 'Pengumuman' },
-            ].map((menu, i) => (
-              <div key={i} onClick={menu.action} className="flex flex-col items-center gap-1.5 cursor-pointer active:scale-95 transition-transform">
-                <div className="w-12 h-12 bg-surface rounded-2xl shadow-sm border border-border flex items-center justify-center relative overflow-hidden group">
-                  <div className="absolute inset-0 bg-primary-light opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                  {menu.icon}
-                </div>
-                <span className="text-[10px] font-medium text-muted text-center leading-tight w-16">{menu.label}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-      </div>
-    </div>
-  );
-
-  const renderAbsensiMap = () => (
-    <div className="h-full flex flex-col bg-background relative animate-in fade-in">
-      {/* Fake Map Background */}
-      <div className="absolute inset-0 bg-[url('https://maps.wikimedia.org/osm-intl/14/11993/8664.png')] bg-cover bg-center opacity-70 mix-blend-multiply"></div>
-      
-      {/* Header Back */}
-      <div className="relative z-10 pt-12 px-4 flex justify-between items-center">
-        <button onClick={() => setCurrentTab('BERANDA')} className="w-10 h-10 bg-surface rounded-full flex items-center justify-center shadow-lg text-muted">
-          <ArrowLeft className="w-5 h-5 text-foreground" />
-        </button>
-        <button className="w-10 h-10 bg-surface rounded-full flex items-center justify-center shadow-lg text-muted">
-          <RefreshCcw className="w-5 h-5 text-foreground" />
-        </button>
-      </div>
-
-      {/* Map Pins */}
-      <div className="relative z-10 flex-1 flex flex-col items-center justify-center">
-        <div className="animate-bounce">
-          <div className="w-12 h-12 rounded-full bg-danger/20 flex items-center justify-center">
-            <div className="w-8 h-8 rounded-full bg-danger text-white flex items-center justify-center shadow-lg border-2 border-white">
-              <MapPin className="w-4 h-4" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Bottom Sheet Action */}
-      <div className="relative z-20 bg-surface rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] p-5 pb-24 space-y-4">
-        <div className="w-12 h-1.5 bg-border rounded-full mx-auto mb-2"></div>
-        
-        <div className="flex items-center gap-3 bg-background p-3 rounded-xl">
-          <MapPin className="text-muted w-5 h-5" />
-          <div>
-            <p className="text-[10px] font-medium text-muted">Lokasi</p>
-            <p className="text-sm font-bold text-foreground">Kantor BPR ARA - Pusat</p>
-          </div>
-        </div>
-
-        <div className="flex justify-between items-center px-2">
-          <div className="flex items-center gap-3">
-            <Clock className="text-muted w-5 h-5" />
-            <div>
-              <p className="text-[11px] font-bold text-foreground">Reguler</p>
-              <p className="text-sm font-black text-foreground">08:00 - 17:00</p>
-            </div>
-          </div>
-          <div className="text-right">
-            <p className="text-[11px] font-bold text-muted">{formattedDate}</p>
-          </div>
-        </div>
-
-        <div className="flex justify-between items-center bg-surface border border-border p-3 rounded-2xl shadow-sm">
-          <div className="flex items-center gap-3">
-            <Briefcase className="text-primary w-5 h-5" />
-            <p className="text-xs font-bold text-muted">Jam Kerja<br/><span className="text-muted font-medium">-</span></p>
-          </div>
-          <button onClick={handleAbsenMasuk} className="bg-success hover:bg-success/90 active:bg-success/80 text-white px-5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 shadow-md shadow-success/30 transition-all">
-            Absensi Masuk <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
-        
-        <div className="flex justify-between items-center bg-surface border border-border p-3 rounded-2xl shadow-sm opacity-50">
-          <div className="flex items-center gap-3">
-            <Clock className="text-warning w-5 h-5" />
-            <p className="text-xs font-bold text-muted">Istirahat<br/><span className="text-muted font-medium">-</span></p>
-          </div>
-          <button className="bg-muted text-white px-5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2">
-            Mulai Istirahat <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderAktivitasList = () => (
-    <div className="h-full bg-background flex flex-col animate-in slide-in-from-right-4 pb-20">
-      {/* Header */}
-      <div className="bg-primary text-primary-foreground p-4 pt-12 flex items-center justify-between">
-        <button onClick={() => setActiveMenu('NONE')} className="p-2"><ArrowLeft size={20}/></button>
-        <h2 className="font-bold">Laporan Aktivitas</h2>
-        <button className="p-2"><div className="w-5 h-5"></div></button>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex bg-surface border-b border-border">
-        <button 
-          onClick={() => setActivityType('COLLECTION')}
-          className={`flex-1 py-3 text-[11px] font-bold text-center border-b-2 transition-colors ${activityType === 'COLLECTION' ? 'border-primary text-primary' : 'border-transparent text-muted'}`}
-        >
-          PENAGIHAN ({pendingCollectionCases.length})
-        </button>
-        <button 
-          onClick={() => setActivityType('LOS')}
-          className={`flex-1 py-3 text-[11px] font-bold text-center border-b-2 transition-colors ${activityType === 'LOS' ? 'border-primary text-primary' : 'border-transparent text-muted'}`}
-        >
-          SURVEY ({surveyPendingApps.length})
-        </button>
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        {activityType === 'COLLECTION' && pendingCollectionCases.map(c => (
-          <div key={c.id} onClick={() => { setSelectedId(c.id); setActiveMenu('AKTIVITAS_FORM'); }} className="bg-surface p-4 rounded-xl shadow-sm border border-border cursor-pointer active:bg-primary-light/50 transition-colors">
-            <div className="flex justify-between items-start mb-1">
-              <span className="font-bold text-sm text-foreground">{c.debtorName}</span>
-              <span className="text-[9px] font-black bg-danger/10 text-danger px-1.5 py-0.5 rounded">DPD {c.dpdDays}</span>
-            </div>
-            <p className="text-[10px] text-muted font-medium">Tunggakan: <strong className="text-foreground">{formatIDR(c.overdueAmount)}</strong></p>
-          </div>
-        ))}
-        {activityType === 'LOS' && surveyPendingApps.map(app => (
-          <div key={app.id} onClick={() => { setSelectedId(app.id); setActiveMenu('AKTIVITAS_FORM'); }} className="bg-surface p-4 rounded-xl shadow-sm border border-border cursor-pointer active:bg-primary-light/50 transition-colors">
-            <div className="flex justify-between items-start mb-1">
-              <span className="font-bold text-sm text-foreground">{app.customerName}</span>
-              <span className="text-[9px] font-black bg-primary-light text-primary px-1.5 py-0.5 rounded">SURVEY BARU</span>
-            </div>
-            <p className="text-[10px] text-muted font-medium">Plafon: <strong className="text-foreground">{formatIDR(app.requestedPlafon)}</strong></p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-
-  const renderAktivitasForm = () => (
-    <div className="h-full bg-surface flex flex-col animate-in slide-in-from-right-4">
-      {/* Header */}
-      <div className="bg-primary text-primary-foreground p-4 pt-12 flex items-center justify-between">
-        <button onClick={() => setActiveMenu('AKTIVITAS_LIST')} className="p-2"><ArrowLeft size={20}/></button>
-        <h2 className="font-bold text-sm truncate max-w-[200px]">
-          {activityType === 'COLLECTION' ? activeCase?.debtorName : activeApp?.customerName}
-        </h2>
-        <button className="p-2"><div className="w-5 h-5"></div></button>
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-5 space-y-6 bg-background pb-24">
-        {/* Step 1: Geotag (Auto) */}
-        <div>
-          <label className="text-[10px] font-bold text-muted uppercase mb-2 block">1. Bukti Lokasi (Otomatis)</label>
-          <div className="bg-surface border border-border rounded-xl p-3 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-success/10 flex items-center justify-center text-success"><MapPin size={20}/></div>
-            <div>
-              <div className="text-foreground font-bold text-xs">-7.55611, 110.8222</div>
-              <div className="text-[9px] text-success font-bold bg-success/10 px-1 py-0.5 rounded inline-block mt-1">✓ LOKASI SESUAI (Akurasi 4m)</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Step 2: Camera */}
-        <div>
-          <label className="text-[10px] font-bold text-muted uppercase mb-2 block">2. Foto Bukti (Kamera)</label>
-          <button className="w-full bg-surface border-2 border-dashed border-muted/30 rounded-xl py-8 flex flex-col items-center justify-center text-primary active:bg-primary-light transition-colors">
-            <Camera size={32} className="mb-2"/>
-            <span className="font-bold text-xs">Ketuk untuk Buka Kamera</span>
-          </button>
-        </div>
-
-        {/* Step 3: Outcome */}
-        {activityType === 'COLLECTION' && (
-          <div>
-            <label className="text-[10px] font-bold text-muted uppercase mb-2 block">3. Hasil Kunjungan</label>
-            <div className="grid grid-cols-2 gap-2">
-              {['Janji Bayar', 'Bayar Langsung', 'Rumah Kosong', 'Tolak Bayar'].map((opt) => (
-                <button
-                  key={opt}
-                  onClick={() => setFormState({...formState, outcome: opt})}
-                  className={`p-2.5 rounded-lg text-[11px] font-bold border transition-colors ${
-                    formState.outcome === opt ? 'bg-primary border-primary text-white shadow-md' : 'bg-surface border-border text-muted hover:bg-background'
-                  }`}
-                >
-                  {opt}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Step 4: Notes */}
-        <div>
-          <label className="text-[10px] font-bold text-muted uppercase mb-2 block">4. Catatan (Opsional)</label>
-          <textarea
-            rows={3}
-            value={formState.notes}
-            onChange={(e) => setFormState({ ...formState, notes: e.target.value })}
-            placeholder="Tuliskan keterangan tambahan..."
-            className="w-full p-3 rounded-xl bg-surface border border-border text-xs focus:outline-none focus:border-primary font-medium text-foreground"
-          />
-        </div>
-        
-        <button onClick={handleSaveActivity} className="w-full py-3.5 bg-primary text-white rounded-xl font-bold text-sm shadow-lg shadow-primary/20 active:bg-primary-dark transition-colors flex items-center justify-center gap-2 mt-4">
-          <Send size={16}/> Kirim Laporan
-        </button>
-      </div>
-    </div>
-  );
 
   return (
-    <div className="flex flex-col items-center bg-primary-navy min-h-screen -mx-4 -mt-4 p-4 sm:p-8">
-      <div className="w-full max-w-[400px]">
-        <CreditPipelineHeader currentStage="Field Survey" />
+    <StageShell
+      stage="Field Survey"
+      judul="Survei Lapangan"
+      keterangan="Memantau berkas yang menunggu kunjungan surveyor dan membaca hasil survei yang sudah masuk."
+    >
+      {/* Menjelaskan ke mana perginya pekerjaan lapangan, supaya tidak dicari di web. */}
+      <div className="flex items-start gap-3 rounded-2xl border border-border bg-surface px-5 py-4 shadow-sm">
+        <Smartphone className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+        <p className="text-xs leading-relaxed text-slate-600">
+          Pengambilan foto, titik lokasi, dan absensi surveyor dikerjakan lewat aplikasi Android.
+          Halaman web ini untuk memantau antrean dan membaca hasilnya, atau mencatat survei dari kantor
+          bila laporannya masuk di luar aplikasi.
+        </p>
       </div>
-      {/* Mobile Device Frame */}
-      <div className="w-full max-w-[400px] bg-background rounded-[40px] shadow-2xl overflow-hidden flex flex-col h-[85vh] sm:h-[800px] border-[12px] border-black relative">
-        
-        {/* Dynamic Island / Notch Simulation */}
-        <div className="absolute top-0 w-full flex justify-center z-50">
-          <div className="w-32 h-6 bg-black rounded-b-3xl"></div>
-        </div>
-        <div className="absolute top-0 left-0 w-full px-6 py-1.5 flex justify-between items-center text-white text-[10px] font-bold z-40">
-          <span>{formattedTime}</span>
-          <div className="flex gap-1.5 items-center">
-            <Activity size={10}/>
-            <div className="w-4 h-2.5 border border-white rounded-[2px] relative"><div className="absolute inset-px bg-white w-[80%]"></div></div>
-          </div>
-        </div>
 
-        {/* --- MAIN CONTENT AREA --- */}
-        <div className="flex-1 overflow-hidden relative">
-          {activeMenu === 'NONE' ? (
-            <>
-              {currentTab === 'BERANDA' && renderBeranda()}
-              {currentTab === 'ABSENSI' && renderAbsensiMap()}
-              {currentTab === 'DATA_ABSENSI' && <div className="p-8 text-center text-muted mt-20">Fitur Data Absensi belum aktif.</div>}
-            </>
+      <StageWorkbench
+        judulAntrean="Antrean survei"
+        jumlah={antrean.length}
+        antrean={
+          antrean.length === 0 ? (
+            <Kosong
+              rapat
+              icon={Inbox}
+              judul="Tidak ada berkas menunggu survei"
+              keterangan="Berkas masuk ke sini setelah pemeriksaan SLIK selesai."
+            />
           ) : (
-            <>
-              {activeMenu === 'AKTIVITAS_LIST' && renderAktivitasList()}
-              {activeMenu === 'AKTIVITAS_FORM' && renderAktivitasForm()}
-            </>
-          )}
-        </div>
+            antrean.map(a => {
+              const sla = sisaSla(a.slaDeadline, a.slaExceeded);
+              return (
+                <BarisAntrean
+                  key={a.id}
+                  terpilih={terpilihId === a.id}
+                  onClick={() => setTerpilihId(a.id)}
+                  utama={a.customerName}
+                  kedua={`${rupiah(a.requestedPlafon)} · ${a.kecamatan || a.kabupaten || 'lokasi belum dicatat'}`}
+                  kanan={
+                    a.survey
+                      ? <NadaPill label="Sudah disurvei" nada="success" />
+                      : <StatusPill stage={a.currentStage} />
+                  }
+                  bawah={
+                    sla.nada !== 'neutral' ? (
+                      <span className={cn('text-[10px] font-bold', sla.nada === 'danger' ? 'text-danger' : 'text-warning')}>
+                        {sla.label}
+                      </span>
+                    ) : undefined
+                  }
+                />
+              );
+            })
+          )
+        }
+      >
+        {!app ? (
+          <BelumAdaPilihan
+            icon={MapPin}
+            judul="Pilih berkas untuk melihat surveinya"
+            keterangan="Klik salah satu nama di antrean sebelah kiri. Hasil survei atau lembar pencatatannya akan terbuka di sini."
+            antreanKosong={antrean.length === 0}
+          />
+        ) : survei ? (
+          /* --------------------------- hasil survei --------------------------- */
+          <div className="space-y-5">
+            <Panel judul={`Hasil survei · ${app.customerName}`}>
+              <div className="grid grid-cols-1 gap-x-6 sm:grid-cols-2">
+                <dl>
+                  <Baris k="Surveyor" v={survei.surveyorName || '—'} />
+                  <Baris k="Tanggal survei" v={tanggalPendek(survei.conductedDate || survei.scheduledDate)} />
+                  <Baris k="Skor survei" v={Number.isFinite(Number(survei.surveyScore)) ? `${survei.surveyScore}/100` : '—'} />
+                  <Baris k="Kepemilikan rumah" v={labelDari(KEPEMILIKAN, survei.houseOwnership)} />
+                </dl>
+                <dl>
+                  <Baris k="Kondisi usaha" v={labelDari(KONDISI_USAHA, survei.businessCondition)} />
+                  <Baris k="Tanggapan tetangga" v={labelDari(TANGGAPAN_TETANGGA, survei.neighborFeedback)} />
+                  <Baris k="Narasumber" v={survei.neighborIntervieweeName || '—'} />
+                  <Baris k="Alamat lokasi" v={survei.locationAddress || app.address || '—'} />
+                </dl>
+              </div>
 
-        {/* --- BOTTOM NAVIGATION BAR --- */}
-        {activeMenu === 'NONE' && (
-          <div className="bg-surface border-t border-border px-6 py-2 pb-6 absolute bottom-0 w-full z-30 shadow-[0_-5px_20px_rgba(0,0,0,0.05)]">
-            <div className="flex justify-between items-end">
-              
-              <button 
-                onClick={() => setCurrentTab('BERANDA')} 
-                className={`flex flex-col items-center gap-1 w-16 ${currentTab === 'BERANDA' ? 'text-primary' : 'text-muted'}`}
-              >
-                <Home className="w-5 h-5" />
-                <span className="text-[9px] font-bold">BERANDA</span>
-              </button>
-
-              {/* Big Center Button */}
-              <button 
-                onClick={() => setCurrentTab('ABSENSI')} 
-                className="relative -top-5 flex flex-col items-center group"
-              >
-                <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center shadow-lg shadow-primary/30 text-white border-4 border-surface group-active:scale-95 transition-transform hover:bg-primary-dark">
-                  <Fingerprint className="w-8 h-8" />
+              {survei.surveyorSummary && (
+                <div className="mt-4 rounded-xl border border-border bg-surface-muted px-3.5 py-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-muted">Catatan surveyor</p>
+                  <p className="mt-1 text-xs leading-relaxed text-foreground">{survei.surveyorSummary}</p>
                 </div>
-                <span className={`text-[10px] font-bold mt-1 ${currentTab === 'ABSENSI' ? 'text-primary' : 'text-muted'}`}>ABSENSI</span>
-              </button>
+              )}
+            </Panel>
 
-              <button 
-                onClick={() => setCurrentTab('DATA_ABSENSI')} 
-                className={`flex flex-col items-center gap-1 w-16 ${currentTab === 'DATA_ABSENSI' ? 'text-primary' : 'text-muted'}`}
-              >
-                <ClipboardList className="w-5 h-5" />
-                <span className="text-[9px] font-bold text-center leading-tight">DATA<br/>ABSENSI</span>
-              </button>
-            </div>
+            {survei.photos?.length > 0 && (
+              <Panel judul="Foto lapangan" hitungan={survei.photos.length}>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  {survei.photos.map(f => (
+                    <figure key={f.id} className="overflow-hidden rounded-xl border border-border">
+                      <img src={f.url} alt={f.label} className="h-28 w-full object-cover" />
+                      <figcaption className="truncate px-2 py-1.5 text-[10px] font-bold text-foreground">
+                        {f.label}
+                      </figcaption>
+                    </figure>
+                  ))}
+                </div>
+              </Panel>
+            )}
           </div>
-        )}
+        ) : (
+          /* --------------------------- catat survei --------------------------- */
+          <Panel judul={`Catat hasil survei · ${app.customerName}`}>
+            <p className="-mt-1 mb-5 text-[11px] tabular-nums text-slate-500">
+              {app.applicationNumber} · {rupiah(app.requestedPlafon)} · {app.requestedTenorMonths} bulan
+            </p>
 
-      </div>
-    </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <Label untuk="s-alamat">Alamat lokasi yang dikunjungi</Label>
+                <input id="s-alamat" className={kelasIsian} value={form.locationAddress}
+                  onChange={e => setForm(f => ({ ...f, locationAddress: e.target.value }))} />
+              </div>
+
+              <div>
+                <Label untuk="s-rumah">Kepemilikan rumah</Label>
+                <select id="s-rumah" className={cn(kelasIsian, 'cursor-pointer')} value={form.houseOwnership}
+                  onChange={e => setForm(f => ({ ...f, houseOwnership: e.target.value }))}>
+                  {KEPEMILIKAN.map(o => <option key={o.nilai} value={o.nilai}>{o.label}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <Label untuk="s-usaha">Kondisi usaha</Label>
+                <select id="s-usaha" className={cn(kelasIsian, 'cursor-pointer')} value={form.businessCondition}
+                  onChange={e => setForm(f => ({ ...f, businessCondition: e.target.value }))}>
+                  {KONDISI_USAHA.map(o => <option key={o.nilai} value={o.nilai}>{o.label}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <Label untuk="s-narasumber">Nama narasumber</Label>
+                <input id="s-narasumber" className={kelasIsian} placeholder="Tetangga atau perangkat setempat"
+                  value={form.neighborIntervieweeName}
+                  onChange={e => setForm(f => ({ ...f, neighborIntervieweeName: e.target.value }))} />
+              </div>
+
+              <div>
+                <Label untuk="s-hubungan">Hubungan dengan pemohon</Label>
+                <input id="s-hubungan" className={kelasIsian} placeholder="Misalnya tetangga sebelah, ketua RT"
+                  value={form.neighborIntervieweeRelation}
+                  onChange={e => setForm(f => ({ ...f, neighborIntervieweeRelation: e.target.value }))} />
+              </div>
+
+              <div>
+                <Label untuk="s-tanggapan">Tanggapan lingkungan</Label>
+                <select id="s-tanggapan" className={cn(kelasIsian, 'cursor-pointer')} value={form.neighborFeedback}
+                  onChange={e => setForm(f => ({ ...f, neighborFeedback: e.target.value }))}>
+                  {TANGGAPAN_TETANGGA.map(o => <option key={o.nilai} value={o.nilai}>{o.label}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <Label untuk="s-skor">Skor survei (0–100)</Label>
+                <input id="s-skor" type="number" min={0} max={100} placeholder="0–100"
+                  className={cn(kelasIsian, 'tabular-nums')}
+                  value={form.surveyScore || ''}
+                  onChange={e => setForm(f => ({
+                    ...f, surveyScore: Math.max(0, Math.min(100, Number(e.target.value) || 0)),
+                  }))} />
+              </div>
+
+              <div className="sm:col-span-2">
+                <Label untuk="s-catatan">Catatan surveyor</Label>
+                <textarea id="s-catatan" rows={4} className={cn(kelasIsian, 'resize-y')}
+                  placeholder="Apa yang Anda lihat di lokasi: kondisi tempat usaha, keramaian, akses jalan, dan hal yang perlu diperhatikan."
+                  value={form.surveyorSummary}
+                  onChange={e => setForm(f => ({ ...f, surveyorSummary: e.target.value }))} />
+              </div>
+            </div>
+
+            <div className="mt-5 flex flex-col items-stretch gap-2 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-[11px] text-slate-500">
+                {siapKirim
+                  ? 'Hasil survei akan tercatat pada berkas ini.'
+                  : 'Isi catatan surveyor dan skor survei sebelum menyimpan.'}
+              </p>
+              <Button type="button" disabled={!siapKirim} onClick={kirim}>
+                <ClipboardCheck className="mr-1.5 h-4 w-4" /> Simpan hasil survei
+              </Button>
+            </div>
+          </Panel>
+        )}
+      </StageWorkbench>
+    </StageShell>
   );
 };
