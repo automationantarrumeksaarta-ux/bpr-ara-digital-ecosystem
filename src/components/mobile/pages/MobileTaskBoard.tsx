@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from 'react';
-import {
-  CalendarDays, ClipboardList, FileText, ImageIcon, Plus, Search, User2, UserCheck, X,
-} from 'lucide-react';
+import { AlertTriangle, CalendarDays, ClipboardList, FileText, ImageIcon, Plus, Search, User2, UserCheck, X } from 'lucide-react';
 import { useApp } from '../../../context/AppContext';
+import { saringTugasUntuk } from '../../../utils/hirarki';
+import { tugasTertunggak, hariTerlambat } from '../../../utils/tugas';
 import { AppBar, Card, EmptyState, Screen, Stack } from '../ui/primitives';
 import { ink, radius, surface, text, tone, HIT_TARGET, type ToneName } from '../ui/tokens';
 
@@ -70,7 +70,7 @@ const tenggat = (tanggal?: string): { teks: string; mendesak: boolean; lewat: bo
 };
 
 const MobileTaskBoard: React.FC = () => {
-  const { flowTasks, currentUser } = useApp() as any;
+  const { flowTasks, currentUser, taskRoutes, allUsers } = useApp() as any;
   const [tahap, setTahap] = useState<Tahap>('aktif');
   const [cari, setCari] = useState('');
   const [hanyaSaya, setHanyaSaya] = useState(false);
@@ -85,10 +85,25 @@ const MobileTaskBoard: React.FC = () => {
     return !!pic && (pic === namaSaya || pic === tabSaya);
   };
 
-  const dasar = useMemo(
-    () => (flowTasks ?? []).filter((t: any) => !hanyaSaya || milikSaya(t)),
-    [flowTasks, hanyaSaya, namaSaya, tabSaya],
+  /*
+   * Papan tugas hanya memuat tugas sendiri dan tugas bawahan, berjenjang —
+   * aturan yang sama persis dengan versi web, lewat utilitas bersama.
+   *
+   * Sebelumnya `flowTasks` dipakai apa adanya, sehingga setiap pegawai melihat
+   * papan tugas seluruh kantor. Penyaring "Tugas saya" hanya mempersempit
+   * tampilan, bukan membatasi hak akses.
+   */
+  const terlihat = useMemo(
+    () => saringTugasUntuk(flowTasks ?? [], currentUser?.id, currentUser?.name, taskRoutes ?? {}, allUsers ?? []),
+    [flowTasks, currentUser?.id, currentUser?.name, taskRoutes, allUsers],
   );
+
+  const dasar = useMemo(
+    () => terlihat.filter((t: any) => !hanyaSaya || milikSaya(t)),
+    [terlihat, hanyaSaya, namaSaya, tabSaya],
+  );
+
+  const tertunggak = useMemo(() => tugasTertunggak(terlihat), [terlihat]);
 
   const jumlahPerTahap = useMemo(() => {
     const n: Record<Tahap, number> = { aktif: 0, menunggu: 0, selesai: 0 };
@@ -162,6 +177,25 @@ const MobileTaskBoard: React.FC = () => {
       />
 
       <Stack className="gap-4 pb-24">
+        {/*
+          Pengingat tugas yang lewat hari tetapi statusnya belum berubah.
+          Tidak muncul bila tidak ada — spanduk yang selalu hadir akan berhenti
+          dibaca dalam hitungan hari.
+        */}
+        {tertunggak.length > 0 && (
+          <div className={`${radius.card} bg-amber-50 border border-amber-200 px-4 py-3 flex items-start gap-2.5`}>
+            <AlertTriangle className="w-4 h-4 shrink-0 mt-px text-amber-600" />
+            <div className="min-w-0">
+              <p className={`${text.footnote} font-semibold text-amber-700`}>
+                {tertunggak.length} tugas lewat tenggat
+              </p>
+              <p className={`${text.caption} text-amber-700/80 mt-0.5 leading-relaxed`}>
+                Terlama {hariTerlambat(tertunggak[0])} hari. Perbarui statusnya atau ajukan validasi.
+              </p>
+            </div>
+          </div>
+        )}
+
         <label className={`flex items-center gap-2.5 px-3.5 ${HIT_TARGET} ${surface.card} ${radius.control} border ${surface.divider}`}>
           <Search className={`w-4 h-4 shrink-0 ${ink.faint}`} />
           <input

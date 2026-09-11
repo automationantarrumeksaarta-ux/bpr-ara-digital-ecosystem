@@ -1,11 +1,38 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { saringTugasUntuk, semuaBawahan } from '../../utils/hirarki';
+import { PengingatTugas } from '../common/PengingatTugas';
 import { TaskTableView } from '../tasks/TaskTableView';
 import { TaskFormModal } from '../common/TaskFormModal';
 import { TaskItem, FlowTaskLegacy } from '../../types';
 
 export const FlowTasksView: React.FC = () => {
-  const { flowTasks, currentUser, updateTaskStatus, createFlowTask, deleteFlowTask } = useApp();
+  const {
+    flowTasks, currentUser, updateTaskStatus, createFlowTask, deleteFlowTask,
+    taskRoutes, allUsers,
+  } = useApp() as any;
+
+  /*
+   * Papan tugas hanya memuat tugas sendiri dan tugas bawahan, berjenjang.
+   *
+   * Sebelumnya `flowTasks` diteruskan apa adanya, sehingga setiap orang yang
+   * membuka menu ini melihat papan tugas seluruh pegawai — termasuk yang tidak
+   * ada hubungan atasan–bawahan dengannya sama sekali.
+   *
+   * Rantai atasan diambil dari task_routes, yaitu isian "Lapor / Arahkan Task
+   * Ke (Atasan Langsung)" di menu Super Admin. Aturannya berlaku untuk semua
+   * peran, termasuk admin: yang ingin mengawasi banyak orang ditetapkan sebagai
+   * atasan mereka, bukan dikecualikan dari aturan.
+   */
+  const tugasSaya = useMemo(
+    () => saringTugasUntuk(flowTasks ?? [], currentUser?.id, currentUser?.name, taskRoutes ?? {}, allUsers ?? []),
+    [flowTasks, currentUser?.id, currentUser?.name, taskRoutes, allUsers],
+  );
+
+  const jumlahBawahan = useMemo(
+    () => semuaBawahan(taskRoutes ?? {}, currentUser?.id).size,
+    [taskRoutes, currentUser?.id],
+  );
   
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<TaskItem | null>(null);
@@ -40,11 +67,21 @@ export const FlowTasksView: React.FC = () => {
     <div className="w-full h-full flex flex-col relative z-0 animate-in fade-in">
       <div className="mb-2 mx-4 sm:mx-6 mt-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-4 flex items-center gap-2">
         <span className="text-[10px] font-black text-slate-400 tracking-widest uppercase">
-          MY WORKSPACE / TASK MANAGEMENT
+          Papan Tugas
+        </span>
+        {/* Cakupan ditulis apa adanya supaya tidak ada yang mengira papan ini
+            memuat seluruh pegawai, atau sebaliknya mengira tugasnya hilang. */}
+        <span className="text-[11px] text-slate-500">
+          {jumlahBawahan > 0
+            ? `Tugas Anda dan ${jumlahBawahan} bawahan`
+            : 'Tugas Anda'}
         </span>
       </div>
+      {/* Pengingat tugas lewat tenggat; tidak muncul bila tidak ada. */}
+      <PengingatTugas tugas={tugasSaya} className="mx-4 sm:mx-6 mb-2" />
+
       <TaskTableView
-        tasks={flowTasks}
+        tasks={tugasSaya}
         userRole={currentUser.role as any}
         currentUser={currentUser as any}
         currentUserUnit={currentUser.unit || 'BIS'}
