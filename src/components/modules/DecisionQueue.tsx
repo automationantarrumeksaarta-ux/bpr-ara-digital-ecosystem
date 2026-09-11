@@ -3,6 +3,9 @@ import { TaskItem, User, BEISTaskItemStatus as TaskStatus, EvidenceFile } from '
 import { CheckCircle2, XCircle, ShieldCheck, Search, Filter, FileText, ExternalLink, ArrowRight } from 'lucide-react';
 import { getAllUsersList } from '../../utils/beisUtils';
 import { FilePreviewModal } from '../common/FilePreviewModal';
+import { PageContainer } from '../ui/PageContainer';
+import { DeretAngka } from '../credit/StageShell';
+import { Panel } from '../credit/StageParts';
 
 interface DecisionQueueProps {
   tasks: TaskItem[];
@@ -175,87 +178,114 @@ export const DecisionQueue: React.FC<DecisionQueueProps> = ({ tasks, currentUser
 
   const isTaskApproved = (status: TaskStatus) => status === 'Validated Closed' || status === 'Improved';
 
+  // Ringkasan antrean. Dihitung dari daftar yang SAMA dengan yang ditampilkan,
+  // jadi angkanya tidak pernah bercerita lain daripada isi tabelnya.
+  const menunggu = filteredTasks.filter(t => !isTaskApproved(t.status)).length;
+  const disetujui = filteredTasks.filter(t => isTaskApproved(t.status)).length;
+  const dikembalikan = filteredTasks.filter(
+    t => t.status === 'Minor Rework' || t.status === 'Major Rework').length;
+  const terhambat = filteredTasks.filter(t => t.status === 'Blocked').length;
+
+  const kelasIsian =
+    'rounded-xl border border-border bg-surface px-3 py-2 text-xs font-medium text-foreground ' +
+    'outline-none transition-colors focus:border-primary focus-visible:ring-2 focus-visible:ring-ring';
+
   return (
-    <div className="flex-1 flex flex-col h-full bg-background p-6">
-      <div className="mb-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-4 flex items-center gap-2">
-        <span className="text-[10px] font-black text-slate-400 tracking-widest uppercase">
-          MY WORKSPACE / DECISION QUEUE
-        </span>
-      </div>
-      <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <PageContainer className="p-6">
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
-            <ShieldCheck className="w-6 h-6 text-primary" />
-            Decision Queue (Antrean Keputusan)
-          </h2>
-          <p className="text-sm text-muted mt-1">
-            Validasi dan persetujuan tugas berdasarkan matriks hirarki.
+          <h1 className="text-xl font-bold tracking-tight text-foreground">Antrean Persetujuan</h1>
+          <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-500">
+            Tugas yang menunggu keputusan Anda sebagai validator, beserta bukti penyelesaiannya.
           </p>
         </div>
+      </header>
 
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <Search className="w-4 h-4 absolute left-3 top-2.5 text-muted" />
-            <input
-              type="text"
-              placeholder="Cari Task ID, PIC, Deskripsi..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 pr-4 py-2 bg-surface border border-border rounded-xl text-sm w-64 text-foreground focus:ring-1 focus:ring-primary focus:border-primary outline-none"
-            />
-          </div>
-          <select
-            value={filterUnit}
-            onChange={(e) => setFilterUnit(e.target.value)}
-            className="px-3 py-2 bg-surface border border-border rounded-xl text-sm font-medium text-foreground focus:ring-1 focus:ring-primary focus:border-primary outline-none"
-          >
-            <option value="ALL">Semua Unit</option>
-            <option value="BIS">BIS - Bisnis</option>
-            <option value="OPS">OPS - Operasional</option>
-            <option value="CRD">CRD - Credit</option>
-          </select>
-          <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            className="px-3 py-2 bg-surface border border-border rounded-xl text-sm font-medium text-foreground focus:ring-1 focus:ring-primary focus:border-primary outline-none"
-          >
-            <option value="ALL">Semua Status</option>
-            <option value="Planned">Planned</option>
-            <option value="In Progress">In Progress</option>
-            <option value="Submitted">Submitted</option>
-            <option value="Minor Rework">Minor Rework</option>
-            <option value="Major Rework">Major Rework</option>
-            <option value="Blocked">Blocked</option>
-            <option value="Validated Closed">Validated Closed</option>
-            <option value="Improved">Improved</option>
-          </select>
-        </div>
-      </div>
+      <DeretAngka
+        angka={[
+          {
+            label: 'Menunggu keputusan',
+            nilai: menunggu.toLocaleString('id-ID'),
+            konteks: menunggu > 0 ? 'Perlu ditindaklanjuti' : 'Tidak ada yang tertahan',
+            nada: menunggu > 0 ? 'warning' : 'default',
+          },
+          { label: 'Sudah disetujui', nilai: disetujui.toLocaleString('id-ID'), konteks: 'Dalam tampilan ini', nada: disetujui > 0 ? 'success' : 'default' },
+          { label: 'Dikembalikan', nilai: dikembalikan.toLocaleString('id-ID'), konteks: 'Minta perbaikan' },
+          { label: 'Terhambat', nilai: terhambat.toLocaleString('id-ID'), konteks: terhambat > 0 ? 'Dieskalasikan' : 'Tidak ada', nada: terhambat > 0 ? 'danger' : 'default' },
+        ]}
+      />
 
+      {/*
+        Bilah tindakan massal muncul hanya saat ada yang dipilih, dan tetap
+        menempel di atas daftar supaya tidak perlu menggulir kembali ke atas
+        setelah memilih beberapa baris.
+      */}
       {selectedTaskIds.length > 0 && (
-        <div className="mb-4 p-3 bg-primary-light border border-primary/20 rounded-xl flex items-center justify-between animate-in fade-in">
-          <span className="text-sm font-semibold text-primary">
-            {selectedTaskIds.length} Tugas Dipilih
+        <div className="sticky top-2 z-20 flex items-center justify-between gap-3 rounded-2xl border border-primary/20 bg-primary-light px-4 py-3 shadow-sm">
+          <span className="text-xs font-bold tabular-nums text-primary-dark">
+            {selectedTaskIds.length} tugas dipilih
           </span>
           <div className="flex gap-2">
             <button
               onClick={() => handleBulkAction('Minor Rework')}
-              className="px-3 py-1.5 bg-warning/10 hover:bg-warning/20 text-warning rounded-lg text-xs font-bold transition-colors"
+              className="rounded-xl bg-warning/15 px-3 py-2 text-xs font-bold text-warning transition-colors hover:bg-warning/25"
             >
-              Kembalikan (Minor Rework)
+              Kembalikan untuk diperbaiki
             </button>
             <button
               onClick={() => handleBulkAction('Validated Closed')}
-              className="px-3 py-1.5 bg-success hover:bg-success/90 text-white rounded-lg text-xs font-bold transition-colors"
+              className="rounded-xl bg-success px-3 py-2 text-xs font-bold text-white transition-colors hover:opacity-90"
             >
-              Approve Semua (Validated Closed)
+              Setujui semua
             </button>
           </div>
         </div>
       )}
 
-      <div className="bg-surface border border-border rounded-2xl overflow-hidden flex-1 flex flex-col shadow-sm">
-        <div className="overflow-x-auto flex-1">
+      <Panel
+        judul="Daftar tugas"
+        hitungan={filteredTasks.length}
+        padat
+        alat={
+          <>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
+              <input
+                type="search"
+                placeholder="Cari nomor tugas, PIC, atau deskripsi"
+                aria-label="Cari tugas"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className={`${kelasIsian} w-60 pl-9`}
+              />
+            </div>
+            <select
+              value={filterUnit} onChange={(e) => setFilterUnit(e.target.value)}
+              aria-label="Saring unit" className={`${kelasIsian} cursor-pointer`}
+            >
+              <option value="ALL">Semua unit</option>
+              <option value="BIS">BIS · Bisnis</option>
+              <option value="OPS">OPS · Operasional</option>
+              <option value="CRD">CRD · Kredit</option>
+            </select>
+            <select
+              value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}
+              aria-label="Saring status" className={`${kelasIsian} cursor-pointer`}
+            >
+              <option value="ALL">Semua status</option>
+              <option value="Planned">Direncanakan</option>
+              <option value="In Progress">Dikerjakan</option>
+              <option value="Submitted">Diajukan</option>
+              <option value="Minor Rework">Perlu perbaikan</option>
+              <option value="Major Rework">Perlu perbaikan besar</option>
+              <option value="Blocked">Terhambat</option>
+              <option value="Validated Closed">Disetujui</option>
+              <option value="Improved">Disetujui & distandarkan</option>
+            </select>
+          </>
+        }
+      >
+        <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className="bg-surface-muted text-muted font-bold border-b border-border uppercase text-[10px] tracking-wider whitespace-nowrap">
               <tr>
@@ -277,9 +307,15 @@ export const DecisionQueue: React.FC<DecisionQueueProps> = ({ tasks, currentUser
             <tbody className="divide-y divide-border text-foreground">
               {filteredTasks.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-muted">
-                    <ShieldCheck className="w-8 h-8 mx-auto mb-2 text-muted/50" />
-                    <p>Antrean kosong. Tidak ada tugas yang menunggu validasi.</p>
+                  <td colSpan={7} className="px-6 py-16 text-center">
+                    <span className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-surface-muted">
+                      <ShieldCheck className="h-5 w-5 text-muted" strokeWidth={1.75} />
+                    </span>
+                    <p className="text-sm font-bold text-foreground">Tidak ada yang menunggu keputusan</p>
+                    <p className="mx-auto mt-1.5 max-w-sm text-xs leading-relaxed text-slate-500">
+                      Tugas muncul di sini setelah pelaksananya mengajukan penyelesaian dan Anda
+                      ditunjuk sebagai validatornya.
+                    </p>
                   </td>
                 </tr>
               ) : (
@@ -489,10 +525,10 @@ export const DecisionQueue: React.FC<DecisionQueueProps> = ({ tasks, currentUser
             </tbody>
           </table>
         </div>
-      </div>
-      
+      </Panel>
+
       {/* File Preview Modal */}
       <FilePreviewModal file={previewFile} onClose={() => setPreviewFile(null)} />
-    </div>
+    </PageContainer>
   );
 };

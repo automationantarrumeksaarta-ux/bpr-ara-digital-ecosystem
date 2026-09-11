@@ -98,11 +98,12 @@ export const navigationConfig: NavGroup[] = [
   },
   {
     id: 'workspace',
-    label: 'MY WORKSPACE',
+    label: 'RUANG KERJA SAYA',
     items: [
       {
         id: 'FLOW_TASKS',
         title: 'Task Board',
+        label: 'Papan Tugas',
         path: '/operations/tasks',
         icon: KanbanSquare,
         badgeType: 'TASKS',
@@ -112,6 +113,7 @@ export const navigationConfig: NavGroup[] = [
       {
         id: 'DECISION_QUEUE',
         title: 'Approval Queue',
+        label: 'Antrean Persetujuan',
         path: '/operations/decision-queue',
         icon: CheckSquare,
         allowedRoles: [...DIR_KOM, 'PE Bisnis & Collection', 'Kepala Cabang'],
@@ -119,6 +121,7 @@ export const navigationConfig: NavGroup[] = [
       {
         id: 'CALENDAR_VIEW',
         title: 'Calendar',
+        label: 'Kalender',
         path: '/operations/calendar',
         icon: Calendar,
         allowedRoles: ALL_ROLES,
@@ -126,6 +129,7 @@ export const navigationConfig: NavGroup[] = [
       {
         id: 'PROJECT_MANAGEMENT',
         title: 'Projects',
+        label: 'Proyek',
         path: '/operations/projects',
         icon: Briefcase,
         allowedRoles: ALL_ROLES,
@@ -139,6 +143,7 @@ export const navigationConfig: NavGroup[] = [
       {
         id: 'CRM_CUSTOMERS',
         title: 'Customer 360',
+        label: 'CRM Nasabah',
         path: '/customer/360',
         icon: Users,
         allowedRoles: BISNIS,
@@ -146,6 +151,7 @@ export const navigationConfig: NavGroup[] = [
       {
         id: 'MARKETING_ACTIVITY',
         title: 'Marketing Activities',
+        label: 'Aktivitas Lapangan',
         path: '/customer/marketing',
         icon: Target,
         allowedRoles: BISNIS,
