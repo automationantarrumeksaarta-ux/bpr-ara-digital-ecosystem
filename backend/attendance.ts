@@ -94,6 +94,17 @@ router.get('/kantor', (_req, res) => {
     jamMasuk: keJam(BATAS_TERLAMBAT),
     jamPulang: keJam(JAM_PULANG),
     wajibSelfie: true,
+
+    /*
+     * Sumber ubin peta, dilayani server supaya bisa diganti tanpa membangun
+     * ulang APK.
+     *
+     * Bawaannya OpenStreetMap karena bebas dipakai tanpa kunci dan lisensinya
+     * jelas. Penyedia yang tampilannya lebih modern (MapTiler, Stadia) menuntut
+     * kunci API; isi PETA_UBIN_URL dan PETA_ATRIBUSI di .env lalu restart.
+     */
+    petaUbinUrl: process.env.PETA_UBIN_URL || null,
+    petaAtribusi: process.env.PETA_ATRIBUSI || null,
   });
 });
 

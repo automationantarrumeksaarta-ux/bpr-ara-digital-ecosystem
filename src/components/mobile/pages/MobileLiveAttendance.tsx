@@ -33,7 +33,10 @@ const MobileLiveAttendance: React.FC = () => {
   const { currentUser } = useApp();
   const { posisi, alamat, memuat: memuatLokasi, error: errorLokasi, minta } = useGeolocation();
   const { hariIni, muatUlang } = useMobileAttendance();
-  const { radiusMeter, akurasiMaksMeter, jamMasuk, jamPulang, terdekat } = useKantorAbsen(posisi);
+  const {
+    radiusMeter, akurasiMaksMeter, jamMasuk, jamPulang,
+    petaUbinUrl, petaAtribusi, terdekat,
+  } = useKantorAbsen(posisi);
 
   const [mengirim, setMengirim] = useState(false);
   const [pesan, setPesan] = useState<{ tipe: 'ok' | 'gagal'; teks: string } | null>(null);
@@ -105,6 +108,8 @@ const MobileLiveAttendance: React.FC = () => {
             lng={posisi.lng}
             kantor={terdekat?.kantor}
             radiusMeter={radiusMeter}
+            ubinUrl={petaUbinUrl ?? undefined}
+            atribusi={petaAtribusi ?? undefined}
             /*
               height={0} menyerahkan tinggi ke kelas, bukan ke style; nilai
               bawaan 176px akan memaksa peta jadi pita tipis di puncak layar.
@@ -174,6 +179,17 @@ const MobileLiveAttendance: React.FC = () => {
               >
                 {Math.round(terdekat.jarak).toLocaleString('id-ID')} m dari titik kantor
                 {posisi && ` · akurasi ±${Math.round(posisi.akurasi)} m`}
+              </span>
+            )}
+            {/*
+              Koordinat mentah ditampilkan supaya bila absen tertolak padahal
+              pegawai memang di kantor, angkanya bisa langsung dibandingkan
+              dengan titik kantor yang tercatat — penyebab tersering justru
+              titik kantornya yang meleset, bukan ponselnya.
+            */}
+            {posisi && (
+              <span className={`block ${text.caption} ${ink.faint} mt-0.5 tabular-nums`}>
+                {posisi.lat.toFixed(6)}, {posisi.lng.toFixed(6)}
               </span>
             )}
           </div>

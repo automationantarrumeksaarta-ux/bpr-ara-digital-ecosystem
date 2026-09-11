@@ -44,16 +44,21 @@ interface Hasil {
   /** Jam operasional kantor, "HH:MM". */
   jamMasuk: string;
   jamPulang: string;
+  /** Sumber ubin peta bila diatur di server; null berarti pakai bawaan. */
+  petaUbinUrl: string | null;
+  petaAtribusi: string | null;
   /** null selama daftar kantor atau posisi belum ada. */
   terdekat: { kantor: Kantor; jarak: number; diDalamRadius: boolean } | null;
 }
 
-export function useKantorAbsen(posisi: { lat: number; lng: number } | null): Hasil {
+export function useKantorAbsen(posisi: { lat: number; lng: number; akurasi?: number } | null): Hasil {
   const [kantor, setKantor] = useState<Kantor[]>([]);
   const [radiusMeter, setRadius] = useState(50);
   const [akurasiMaksMeter, setAkurasiMaks] = useState(100);
   const [jamMasuk, setJamMasuk] = useState('08:00');
   const [jamPulang, setJamPulang] = useState('17:00');
+  const [petaUbinUrl, setPetaUbinUrl] = useState<string | null>(null);
+  const [petaAtribusi, setPetaAtribusi] = useState<string | null>(null);
   const [memuat, setMemuat] = useState(true);
 
   useEffect(() => {
@@ -68,6 +73,8 @@ export function useKantorAbsen(posisi: { lat: number; lng: number } | null): Has
         if (Number.isFinite(json.akurasiMaksMeter)) setAkurasiMaks(json.akurasiMaksMeter);
         if (typeof json.jamMasuk === 'string') setJamMasuk(json.jamMasuk);
         if (typeof json.jamPulang === 'string') setJamPulang(json.jamPulang);
+        if (typeof json.petaUbinUrl === 'string') setPetaUbinUrl(json.petaUbinUrl);
+        if (typeof json.petaAtribusi === 'string') setPetaAtribusi(json.petaAtribusi);
       } catch {
         // Dibiarkan kosong: layar tetap boleh mengirim absen, dan server yang
         // memutuskan. Memblokir absen hanya karena daftar kantor gagal dimuat
@@ -87,8 +94,24 @@ export function useKantorAbsen(posisi: { lat: number; lng: number } | null): Has
       const d = jarakMeter(posisi.lat, posisi.lng, k.lat, k.lng);
       if (d < jarak) { pilih = k; jarak = d; }
     }
-    return { kantor: pilih, jarak, diDalamRadius: jarak <= radiusMeter };
-  }, [posisi?.lat, posisi?.lng, kantor, radiusMeter]);
+    /*
+     * Ketidakpastian GPS ikut diperhitungkan, sama seperti di server.
+     *
+     * Di dalam gedung ponsel lazim melaporkan akurasi 20–60 meter, sehingga
+     * pegawai yang benar-benar berada di kantor bisa terbaca puluhan meter di
+     * luar titiknya. Yang dibandingkan adalah jarak terdekat yang masih
+     * mungkin, yaitu jarak terbaca dikurangi ketidakpastiannya.
+     */
+    const toleransi = Number.isFinite(posisi.akurasi) && (posisi.akurasi ?? 0) > 0
+      ? Math.min(posisi.akurasi!, akurasiMaksMeter)
+      : 0;
+    const terdekatMungkin = Math.max(0, jarak - toleransi);
 
-  return { memuat, kantor, radiusMeter, akurasiMaksMeter, jamMasuk, jamPulang, terdekat };
+    return { kantor: pilih, jarak, diDalamRadius: terdekatMungkin <= radiusMeter };
+  }, [posisi?.lat, posisi?.lng, posisi?.akurasi, kantor, radiusMeter, akurasiMaksMeter]);
+
+  return {
+    memuat, kantor, radiusMeter, akurasiMaksMeter,
+    jamMasuk, jamPulang, petaUbinUrl, petaAtribusi, terdekat,
+  };
 }

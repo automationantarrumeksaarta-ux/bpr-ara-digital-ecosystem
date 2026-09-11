@@ -13,6 +13,29 @@ import { ink, radius, text } from './tokens';
 
 const UKURAN_UBIN = 256;
 
+/**
+ * Sumber ubin peta.
+ *
+ * Bawaannya OpenStreetMap: bebas dipakai, tanpa kunci, dan lisensinya jelas
+ * untuk aplikasi internal. Tampilannya memang ramai karena dibuat sebagai peta
+ * rujukan serbaguna, bukan latar belakang.
+ *
+ * Penyedia yang tampilannya lebih tenang dan modern — MapTiler, Stadia,
+ * Thunderforest — semuanya menuntut kunci API. CARTO pun sejak beberapa waktu
+ * lalu menolak permintaan tanpa kunci dan mengembalikan ubin bertuliskan
+ * "API KEY REQUIRED", jadi tidak bisa dipakai begitu saja.
+ *
+ * Karena itu alamat ubin dibuat dapat diatur dari server lewat
+ * /api/attendances/kantor. Bila kunci sudah dimiliki, cukup isi PETA_UBIN_URL
+ * di .env pada VPS lalu restart — peta langsung berganti tanpa membangun ulang
+ * APK. Lihat ABSENSI.md.
+ *
+ * Penanda `{z}`, `{x}`, `{y}` diganti nomor ubin; `{r}` diganti "@2x" bila
+ * penyedianya menyediakan ubin kerapatan ganda.
+ */
+export const UBIN_BAWAAN = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+export const ATRIBUSI_BAWAAN = '© OpenStreetMap';
+
 /** Konversi lon/lat ke koordinat ubin Web Mercator (pecahan). */
 const keUbin = (lat: number, lng: number, z: number) => {
   const n = 2 ** z;
@@ -21,6 +44,22 @@ const keUbin = (lat: number, lng: number, z: number) => {
   const y = ((1 - Math.asinh(Math.tan(latRad)) / Math.PI) / 2) * n;
   return { x, y };
 };
+
+/**
+ * Meter per piksel pada suatu lintang dan tingkat perbesaran.
+ *
+ * Dipakai menggambar lingkaran radius dengan ukuran yang benar-benar sesuai
+ * jaraknya di lapangan, bukan lingkaran berukuran tebakan.
+ */
+const meterPerPiksel = (lat: number, zoom: number) =>
+  (156543.03392 * Math.cos((lat * Math.PI) / 180)) / 2 ** zoom;
+
+const susunUrl = (pola: string, z: number, x: number, y: number) =>
+  pola
+    .replace('{z}', String(z))
+    .replace('{x}', String(x))
+    .replace('{y}', String(y))
+    .replace('{r}', '@2x');
 
 interface MiniMapProps {
   lat: number;
@@ -32,17 +71,12 @@ interface MiniMapProps {
   kantor?: { lat: number; lng: number; nama: string };
   /** Radius absen dalam meter; digambar sebagai lingkaran di sekitar kantor. */
   radiusMeter?: number;
+  /** Pola alamat ubin; lihat UBIN_BAWAAN. */
+  ubinUrl?: string;
+  /** Teks atribusi penyedia peta; wajib ditampilkan. */
+  atribusi?: string;
   className?: string;
 }
-
-/**
- * Meter per piksel pada suatu lintang dan tingkat perbesaran.
- *
- * Dipakai untuk menggambar lingkaran radius dengan ukuran yang benar-benar
- * sesuai jaraknya di lapangan, bukan lingkaran berukuran tebakan.
- */
-const meterPerPiksel = (lat: number, zoom: number) =>
-  (156543.03392 * Math.cos((lat * Math.PI) / 180)) / 2 ** zoom;
 
 export const MiniMap: React.FC<MiniMapProps> = ({
   lat,
@@ -51,9 +85,18 @@ export const MiniMap: React.FC<MiniMapProps> = ({
   height = 176,
   kantor,
   radiusMeter,
+  ubinUrl = UBIN_BAWAAN,
+  atribusi = ATRIBUSI_BAWAAN,
   className = '',
 }) => {
   const [gagal, setGagal] = useState(0);
+  /*
+   * Bila sumber ubin yang dipilih tidak dapat dihubungi, turun ke OpenStreetMap
+   * sebelum menyerah. Peta yang tampilannya biasa masih jauh lebih berguna
+   * daripada kotak abu-abu, apalagi di layar yang dipakai untuk memastikan
+   * posisi sebelum absen.
+   */
+  const [pakaiCadangan, setPakaiCadangan] = useState(false);
 
   const { x, y } = keUbin(lat, lng, zoom);
   const ubinX = Math.floor(x);
@@ -69,7 +112,7 @@ export const MiniMap: React.FC<MiniMapProps> = ({
       const ty = ubinY + dy;
       ubin.push({
         key: `${tx}-${ty}`,
-        url: `https://tile.openstreetmap.org/${zoom}/${tx}/${ty}.png`,
+        url: susunUrl(pakaiCadangan ? UBIN_BAWAAN : ubinUrl, zoom, tx, ty),
         dx,
         dy,
       });
@@ -107,7 +150,10 @@ export const MiniMap: React.FC<MiniMapProps> = ({
               alt=""
               aria-hidden
               loading="lazy"
-              onError={() => setGagal(n => n + 1)}
+              onError={() => {
+                if (!pakaiCadangan) { setPakaiCadangan(true); setGagal(0); return; }
+                setGagal(n => n + 1);
+              }}
               className="absolute max-w-none"
               /*
                * Titik asal pembungkus ini berada tepat di tengah bingkai, dan
@@ -165,8 +211,9 @@ export const MiniMap: React.FC<MiniMapProps> = ({
       </div>
 
       {/* Atribusi wajib untuk ubin OpenStreetMap */}
-      <span className="absolute bottom-0 right-0 px-1.5 py-0.5 bg-white/80 text-[9px] text-slate-600">
-        © OpenStreetMap
+      {/* Atribusi penyedia peta; wajib menurut lisensinya. */}
+      <span className="absolute bottom-0 right-0 bg-white/80 px-1.5 py-0.5 text-[9px] text-slate-600">
+        {pakaiCadangan ? ATRIBUSI_BAWAAN : atribusi}
       </span>
     </div>
   );

@@ -36,7 +36,9 @@ const MobileHome: React.FC = () => {
         style={{ paddingTop: 'calc(env(safe-area-inset-top) + 16px)' }}
       >
         <div className="flex items-center gap-3">
-          <Avatar name={nama} size={44} />
+          {/* src wajib diteruskan; tanpa ini foto profil yang sudah diganti
+              tidak pernah muncul di beranda dan hanya tampil di layar Profil. */}
+          <Avatar name={nama} size={44} src={(currentUser as any)?.avatar_url} />
           <div className="flex-1 min-w-0">
             <p className={`${text.body} font-semibold ${ink.strong} truncate`}>{nama}</p>
             <p className={`${text.caption} ${ink.muted} truncate`}>

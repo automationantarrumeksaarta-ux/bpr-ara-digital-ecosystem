@@ -25,8 +25,18 @@ export const KANTOR: Kantor[] = [
   { id: 'klodran',  nama: 'Kas Klodran',    lat: -7.533948795607715,  lng: 110.79147304635002 },
 ];
 
-/** Jarak maksimum dari kantor terdekat agar absen diterima. */
-export const RADIUS_ABSEN_METER = 50;
+/**
+ * Jarak maksimum dari kantor terdekat agar absen diterima.
+ *
+ * Dapat diubah lewat env RADIUS_ABSEN_METER tanpa menyunting kode, karena
+ * angka yang tepat bergantung pada bentuk bangunan dan kualitas sinyal di
+ * masing-masing kantor. Bila pegawai yang benar-benar berada di dalam kantor
+ * masih tertolak, naikkan nilainya secara bertahap sambil memperhatikan jarak
+ * yang tertulis di layar absen.
+ */
+export const RADIUS_ABSEN_METER = Number(process.env.RADIUS_ABSEN_METER) > 0
+  ? Number(process.env.RADIUS_ABSEN_METER)
+  : 50;
 
 /**
  * Batas ketidakakuratan GPS yang masih dianggap layak dipercaya.
@@ -37,7 +47,9 @@ export const RADIUS_ABSEN_METER = 50;
  * yakin. Dibedakan supaya pesannya bisa menyarankan tindakan yang benar:
  * keluar sebentar ke tempat terbuka, bukan mendekat ke kantor.
  */
-export const AKURASI_MAKS_METER = 100;
+export const AKURASI_MAKS_METER = Number(process.env.AKURASI_MAKS_METER) > 0
+  ? Number(process.env.AKURASI_MAKS_METER)
+  : 100;
 
 /** Jarak dua titik di permukaan bumi dalam meter (haversine). */
 export function jarakMeter(
@@ -117,13 +129,37 @@ export function periksaLokasiAbsen(
   if (!dekat) {
     return { boleh: false, alasan: 'Daftar kantor belum tersedia.' };
   }
-  if (!dekat.diDalamRadius) {
+
+  /*
+   * Ketidakpastian GPS ikut diperhitungkan.
+   *
+   * `akurasi` yang dilaporkan ponsel bukan hiasan: artinya "posisi sebenarnya
+   * ada di suatu titik dalam lingkaran seradius sekian meter". Di dalam gedung
+   * ponsel lazim melaporkan 20–60 meter. Jadi pegawai yang benar-benar berdiri
+   * di dalam kantor bisa saja terbaca 80 meter dari titiknya — dan dengan
+   * perbandingan mentah terhadap radius 50 meter, ia ditolak padahal hadir.
+   *
+   * Yang dibandingkan sekarang adalah jarak TERDEKAT yang masih mungkin, yaitu
+   * jarak terbaca dikurangi ketidakpastiannya. Ini cara yang lazim dipakai
+   * geofence, dan tetap terkendali karena pembacaan dengan ketidakpastian di
+   * atas AKURASI_MAKS_METER sudah ditolak lebih dulu di atas. Dengan radius 50
+   * meter dan batas akurasi 100 meter, jarak terbaca paling jauh yang masih
+   * diterima adalah 150 meter.
+   *
+   * Penjagaan ini tidak berdiri sendiri: setiap absen tetap menuntut swafoto,
+   * dan lokasi tiruan diblokir di sisi aplikasi.
+   */
+  const toleransi = Number.isFinite(akur) && akur > 0 ? Math.min(akur, AKURASI_MAKS_METER) : 0;
+  const jarakTerdekatMungkin = Math.max(0, dekat.jarak - toleransi);
+
+  if (jarakTerdekatMungkin > RADIUS_ABSEN_METER) {
     return {
       boleh: false,
       alasan:
-        `Anda berada ${Math.round(dekat.jarak).toLocaleString('id-ID')} meter dari ` +
-        `${dekat.kantor.nama}. Absen hanya bisa dilakukan dalam radius ` +
-        `${RADIUS_ABSEN_METER} meter dari kantor.`,
+        `Anda terbaca ${Math.round(dekat.jarak).toLocaleString('id-ID')} meter dari ` +
+        `${dekat.kantor.nama}` +
+        (toleransi > 0 ? ` (akurasi GPS ±${Math.round(toleransi)} meter)` : '') +
+        `. Absen hanya bisa dilakukan dalam radius ${RADIUS_ABSEN_METER} meter dari kantor.`,
     };
   }
   return { boleh: true, kantor: dekat.kantor, jarak: dekat.jarak };
