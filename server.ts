@@ -94,12 +94,14 @@ import notificationRoutes from './backend/notifications.js';
 import attendanceRoutes from './backend/attendance.js';
 import activityRoutes from './backend/activities.js';
 import payrollRoutes from './backend/payroll.js';
+import ewsRoutes from './backend/ews.js';
 
 app.use('/api/auth', authRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/attendances', attendanceRoutes);
 app.use('/api/activities', activityRoutes);
 app.use('/api/payroll', payrollRoutes);
+app.use('/api/ews', ewsRoutes);
 app.use('/api', parserRoutes);
 
 // AI Assistant endpoint

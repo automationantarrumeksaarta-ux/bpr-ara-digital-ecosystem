@@ -15,7 +15,8 @@ import {
   Landmark,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { SurakartaHeatMap, RISK_STOPS, riskColor } from './kepatuhan/SurakartaHeatMap';
+import { SurakartaHeatMap, RISK_STOPS, riskColor, type TitikPeta } from './kepatuhan/SurakartaHeatMap';
+import { TITIK_KELURAHAN } from '../../data/geo/kelurahanPoints';
 import { KARESIDENAN_SURAKARTA } from '../../data/geo/surakartaMap';
 import {
   KECAMATAN_PER_WILAYAH,
@@ -136,6 +137,7 @@ export const DashboardHeatMap: React.FC = () => {
 
   const {
     portofolioWilayah: PORTOFOLIO_WILAYAH,
+    portofolioKelurahan: PORTOFOLIO_KELURAHAN,
     portofolioAO: PORTOFOLIO_AO,
     nasabahBermasalah: NASABAH_BERMASALAH,
     rasioSektor: RASIO_SEKTOR,
@@ -153,6 +155,10 @@ export const DashboardHeatMap: React.FC = () => {
   const [kecamatanFilter, setKecamatanFilter] = useState<string>('Semua Kecamatan');
   const [sektorDipilih, setSektorDipilih] = useState<string | null>(null);
   const [tujuanDipilih, setTujuanDipilih] = useState<string | null>(null);
+  // Peta wilayah bisa dilihat per kabupaten atau per desa. Desa dijadikan
+  // bawaan karena itulah tingkat yang benar-benar membedakan satu tempat
+  // dengan tempat lain; per kabupaten semuanya jadi satu rata-rata.
+  const [tingkatPeta, setTingkatPeta] = useState<'KABUPATEN' | 'DESA'>('DESA');
 
   // Kategori aktif menyesuaikan data yang datang; saat sumber berganti dari
   // contoh ke API, pilihan lama bisa saja tidak ada lagi.
@@ -250,6 +256,41 @@ export const DashboardHeatMap: React.FC = () => {
     }
     return out;
   }, [PORTOFOLIO_WILAYAH]);
+
+  /*
+   * Titik desa untuk peta wilayah.
+   *
+   * Peta sebelumnya mewarnai satu kabupaten dengan satu warna, sehingga seluruh
+   * perbedaan di dalamnya tertutup rata-rata. Pada data nyata Karanganyar saja
+   * berisi lebih dari seratus desa dengan rentang NPL 0% sampai 100%.
+   *
+   * Desa yang koordinatnya belum ditemukan sengaja tidak digambar, bukan
+   * ditaruh di tengah kabupaten: lingkaran merah di lokasi yang salah lebih
+   * berbahaya daripada lingkaran yang tidak ada.
+   */
+  const titikDesa = useMemo<TitikPeta[]>(() => {
+    const peta = new Map(
+      TITIK_KELURAHAN.map(t => [`${t.kabupaten}|${t.kecamatan}|${t.kelurahan}`.toLowerCase(), t]),
+    );
+    const hasil: TitikPeta[] = [];
+    for (const k of PORTOFOLIO_KELURAHAN) {
+      const titik = peta.get(`${k.wilayah}|${k.kecamatan ?? ''}|${k.kelurahan}`.toLowerCase());
+      if (!titik) continue;
+      hasil.push({
+        id: `${k.wilayah}-${k.kecamatan}-${k.kelurahan}`,
+        x: titik.x,
+        y: titik.y,
+        nama: k.kelurahan,
+        subJudul: `${k.kecamatan ?? '—'} · ${k.nasabahBermasalah} dari ${k.totalNasabah} nasabah bermasalah`,
+        rasio: k.totalBakiDebet > 0 ? (k.bakiDebetBermasalah / k.totalBakiDebet) * 100 : 0,
+        bobot: k.totalBakiDebet,
+        wilayahId: k.wilayah,
+      });
+    }
+    return hasil;
+  }, [PORTOFOLIO_KELURAHAN]);
+
+  const desaTanpaTitik = Math.max(0, PORTOFOLIO_KELURAHAN.length - titikDesa.length);
 
   const nilaiSektor = useMemo(
     () => (SEKTOR_PER_WILAYAH[sektorAktif] ?? {}) as Record<string, number>,
@@ -406,7 +447,45 @@ export const DashboardHeatMap: React.FC = () => {
           iconClass="text-blue-500"
         >
           <Legend />
-          <SurakartaHeatMap values={rasioWilayah} selectedId={wilayahFilter} onSelect={pilihWilayah} />
+          <SurakartaHeatMap
+            values={rasioWilayah}
+            titikDesa={tingkatPeta === 'DESA' ? titikDesa : undefined}
+            formatBobot={(v) => `Baki debet ${rupiahRingkas(v)}`}
+            selectedId={wilayahFilter}
+            onSelect={pilihWilayah}
+          />
+
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+            <div
+              role="tablist"
+              aria-label="Tingkat rincian peta"
+              className="flex gap-1 rounded-lg bg-gray-100 dark:bg-gray-700/50 p-0.5"
+            >
+              {([['KABUPATEN', 'Per kabupaten'], ['DESA', 'Per desa']] as const).map(([id, label]) => (
+                <button
+                  key={id}
+                  role="tab"
+                  aria-selected={tingkatPeta === id}
+                  onClick={() => setTingkatPeta(id)}
+                  className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-colors ${
+                    tingkatPeta === id
+                      ? 'bg-white dark:bg-gray-800 text-blue-600 shadow-sm'
+                      : 'text-gray-500 hover:text-gray-800 dark:hover:text-gray-200'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {tingkatPeta === 'DESA' && (
+              <span className="text-[10px] text-gray-500 dark:text-gray-400">
+                {titikDesa.length} desa dipetakan
+                {desaTanpaTitik > 0 && `, ${desaTanpaTitik} belum berkoordinat`}
+                {' '}· besar lingkaran = baki debet
+              </span>
+            )}
+          </div>
+
           <div className="mt-4 space-y-2">
             <h4 className="text-[10px] font-bold text-gray-700 dark:text-gray-300">Rasio Bermasalah per Kabupaten</h4>
             {wilayahUrut.map(w => {

@@ -164,6 +164,30 @@ router.get('/kepatuhan/heatmap', (req, res) => {
       ORDER BY nasabahBermasalah DESC
     `).all();
 
+    /*
+     * Agregat per kelurahan/desa.
+     *
+     * Peta sebelumnya hanya mengelompokkan per kabupaten, sehingga seluruh
+     * perbedaan di dalamnya hilang jadi satu rata-rata. Pada data nyata,
+     * Karanganyar saja berisi lebih dari seratus desa dengan rentang NPL 0%
+     * sampai 100%: puluhan desa bersih dan puluhan lainnya di atas 50%,
+     * semuanya tertutup satu warna.
+     */
+    const portofolioKelurahan = db.prepare(`
+      SELECT
+        kabupaten                                                   AS wilayah,
+        kecamatan,
+        kelurahan,
+        COUNT(*)                                                    AS totalNasabah,
+        COALESCE(SUM(outstanding), 0)                               AS totalBakiDebet,
+        SUM(CASE WHEN ${bermasalah} THEN 1 ELSE 0 END)              AS nasabahBermasalah,
+        COALESCE(SUM(CASE WHEN ${bermasalah} THEN outstanding ELSE 0 END), 0) AS bakiDebetBermasalah
+      FROM loans
+      WHERE kabupaten IS NOT NULL AND kelurahan IS NOT NULL AND TRIM(kelurahan) != ''
+      GROUP BY kabupaten, kecamatan, kelurahan
+      ORDER BY bakiDebetBermasalah DESC
+    `).all();
+
     const portofolioAO = db.prepare(`
       SELECT
         COALESCE(NULLIF(TRIM(officer_name), ''), 'Tanpa AO')        AS ao,
@@ -261,6 +285,7 @@ router.get('/kepatuhan/heatmap', (req, res) => {
           : 0,
       },
       portofolioWilayah,
+      portofolioKelurahan,
       portofolioAO,
       rasioSektor: perKategori('sektor'),
       rasioTujuan: perKategori('tujuan'),
@@ -303,6 +328,50 @@ const angka = (v: unknown): number => {
     .replace(',', '.');              // koma desimal
   const n = parseFloat(bersih);
   return Number.isFinite(n) ? n : 0;
+};
+
+/**
+ * Nama tempat dari CBS ditulis huruf besar semua (WUKIRSAWIT). Dirapikan agar
+ * bisa dibaca, dengan menjaga penghubung seperti "di" tetap huruf kecil.
+ */
+const rapikanNama = (v: unknown): string | null => {
+  const t = teks(v);
+  if (!t) return null;
+  const kecil = new Set(['di', 'ke', 'dan', 'the']);
+  return t
+    .toLowerCase()
+    .split(/\s+/)
+    .map((k, i) => (i > 0 && kecil.has(k) ? k : k.charAt(0).toUpperCase() + k.slice(1)))
+    .join(' ');
+};
+
+/**
+ * Tanggal sel menjadi ISO (YYYY-MM-DD).
+ *
+ * Berkas CBS menulis tanggal sebagai teks "14/09/2018" (hari/bulan/tahun),
+ * tetapi sel yang sama bisa juga terbaca sebagai serial number Excel bila
+ * selnya bertipe tanggal. Keduanya ditangani; yang tidak dikenali
+ * mengembalikan null, bukan tanggal hari ini.
+ */
+const tanggalIso = (v: unknown): string | null => {
+  if (v === null || v === undefined || v === '') return null;
+
+  if (typeof v === 'number' && Number.isFinite(v) && v > 0) {
+    // Serial Excel: hari sejak 30 Desember 1899.
+    const ms = Math.round((v - 25569) * 86400 * 1000);
+    const d = new Date(ms);
+    return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
+  }
+
+  const t = teks(v);
+  const m = t.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})$/);
+  if (m) {
+    const [, hari, bulan, tahun] = m;
+    const d = new Date(Number(tahun), Number(bulan) - 1, Number(hari));
+    if (d.getFullYear() !== Number(tahun) || d.getMonth() !== Number(bulan) - 1) return null;
+    return `${tahun}-${bulan.padStart(2, '0')}-${hari.padStart(2, '0')}`;
+  }
+  return null;
 };
 
 const BULAN_ID = [
@@ -772,6 +841,7 @@ function petakanKolom(data: any[][]): { header: number; kolom: Record<string, nu
     alamat: /^(alamat|almt)/i,
     kabupaten: /^(kabupaten|kab\.?|kota)$/i,
     kecamatan: /^kecamatan$/i,
+    kelurahan: /^(kelurahan|desa|kel\.?)$/i,
     plafon: /^(plafon|plafond|limit|jumlah pinjaman)/i,
     bakiDebet: /^(baki\s*debet|outstanding|os|saldo pokok)/i,
     tunggakanPokok: /^tung+akan\s+pokok$/i,
@@ -782,6 +852,27 @@ function petakanKolom(data: any[][]): { header: number; kolom: Record<string, nu
     ao: /^(ao|account officer|petugas|nama ao)$/i,
     sektor: /^sektor/i,
     tujuan: /^(tujuan|penggunaan)/i,
+
+    /*
+     * Kolom di bawah dipakai sistem peringatan dini.
+     *
+     * "Angsuran Masuk bln ini" dan "Jadwal Angsuran Bulan ini" sama-sama punya
+     * sub-kolom Pokok/Bunga/Total, jadi keduanya harus disebut lengkap sampai
+     * kata Total supaya tidak tertukar.
+     *
+     * Kolom FT muncul dua kali, sesudah Tungakan Pokok dan sesudah Tungakan
+     * Bunga, dan keduanya bergabung menjadi label "Tungakan FT" yang sama.
+     * Pemindaian berjalan dari kiri ke kanan dan yang pertama menang, jadi
+     * yang terambil adalah FT milik pokok — yang memang dipakai menghitung
+     * tunggakan angsuran.
+     */
+    angsuranMasuk: /^angsuran\s*masuk.*total$/i,
+    frekTunggakan: /^tung+akan\s*ft$/i,
+    tanggalMulai: /^masa pinjaman\s*tgl\.?\s*mulai$/i,
+    jatuhTempo: /^masa pinjaman\s*tgl\.?\s*j\.?\s*t\.?$/i,
+    taksasi: /^taksasi$/i,
+    ikatan: /^ikatan$/i,
+    sukuBunga: /^suku\s*bunga$/i,
   };
 
   /** Gabungkan baris header dengan baris sub-header di bawahnya. */
@@ -801,6 +892,26 @@ function petakanKolom(data: any[][]): { header: number; kolom: Record<string, nu
     return hasil;
   };
 
+  /*
+   * Baris header dipilih berdasarkan jumlah kolom yang dikenali, bukan baris
+   * pertama yang sekadar memenuhi syarat minimum.
+   *
+   * Sebelumnya pemindaian berhenti pada baris pertama yang punya "nama" dan
+   * "kolektibilitas". Di berkas CBS ada baris nyaris kosong tepat di atas
+   * header sungguhan; menggabungkan baris kosong itu dengan header di bawahnya
+   * menghasilkan label header apa adanya, TANPA sub-judulnya. Syarat minimum
+   * langsung terpenuhi di situ dan pemindaian berhenti.
+   *
+   * Akibatnya seluruh kolom bertingkat tidak pernah dikenali: "Tungakan
+   * Pokok", "Tungakan Bunga", dan "Jadwal Angsuran Bulan ini Total" hanya
+   * terbaca sebagai "Tungakan" dan "Jadwal Angsuran Bulan ini". Ketiga kolom
+   * itu tersimpan sebagai nol untuk setiap baris, tanpa pesan galat apa pun.
+   *
+   * Dengan penilaian, baris header sungguhan menang karena menghasilkan jauh
+   * lebih banyak kecocokan.
+   */
+  let terbaik: { r: number; kolom: Record<string, number>; skor: number } | null = null;
+
   for (let r = 0; r < Math.min(data.length, 25); r++) {
     const row = data[r];
     if (!row) continue;
@@ -816,13 +927,19 @@ function petakanKolom(data: any[][]): { header: number; kolom: Record<string, nu
     }
 
     // header dianggap sah bila minimal nama + kolektibilitas ketemu
-    if (kolom.nama !== undefined && kolom.kolektibilitas !== undefined) {
-      // Bila baris berikutnya ikut terpakai sebagai sub-header, data mulai
-      // dua baris di bawah.
-      const adaSubHeader = (data[r + 1] ?? []).some((_: any, c: number) =>
-        teks(data[r + 1][c]) && !teks(row[c]));
-      return { header: adaSubHeader ? r + 1 : r, kolom };
-    }
+    if (kolom.nama === undefined || kolom.kolektibilitas === undefined) continue;
+
+    const skor = Object.keys(kolom).length;
+    if (!terbaik || skor > terbaik.skor) terbaik = { r, kolom, skor };
+  }
+
+  if (terbaik) {
+    const row = data[terbaik.r];
+    // Bila baris berikutnya ikut terpakai sebagai sub-header, data mulai
+    // dua baris di bawah.
+    const adaSubHeader = (data[terbaik.r + 1] ?? []).some((_: any, c: number) =>
+      teks(data[terbaik.r + 1][c]) && !teks(row[c]));
+    return { header: adaSubHeader ? terbaik.r + 1 : terbaik.r, kolom: terbaik.kolom };
   }
 
   // cadangan: tata letak lama yang diasumsikan parser sebelumnya
@@ -846,17 +963,22 @@ function processNomKredit(workbook: xlsx.WorkBook) {
   const insertLoan = db.prepare(`
     INSERT INTO loans (account_number, customer_name, address, limit_amount, outstanding,
                        tunggakan_pokok, tunggakan_bunga, collectibility, officer_name,
-                       kabupaten, kecamatan, sektor, tujuan, jumlah_tagihan, jumlah_angsuran,
+                       kabupaten, kecamatan, kelurahan, sektor, tujuan,
+                       jumlah_tagihan, jumlah_angsuran, angsuran_masuk, frek_tunggakan,
+                       tanggal_mulai, tanggal_jatuh_tempo, taksasi, ikatan, suku_bunga,
                        period_date, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
     ON CONFLICT(account_number) DO UPDATE SET
       customer_name = excluded.customer_name, address = excluded.address,
       limit_amount = excluded.limit_amount, outstanding = excluded.outstanding,
       tunggakan_pokok = excluded.tunggakan_pokok, tunggakan_bunga = excluded.tunggakan_bunga,
       collectibility = excluded.collectibility, officer_name = excluded.officer_name,
       kabupaten = excluded.kabupaten, kecamatan = excluded.kecamatan,
-      sektor = excluded.sektor, tujuan = excluded.tujuan,
+      kelurahan = excluded.kelurahan, sektor = excluded.sektor, tujuan = excluded.tujuan,
       jumlah_tagihan = excluded.jumlah_tagihan, jumlah_angsuran = excluded.jumlah_angsuran,
+      angsuran_masuk = excluded.angsuran_masuk, frek_tunggakan = excluded.frek_tunggakan,
+      tanggal_mulai = excluded.tanggal_mulai, tanggal_jatuh_tempo = excluded.tanggal_jatuh_tempo,
+      taksasi = excluded.taksasi, ikatan = excluded.ikatan, suku_bunga = excluded.suku_bunga,
       period_date = excluded.period_date, updated_at = CURRENT_TIMESTAMP
   `);
 
@@ -910,11 +1032,25 @@ function processNomKredit(workbook: xlsx.WorkBook) {
       const tagihan = kolom.tagihan !== undefined ? angka(row[kolom.tagihan]) : tPokok + tBunga;
       const ao = teks(row[kolom.ao]);
 
+      // Nama kelurahan dibiarkan apa adanya, hanya dirapikan huruf besarnya.
+      // Tidak ada daftar resmi kelurahan di backend/wilayah.ts, dan mencocokkan
+      // paksa ke daftar kecamatan justru akan mengubah nama desa yang benar.
+      const kelurahan = kolom.kelurahan !== undefined ? rapikanNama(teks(row[kolom.kelurahan])) : null;
+
       insertLoan.run(
         rekening, nama, alamat, angka(row[kolom.plafon]), bakiDebet,
         tPokok, tBunga, kolek, ao,
-        wilayah, kecamatan, teks(row[kolom.sektor]) || null, teks(row[kolom.tujuan]) || null,
-        tagihan, angsuran, periode,
+        wilayah, kecamatan, kelurahan,
+        teks(row[kolom.sektor]) || null, teks(row[kolom.tujuan]) || null,
+        tagihan, angsuran,
+        angka(row[kolom.angsuranMasuk]),
+        Math.round(angka(row[kolom.frekTunggakan])),
+        tanggalIso(row[kolom.tanggalMulai]),
+        tanggalIso(row[kolom.jatuhTempo]),
+        angka(row[kolom.taksasi]),
+        teks(row[kolom.ikatan]) || null,
+        angka(row[kolom.sukuBunga]),
+        periode,
       );
       diproses++;
 

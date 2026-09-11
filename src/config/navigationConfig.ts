@@ -322,11 +322,12 @@ export const navigationConfig: NavGroup[] = [
   },
   {
     id: 'risk',
-    label: 'RISK & CONTROL',
+    label: 'RISIKO & PENGAWASAN',
     items: [
       {
         id: 'EWS_RISK',
         title: 'EWS Risk',
+        label: 'Peringatan Dini',
         path: '/system/ews',
         icon: AlertOctagon,
         badgeType: 'EWS',

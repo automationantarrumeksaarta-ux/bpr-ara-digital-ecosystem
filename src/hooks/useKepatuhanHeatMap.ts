@@ -14,8 +14,20 @@ import {
   type WilayahId,
 } from '../data/kepatuhan/heatMapData';
 
+/** Agregat per desa/kelurahan — dasar lapisan titik di peta. */
+export interface PortofolioKelurahan {
+  wilayah: string;
+  kecamatan: string | null;
+  kelurahan: string;
+  totalNasabah: number;
+  totalBakiDebet: number;
+  nasabahBermasalah: number;
+  bakiDebetBermasalah: number;
+}
+
 export interface HeatMapDataset {
   portofolioWilayah: PortofolioWilayah[];
+  portofolioKelurahan: PortofolioKelurahan[];
   portofolioAO: PortofolioAO[];
   nasabahBermasalah: NasabahBermasalah[];
   rasioSektor: { sektor: string; rasio: number; icon: string }[];
@@ -62,6 +74,9 @@ const IKON_TUJUAN: Record<string, string> = {
 
 const DATA_CONTOH: HeatMapDataset = {
   portofolioWilayah: PORTOFOLIO_WILAYAH,
+  // Tidak ada contoh untuk tingkat desa: menaruh titik karangan di peta risiko
+  // jauh lebih menyesatkan daripada peta yang kosong.
+  portofolioKelurahan: [],
   portofolioAO: PORTOFOLIO_AO,
   nasabahBermasalah: NASABAH_BERMASALAH,
   rasioSektor: RASIO_SEKTOR,
@@ -118,6 +133,7 @@ export function useKepatuhanHeatMap(): HasilHeatMap {
           resmi: json.resmi ?? null,
           data: {
             portofolioWilayah: json.portofolioWilayah ?? [],
+            portofolioKelurahan: json.portofolioKelurahan ?? [],
             portofolioAO: json.portofolioAO ?? [],
             nasabahBermasalah: json.nasabahBermasalah ?? [],
             rasioSektor: (json.rasioSektor ?? []).map((s: any) => ({

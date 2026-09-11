@@ -332,6 +332,34 @@ export function initDb() {
       jumlah_tagihan: 'REAL DEFAULT 0',
       jumlah_angsuran: 'REAL DEFAULT 0',
       period_date: 'TEXT',
+
+      /*
+       * Kolom di bawah ini sudah lama ada di berkas Nominatif Kredit tetapi
+       * tidak pernah disimpan, sehingga sistem peringatan dini tidak punya
+       * bahan apa pun untuk bekerja.
+       *
+       * kelurahan          — wilayah terkecil. Berkas memilikinya untuk semua
+       *                      baris, dan peta selama ini hanya sampai kabupaten
+       *                      sehingga perbedaan antar desa tidak terlihat.
+       * angsuran_masuk     — yang benar-benar dibayar bulan ini. Dipasangkan
+       *                      dengan jumlah_angsuran (yang dijadwalkan), inilah
+       *                      tanda berhenti membayar yang paling awal.
+       * frek_tunggakan     — kolom "FT", banyaknya angsuran yang tertunggak.
+       *                      Nilainya naik rapi mengikuti kolektibilitas.
+       * tanggal_jatuh_tempo— untuk menemukan kredit yang sudah lewat tempo
+       *                      tetapi baki debetnya belum nol.
+       * taksasi            — nilai agunan, untuk menghitung tutupan jaminan.
+       * ikatan             — jenis pengikatan (APHT, SKMHT, Fidusia, tanpa
+       *                      ikatan). Menentukan seberapa mudah ditagih.
+       */
+      kelurahan: 'TEXT',
+      angsuran_masuk: 'REAL DEFAULT 0',
+      frek_tunggakan: 'INTEGER DEFAULT 0',
+      tanggal_mulai: 'TEXT',
+      tanggal_jatuh_tempo: 'TEXT',
+      taksasi: 'REAL DEFAULT 0',
+      ikatan: 'TEXT',
+      suku_bunga: 'REAL DEFAULT 0',
     };
     for (const [nama, tipe] of Object.entries(tambahan)) {
       if (!loanCols.includes(nama)) {
@@ -341,6 +369,7 @@ export function initDb() {
     }
     db.exec('CREATE INDEX IF NOT EXISTS idx_loans_kabupaten ON loans(kabupaten)');
     db.exec('CREATE INDEX IF NOT EXISTS idx_loans_collectibility ON loans(collectibility)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_loans_kelurahan ON loans(kabupaten, kecamatan, kelurahan)');
   } catch (e) {
     console.error('Error adding loans columns:', e);
   }
