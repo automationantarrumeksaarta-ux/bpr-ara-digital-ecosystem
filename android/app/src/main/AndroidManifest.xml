@@ -56,4 +56,19 @@
     -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+
+    <!--
+      Izin untuk pengingat absen pukul 08:00 dan 17:00.
+
+      POST_NOTIFICATIONS wajib sejak Android 13; tanpa deklarasi ini, permintaan
+      izin di dalam aplikasi langsung ditolak sistem tanpa menampilkan apa pun.
+
+      SCHEDULE_EXACT_ALARM dan USE_EXACT_ALARM membuat pengingat berbunyi pada
+      jamnya, bukan ditunda penghemat daya sampai jauh lewat jam masuk — yang
+      akan menghilangkan seluruh gunanya.
+    -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 </manifest>

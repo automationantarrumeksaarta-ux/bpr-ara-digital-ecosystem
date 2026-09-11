@@ -94,7 +94,9 @@ export const MiniMap: React.FC<MiniMapProps> = ({
   return (
     <div
       className={`relative ${radius.card} overflow-hidden bg-slate-100 ${className}`}
-      style={{ height }}
+      /* Tinggi hanya dipaksa bila pemanggilnya tidak mengaturnya sendiri —
+         layar absen memakai peta memenuhi ruang lewat className. */
+      style={height > 0 ? { height } : undefined}
     >
       <div className="absolute inset-0 flex items-center justify-center">
         <div className="relative" style={{ width: 0, height: 0 }}>

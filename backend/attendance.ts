@@ -41,7 +41,40 @@ const keMenit = (jam: string): number => {
   return m ? Number(m[1]) * 60 + Number(m[2]) : 0;
 };
 
-const BATAS_TERLAMBAT = keMenit(process.env.JAM_MASUK_BATAS || '08:30');
+/*
+ * Jam operasional kantor: 08:00 sampai 17:00.
+ *
+ * BATAS_TERLAMBAT dipakai menandai keterlambatan, JAM_PULANG untuk menghitung
+ * pulang lebih awal. Keduanya bisa diubah lewat env tanpa menyentuh kode.
+ */
+const BATAS_TERLAMBAT = keMenit(process.env.JAM_MASUK_BATAS || '08:00');
+const JAM_PULANG = keMenit(process.env.JAM_PULANG || '17:00');
+
+/**
+ * Swafoto wajib pada setiap absen.
+ *
+ * Tanpa foto, absen bisa dititipkan: cukup meminjamkan akun kepada rekan yang
+ * kebetulan berada di dekat kantor. Titik lokasi saja membuktikan ponselnya ada
+ * di sana, bukan orangnya.
+ *
+ * Diterima hanya sebagai data URL gambar. Aplikasi mengirimnya begitu karena
+ * unggah berkas biner dari dalam APK selalu rusak — Capacitor membaca isi
+ * permintaan sebagai teks UTF-8.
+ */
+const BATAS_SELFIE = 1_200_000;   // ~1,2 juta karakter data URL
+
+function periksaSelfie(nilai: unknown): { boleh: boolean; alasan?: string } {
+  if (typeof nilai !== 'string' || nilai.trim() === '') {
+    return { boleh: false, alasan: 'Swafoto wajib disertakan saat absen.' };
+  }
+  if (!/^data:image\/(jpeg|jpg|png|webp);base64,/.test(nilai)) {
+    return { boleh: false, alasan: 'Format swafoto tidak dikenali.' };
+  }
+  if (nilai.length > BATAS_SELFIE) {
+    return { boleh: false, alasan: 'Ukuran swafoto terlalu besar.' };
+  }
+  return { boleh: true };
+}
 
 /**
  * Daftar kantor dan aturan jaraknya.
@@ -51,10 +84,16 @@ const BATAS_TERLAMBAT = keMenit(process.env.JAM_MASUK_BATAS || '08:30');
  * pembangunan ulang aplikasi.
  */
 router.get('/kantor', (_req, res) => {
+  const keJam = (menit: number) =>
+    `${String(Math.floor(menit / 60)).padStart(2, '0')}:${String(menit % 60).padStart(2, '0')}`;
+
   res.json({
     kantor: KANTOR,
     radiusMeter: RADIUS_ABSEN_METER,
     akurasiMaksMeter: AKURASI_MAKS_METER,
+    jamMasuk: keJam(BATAS_TERLAMBAT),
+    jamPulang: keJam(JAM_PULANG),
+    wajibSelfie: true,
   });
 });
 
@@ -87,9 +126,14 @@ router.get('/', (req, res) => {
 // Clock In
 router.post('/clock-in', (req, res) => {
   try {
-    const { user_id, lat, lng, location, akurasi } = req.body;
+    const { user_id, lat, lng, location, akurasi, selfie } = req.body;
     if (!user_id) {
       return res.status(400).json({ error: 'user_id is required' });
+    }
+
+    const foto = periksaSelfie(selfie);
+    if (!foto.boleh) {
+      return res.status(400).json({ error: foto.alasan });
     }
 
     /*
@@ -118,9 +162,16 @@ router.post('/clock-in', (req, res) => {
     const status = keMenit(now) > BATAS_TERLAMBAT ? 'Terlambat' : 'Hadir';
 
     db.prepare(`
-      INSERT INTO attendances (id, user_id, date, clock_in_time, clock_in_lat, clock_in_lng, clock_in_location, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(id, user_id, today, now, lat || null, lng || null, location || null, status);
+      INSERT INTO attendances (
+        id, user_id, date, clock_in_time, clock_in_lat, clock_in_lng, clock_in_location,
+        status, clock_in_selfie, clock_in_akurasi, clock_in_kantor, clock_in_jarak
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id, user_id, today, now, lat || null, lng || null, location || null, status,
+      selfie, Number(akurasi) || null, lokasi.kantor?.nama ?? null,
+      lokasi.jarak != null ? Math.round(lokasi.jarak) : null,
+    );
 
     const newRecord = db.prepare('SELECT * FROM attendances WHERE id = ?').get(id);
     res.json({
@@ -137,9 +188,14 @@ router.post('/clock-in', (req, res) => {
 // Clock Out
 router.post('/clock-out', (req, res) => {
   try {
-    const { user_id, lat, lng, location, akurasi } = req.body;
+    const { user_id, lat, lng, location, akurasi, selfie } = req.body;
     if (!user_id) {
       return res.status(400).json({ error: 'user_id is required' });
+    }
+
+    const foto = periksaSelfie(selfie);
+    if (!foto.boleh) {
+      return res.status(400).json({ error: foto.alasan });
     }
 
     const lokasi = periksaLokasiAbsen(lat, lng, akurasi);
@@ -159,10 +215,17 @@ router.post('/clock-out', (req, res) => {
     }
 
     db.prepare(`
-      UPDATE attendances 
-      SET clock_out_time = ?, clock_out_lat = ?, clock_out_lng = ?, clock_out_location = ?, updated_at = CURRENT_TIMESTAMP
+      UPDATE attendances
+      SET clock_out_time = ?, clock_out_lat = ?, clock_out_lng = ?, clock_out_location = ?,
+          clock_out_selfie = ?, clock_out_akurasi = ?, clock_out_kantor = ?, clock_out_jarak = ?,
+          updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
-    `).run(now, lat || null, lng || null, location || null, existing.id);
+    `).run(
+      now, lat || null, lng || null, location || null,
+      selfie, Number(akurasi) || null, lokasi.kantor?.nama ?? null,
+      lokasi.jarak != null ? Math.round(lokasi.jarak) : null,
+      existing.id,
+    );
 
     const updatedRecord = db.prepare('SELECT * FROM attendances WHERE id = ?').get(existing.id);
     res.json({

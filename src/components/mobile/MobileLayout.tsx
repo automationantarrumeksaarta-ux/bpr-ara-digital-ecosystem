@@ -2,10 +2,29 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import MobileBottomNav, { TAB_UTAMA } from './MobileBottomNav';
 import { useAndroidBackButton } from '../../hooks/useAndroidBackButton';
+import { useMobileAttendance } from '../../hooks/useMobileAttendance';
+import { useKantorAbsen } from '../../hooks/useKantorAbsen';
+import { usePengingatAbsen } from '../../hooks/usePengingatAbsen';
 import { radius, text } from './ui/tokens';
 import { surface } from './ui/tokens';
 
 export const MobileLayout: React.FC = () => {
+  /*
+   * Pengingat absen dipasang di kerangka, bukan di layar absen.
+   *
+   * Kalau dipasang di layar absen, jadwalnya hanya diperbarui ketika pegawai
+   * membuka layar itu — padahal justru yang lupa membukanya yang perlu
+   * diingatkan. Di sini, setiap kali aplikasi dibuka jadwalnya disegarkan.
+   */
+  const { hariIni } = useMobileAttendance();
+  const { jamMasuk, jamPulang } = useKantorAbsen(null);
+  usePengingatAbsen({
+    jamMasuk,
+    jamPulang,
+    sudahMasuk: !!hariIni?.clock_in_time,
+    sudahPulang: !!hariIni?.clock_out_time,
+  });
+
   const { pathname } = useLocation();
   const [pesanKeluar, setPesanKeluar] = useState(false);
 

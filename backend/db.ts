@@ -268,6 +268,42 @@ export function initDb() {
     );
   `);
 
+  /*
+   * Swafoto absensi.
+   *
+   * Tanpa foto, absen bisa dititipkan ke orang lain — cukup meminjamkan akun
+   * dan berdiri di dekat kantor. Foto wajah pada saat absen membuat kehadiran
+   * orangnya sendiri yang tercatat, bukan sekadar ponselnya.
+   *
+   * Disimpan sebagai data URL, sama seperti foto profil, karena unggah berkas
+   * biner dari dalam APK selalu rusak: Capacitor membaca isi permintaan sebagai
+   * teks UTF-8.
+   *
+   * `clock_in_akurasi` ikut dicatat supaya bisa ditelusuri belakangan bila ada
+   * absen yang lokasinya meragukan.
+   */
+  try {
+    const kolomAbsen = (db.prepare('PRAGMA table_info(attendances)').all() as any[]).map(c => c.name);
+    const tambahanAbsen: Record<string, string> = {
+      clock_in_selfie: 'TEXT',
+      clock_out_selfie: 'TEXT',
+      clock_in_akurasi: 'REAL',
+      clock_out_akurasi: 'REAL',
+      clock_in_kantor: 'TEXT',
+      clock_out_kantor: 'TEXT',
+      clock_in_jarak: 'REAL',
+      clock_out_jarak: 'REAL',
+    };
+    for (const [nama, tipe] of Object.entries(tambahanAbsen)) {
+      if (!kolomAbsen.includes(nama)) {
+        db.exec(`ALTER TABLE attendances ADD COLUMN ${nama} ${tipe}`);
+        console.log(`Added ${nama} column to attendances table.`);
+      }
+    }
+  } catch (e) {
+    console.error('Error adding attendances columns:', e);
+  }
+
   // Add columns if they don't exist
   try {
     const tableInfo = db.prepare("PRAGMA table_info(beis_tasks)").all() as any[];

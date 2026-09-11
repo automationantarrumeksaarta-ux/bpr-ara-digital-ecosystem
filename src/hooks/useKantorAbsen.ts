@@ -41,6 +41,9 @@ interface Hasil {
   kantor: Kantor[];
   radiusMeter: number;
   akurasiMaksMeter: number;
+  /** Jam operasional kantor, "HH:MM". */
+  jamMasuk: string;
+  jamPulang: string;
   /** null selama daftar kantor atau posisi belum ada. */
   terdekat: { kantor: Kantor; jarak: number; diDalamRadius: boolean } | null;
 }
@@ -49,6 +52,8 @@ export function useKantorAbsen(posisi: { lat: number; lng: number } | null): Has
   const [kantor, setKantor] = useState<Kantor[]>([]);
   const [radiusMeter, setRadius] = useState(50);
   const [akurasiMaksMeter, setAkurasiMaks] = useState(100);
+  const [jamMasuk, setJamMasuk] = useState('08:00');
+  const [jamPulang, setJamPulang] = useState('17:00');
   const [memuat, setMemuat] = useState(true);
 
   useEffect(() => {
@@ -61,6 +66,8 @@ export function useKantorAbsen(posisi: { lat: number; lng: number } | null): Has
         setKantor(json.kantor ?? []);
         if (Number.isFinite(json.radiusMeter)) setRadius(json.radiusMeter);
         if (Number.isFinite(json.akurasiMaksMeter)) setAkurasiMaks(json.akurasiMaksMeter);
+        if (typeof json.jamMasuk === 'string') setJamMasuk(json.jamMasuk);
+        if (typeof json.jamPulang === 'string') setJamPulang(json.jamPulang);
       } catch {
         // Dibiarkan kosong: layar tetap boleh mengirim absen, dan server yang
         // memutuskan. Memblokir absen hanya karena daftar kantor gagal dimuat
@@ -83,5 +90,5 @@ export function useKantorAbsen(posisi: { lat: number; lng: number } | null): Has
     return { kantor: pilih, jarak, diDalamRadius: jarak <= radiusMeter };
   }, [posisi?.lat, posisi?.lng, kantor, radiusMeter]);
 
-  return { memuat, kantor, radiusMeter, akurasiMaksMeter, terdekat };
+  return { memuat, kantor, radiusMeter, akurasiMaksMeter, jamMasuk, jamPulang, terdekat };
 }
