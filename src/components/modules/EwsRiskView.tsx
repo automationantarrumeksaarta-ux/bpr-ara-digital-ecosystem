@@ -3,13 +3,13 @@ import {
   AlertTriangle, CheckCircle2, RefreshCw, Search, ShieldAlert, ShieldCheck,
 } from 'lucide-react';
 import {
-  useEwsAlerts, LABEL_KATEGORI, LABEL_TINDAK_LANJUT,
-  type KategoriEws, type PeringatanEws,
+  useEwsAlerts, LABEL_KATEGORI, LABEL_JALUR, KETERANGAN_JALUR, LABEL_TINDAK_LANJUT,
+  type JalurEws, type KategoriEws, type PeringatanEws,
 } from '../../hooks/useEwsAlerts';
 import { PageContainer } from '../ui/PageContainer';
 import { DeretAngka } from '../credit/StageShell';
 import { Kosong, KosongKarenaSaringan, NadaPill, Panel } from '../credit/StageParts';
-import { desimal, rupiah, rupiahRingkas } from '../credit/pipeline';
+import { rupiah, rupiahRingkas } from '../credit/pipeline';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/Table';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
@@ -41,6 +41,7 @@ export const EwsRiskView: React.FC = () => {
   const [cari, setCari] = useState('');
   const [tingkat, setTingkat] = useState<'SEMUA' | 'RED' | 'YELLOW'>('SEMUA');
   const [kategori, setKategori] = useState<'SEMUA' | KategoriEws>('SEMUA');
+  const [jalur, setJalur] = useState<'SEMUA' | JalurEws>('SEMUA');
   const [sembunyikanSelesai, setSembunyikanSelesai] = useState(true);
   const [batas, setBatas] = useState(AWAL_DITAMPILKAN);
   const [dipilih, setDipilih] = useState<PeringatanEws | null>(null);
@@ -54,13 +55,17 @@ export const EwsRiskView: React.FC = () => {
       (p.kelurahan ?? '').toLowerCase().includes(q);
     const cocokTingkat = tingkat === 'SEMUA' || p.tingkat === tingkat;
     const cocokKategori = kategori === 'SEMUA' || p.kategori === kategori;
+    const cocokJalur = jalur === 'SEMUA' || p.jalur === jalur;
     const status = p.tindakLanjut?.status ?? 'TERBUKA';
     const cocokStatus = !sembunyikanSelesai || (status !== 'SELESAI' && status !== 'DIABAIKAN');
-    return cocokCari && cocokTingkat && cocokKategori && cocokStatus;
-  }), [peringatan, cari, tingkat, kategori, sembunyikanSelesai]);
+    return cocokCari && cocokTingkat && cocokKategori && cocokJalur && cocokStatus;
+  }), [peringatan, cari, tingkat, kategori, jalur, sembunyikanSelesai]);
 
-  const adaSaringan = cari.trim() !== '' || tingkat !== 'SEMUA' || kategori !== 'SEMUA';
-  const resetSaringan = () => { setCari(''); setTingkat('SEMUA'); setKategori('SEMUA'); };
+  const adaSaringan =
+    cari.trim() !== '' || tingkat !== 'SEMUA' || kategori !== 'SEMUA' || jalur !== 'SEMUA';
+  const resetSaringan = () => {
+    setCari(''); setTingkat('SEMUA'); setKategori('SEMUA'); setJalur('SEMUA');
+  };
 
   const kategoriTersedia = useMemo(
     () => [...new Set(peringatan.map(p => p.kategori))].sort(),
@@ -122,8 +127,10 @@ export const EwsRiskView: React.FC = () => {
         <div className="min-w-0">
           <h1 className="text-xl font-bold tracking-tight text-foreground">Peringatan Dini Risiko Kredit</h1>
           <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-500">
-            Seluruh peringatan dihitung dari data Nominatif Kredit yang terakhir diunggah.
-            Tidak ada angka contoh di halaman ini.
+            Memantau dua penurunan golongan sebelum terjadi: Lancar yang mulai goyah menuju DPK,
+            dan DPK yang mendekati Kurang Lancar. Rekening yang sudah KL, D, atau M tidak muncul
+            di sini karena penanganannya ada di Collection &amp; Recovery. Seluruh angka dihitung
+            dari Nominatif Kredit yang terakhir diunggah.
           </p>
         </div>
         <Button variant="secondary" onClick={muatUlang}>
@@ -131,24 +138,31 @@ export const EwsRiskView: React.FC = () => {
         </Button>
       </header>
 
+      {/*
+        Dua jalur didahulukan atas hitungan merah/kuning, karena pertanyaan
+        pertama di halaman ini bukan "seberapa gawat" melainkan "berapa rekening
+        yang sedang bergerak turun, dan ke mana". Angkanya rekening unik, bukan
+        jumlah peringatan — satu rekening bisa memicu beberapa aturan sekaligus.
+      */}
       <DeretAngka
         angka={[
+          {
+            label: 'DPK → Kurang Lancar',
+            nilai: ringkas.dpkKeKl.toLocaleString('id-ID'),
+            konteks: `${rupiahRingkas(ringkas.nilaiDpkKeKl)} baki debet`,
+            nada: ringkas.dpkKeKl > 0 ? 'danger' : 'default',
+          },
+          {
+            label: 'Lancar → DPK',
+            nilai: ringkas.lKeDpk.toLocaleString('id-ID'),
+            konteks: `${rupiahRingkas(ringkas.nilaiLKeDpk)} baki debet`,
+            nada: ringkas.lKeDpk > 0 ? 'warning' : 'default',
+          },
           {
             label: 'Perlu perhatian',
             nilai: ringkas.merah.toLocaleString('id-ID'),
             konteks: `dari ${ringkas.total.toLocaleString('id-ID')} peringatan`,
             nada: ringkas.merah > 0 ? 'danger' : 'default',
-          },
-          {
-            label: 'Pantau',
-            nilai: ringkas.kuning.toLocaleString('id-ID'),
-            konteks: 'Belum mendesak, tetapi bergerak',
-            nada: ringkas.kuning > 0 ? 'warning' : 'default',
-          },
-          {
-            label: 'Nilai terdampak',
-            nilai: rupiahRingkas(ringkas.nilaiTerdampak),
-            konteks: 'Baki debet rekening yang tersentuh peringatan',
           },
           {
             label: 'Belum ditangani',
@@ -159,6 +173,46 @@ export const EwsRiskView: React.FC = () => {
           },
         ]}
       />
+
+      {/* Jalur adalah sumbu utama halaman ini, jadi ia berdiri sendiri di luar
+          bilah alat penyaring yang sudah padat. */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div
+          role="tablist"
+          aria-label="Saring jalur penurunan"
+          className="inline-flex rounded-xl border border-border bg-surface p-1"
+        >
+          {([
+            ['SEMUA', 'Semua jalur', peringatan.length],
+            ['DPK_KE_KL', LABEL_JALUR.DPK_KE_KL, peringatan.filter(p => p.jalur === 'DPK_KE_KL').length],
+            ['L_KE_DPK', LABEL_JALUR.L_KE_DPK, peringatan.filter(p => p.jalur === 'L_KE_DPK').length],
+          ] as const).map(([nilai, label, jumlah]) => {
+            const aktif = jalur === nilai;
+            return (
+              <button
+                key={nilai}
+                type="button"
+                role="tab"
+                aria-selected={aktif}
+                onClick={() => { setJalur(nilai as any); setBatas(AWAL_DITAMPILKAN); }}
+                className={cn(
+                  'rounded-lg px-3 py-1.5 text-xs font-bold transition-colors',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  aktif
+                    ? 'bg-primary-light text-primary-dark'
+                    : 'text-slate-500 hover:bg-surface-muted hover:text-foreground',
+                )}
+              >
+                {label}
+                <span className="ml-1.5 tabular-nums opacity-70">{jumlah.toLocaleString('id-ID')}</span>
+              </button>
+            );
+          })}
+        </div>
+        {jalur !== 'SEMUA' && (
+          <p className="text-xs leading-relaxed text-slate-500">{KETERANGAN_JALUR[jalur]}</p>
+        )}
+      </div>
 
       <Panel
         judul="Daftar peringatan"
@@ -243,15 +297,20 @@ export const EwsRiskView: React.FC = () => {
                       <TableCell className="py-3">
                         <span className="block font-bold text-foreground">{p.nama}</span>
                         <span className="block text-[10px] tabular-nums text-slate-500">
-                          {p.kategori === 'KONSENTRASI'
-                            ? 'Portofolio petugas'
-                            : `${p.acuan}${p.kelurahan ? ` · ${p.kelurahan}` : ''}`}
+                          {p.acuan}{p.kelurahan ? ` · ${p.kelurahan}` : ''}
                         </span>
                       </TableCell>
 
                       <TableCell className="py-3">
                         <span className="flex flex-wrap items-center gap-1.5">
                           <span className="font-bold text-foreground">{p.judul}</span>
+                          {/* Jalurnya ikut ditampilkan saat daftar belum disaring,
+                              supaya arah penurunan terbaca tanpa membuka rincian. */}
+                          {jalur === 'SEMUA' && (
+                            <Badge variant={p.jalur === 'DPK_KE_KL' ? 'danger' : 'warning'}>
+                              {LABEL_JALUR[p.jalur]}
+                            </Badge>
+                          )}
                           <Badge variant="neutral">{LABEL_KATEGORI[p.kategori]}</Badge>
                         </span>
                         <span className="mt-0.5 block max-w-lg text-[11px] leading-snug text-slate-500">
@@ -316,11 +375,13 @@ export const EwsRiskView: React.FC = () => {
           </summary>
           <div className="mt-3 grid grid-cols-1 gap-x-8 gap-y-1.5 text-[11px] sm:grid-cols-2">
             {[
-              ['Rekening diperiksa', Number(diagnostik.totalPinjaman).toLocaleString('id-ID')],
-              ['NPL bank saat ini', `${desimal(diagnostik.rasioNplBank, 2)}%`],
+              ['Seluruh rekening kredit', Number(diagnostik.totalPinjaman).toLocaleString('id-ID')],
+              ['Golongan Lancar dipantau', `${Number(diagnostik.rekeningLancar).toLocaleString('id-ID')} rekening`],
+              ['Golongan DPK dipantau', `${Number(diagnostik.rekeningDpk).toLocaleString('id-ID')} rekening`],
+              ['Di luar lingkup karena sudah NPL', `${Number(diagnostik.dilewatiKarenaNpl).toLocaleString('id-ID')} rekening, ditangani Collection & Recovery`],
+              ['Golongan tidak terbaca', `${Number(diagnostik.dilewatiKarenaGolonganTidakDikenal).toLocaleString('id-ID')} rekening`],
               ['Tanpa jadwal angsuran', `${Number(diagnostik.tanpaJadwalAngsuran).toLocaleString('id-ID')} rekening, aturan perilaku bayar dilewati`],
               ['Tanpa tanggal jatuh tempo', `${Number(diagnostik.tanpaTanggalJatuhTempo).toLocaleString('id-ID')} rekening`],
-              ['Tanpa nilai taksasi', `${Number(diagnostik.tanpaTaksasi).toLocaleString('id-ID')} rekening, aturan agunan dilewati`],
             ].map(([k, v]) => (
               <div key={String(k)} className="flex items-baseline justify-between gap-3 border-b border-border py-1">
                 <span className="text-slate-500">{k}</span>
@@ -329,13 +390,17 @@ export const EwsRiskView: React.FC = () => {
             ))}
           </div>
           <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
-            Ambang batas yang dipakai: tunggakan {diagnostik.ambang?.FT_PERINGATAN}x angsuran atau lebih,
-            setoran di bawah {Math.round((diagnostik.ambang?.BAYAR_CUKUP ?? 0) * 100)}% dari jadwal,
-            kredit {rupiahRingkas(diagnostik.ambang?.NOMINAL_BESAR)} ke atas dinaikkan ke tingkat perhatian,
-            dan NPL petugas {diagnostik.ambang?.SELISIH_NPL_PETUGAS} poin di atas rata-rata bank.
-            Angka ini mengikuti praktik pengawasan yang lazim, bukan ketetapan OJK, dan dapat disesuaikan
-            dengan kebijakan internal.
+            Ambang batas yang dipakai: rekening Lancar ditandai sejak tunggakan pertama,
+            rekening DPK ditandai mulai FT {(diagnostik.ambang?.FT_AMBANG_KL ?? 3) - 1} karena
+            ambang Kurang Lancar ada di FT {diagnostik.ambang?.FT_AMBANG_KL}, setoran di bawah{' '}
+            {Math.round((diagnostik.ambang?.BAYAR_CUKUP ?? 0) * 100)}% dari jadwal dihitung sebagai
+            kurang bayar, dan kredit {rupiahRingkas(diagnostik.ambang?.NOMINAL_BESAR)} ke atas
+            dinaikkan satu tingkat perhatian. Angka ini mengikuti praktik pengawasan yang lazim,
+            bukan ketetapan OJK, dan dapat disesuaikan dengan kebijakan internal.
           </p>
+          {diagnostik.catatanLingkup && (
+            <p className="mt-2 text-[11px] leading-relaxed text-slate-500">{diagnostik.catatanLingkup}</p>
+          )}
         </details>
       )}
 

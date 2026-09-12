@@ -12,14 +12,20 @@ import { ambilApi } from '../utils/api';
 
 export type TingkatEws = 'RED' | 'YELLOW';
 
-export type KategoriEws =
-  | 'PERILAKU_BAYAR' | 'TUNGGAKAN' | 'JATUH_TEMPO'
-  | 'AGUNAN' | 'PENGIKATAN' | 'KONSENTRASI';
+export type KategoriEws = 'PERILAKU_BAYAR' | 'TUNGGAKAN' | 'JATUH_TEMPO';
+
+/**
+ * Dua perpindahan yang dipantau: Lancar yang mulai goyah menuju DPK, dan DPK
+ * yang mendekati Kurang Lancar. Rekening yang sudah KL, D, atau M tidak masuk
+ * ke layar ini; penanganannya ada di Collection & Recovery.
+ */
+export type JalurEws = 'L_KE_DPK' | 'DPK_KE_KL';
 
 export interface PeringatanEws {
   id: string;
   kode: string;
   kategori: KategoriEws;
+  jalur: JalurEws;
   tingkat: TingkatEws;
   judul: string;
   keterangan: string;
@@ -41,6 +47,11 @@ export interface RingkasEws {
   belumDitangani: number;
   sudahDitangani: number;
   nilaiTerdampak: number;
+  /** Rekening unik per jalur, bukan jumlah peringatan. */
+  lKeDpk: number;
+  dpkKeKl: number;
+  nilaiLKeDpk: number;
+  nilaiDpkKeKl: number;
 }
 
 interface HasilEws {
@@ -57,15 +68,24 @@ interface HasilEws {
 
 const RINGKAS_KOSONG: RingkasEws = {
   total: 0, merah: 0, kuning: 0, belumDitangani: 0, sudahDitangani: 0, nilaiTerdampak: 0,
+  lKeDpk: 0, dpkKeKl: 0, nilaiLKeDpk: 0, nilaiDpkKeKl: 0,
 };
 
 export const LABEL_KATEGORI: Record<KategoriEws, string> = {
   PERILAKU_BAYAR: 'Perilaku bayar',
   TUNGGAKAN: 'Tunggakan',
   JATUH_TEMPO: 'Jatuh tempo',
-  AGUNAN: 'Agunan',
-  PENGIKATAN: 'Pengikatan',
-  KONSENTRASI: 'Konsentrasi',
+};
+
+export const LABEL_JALUR: Record<JalurEws, string> = {
+  L_KE_DPK: 'Lancar → DPK',
+  DPK_KE_KL: 'DPK → Kurang Lancar',
+};
+
+/** Keterangan singkat tiap jalur, dipakai sebagai penjelasan saringan. */
+export const KETERANGAN_JALUR: Record<JalurEws, string> = {
+  L_KE_DPK: 'Rekening yang masih tercatat Lancar tetapi sudah menunjukkan gejala penurunan.',
+  DPK_KE_KL: 'Rekening DPK yang tinggal selangkah dari penggolongan Kurang Lancar.',
 };
 
 export const LABEL_TINDAK_LANJUT: Record<string, string> = {

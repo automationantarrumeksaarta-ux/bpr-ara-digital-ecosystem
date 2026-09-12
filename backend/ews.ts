@@ -34,34 +34,57 @@ const JWT_SECRET = process.env.JWT_SECRET || 'ara_secret_key_2026';
  * ketetapan OJK, jadi silakan disesuaikan dengan kebijakan internal BPR.
  */
 export const AMBANG = {
-  /** Tunggakan sebanyak ini atau lebih, padahal belum digolongkan NPL. */
-  FT_PERINGATAN: 2,
+  /**
+   * Jumlah angsuran tertunggak yang membuat sebuah rekening menyentuh
+   * penggolongan Kurang Lancar. Dipakai sebagai titik acuan jalur DPK menuju
+   * KL: pada FT satu langkah di bawah angka ini, satu kali gagal bayar lagi
+   * sudah cukup untuk menyeberang.
+   */
+  FT_AMBANG_KL: 3,
   /** Dianggap membayar kurang bila di bawah persentase ini dari jadwal. */
   BAYAR_CUKUP: 0.95,
-  /** Kredit sebesar ini ke atas yang berhenti membayar dinaikkan ke merah. */
+  /** Kredit sebesar ini ke atas dinaikkan satu tingkat perhatian. */
   NOMINAL_BESAR: 100_000_000,
-  /** Portofolio minimum sebelum NPL seorang petugas layak dibandingkan. */
-  MIN_PORTOFOLIO_PETUGAS: 5,
-  /** Selisih NPL petugas terhadap rata-rata bank yang dianggap menonjol. */
-  SELISIH_NPL_PETUGAS: 15,
-  /** Pengikatan yang lemah bila kredit bermasalah: eksekusi jauh lebih sulit. */
-  IKATAN_LEMAH: /skmht|tanpa ikatan/i,
 };
 
+/**
+ * Golongan yang berada di luar lingkup peringatan dini.
+ *
+ * KL, D, dan M bukan lagi peringatan dini — kreditnya sudah bermasalah, dan
+ * yang dibutuhkan adalah penagihan serta penyelesaian, bukan pemantauan.
+ * Ketiganya ditangani modul Collection & Recovery.
+ */
 const NPL = ['KL', 'D', 'M'];
+
+/** Golongan yang dipantau di sini. */
+const DIPANTAU = ['L', 'DPK'];
 
 /* ------------------------------------------------------------------ bentuk */
 
 export type TingkatEws = 'RED' | 'YELLOW';
 
+/**
+ * Dua jalur penurunan yang dipantau.
+ *
+ * EWS di sini sengaja hanya mengurus perpindahan ke bawah satu tingkat dari
+ * golongan yang belum bermasalah: Lancar yang mulai goyah menuju Dalam
+ * Perhatian Khusus, dan DPK yang mendekati Kurang Lancar. Begitu sebuah
+ * rekening sudah KL, D, atau M, ia keluar dari layar ini.
+ */
+export type JalurEws = 'L_KE_DPK' | 'DPK_KE_KL';
+
+export type KategoriEws = 'PERILAKU_BAYAR' | 'TUNGGAKAN' | 'JATUH_TEMPO';
+
 export interface PeringatanEws {
   id: string;
   kode: string;
-  kategori: 'PERILAKU_BAYAR' | 'TUNGGAKAN' | 'JATUH_TEMPO' | 'AGUNAN' | 'PENGIKATAN' | 'KONSENTRASI';
+  kategori: KategoriEws;
+  /** Perpindahan yang sedang diantisipasi. */
+  jalur: JalurEws;
   tingkat: TingkatEws;
   judul: string;
   keterangan: string;
-  /** Nomor rekening, atau nama petugas untuk peringatan konsentrasi. */
+  /** Nomor rekening. */
   acuan: string;
   nama: string;
   petugas: string | null;
@@ -89,8 +112,6 @@ interface BarisPinjaman {
   tunggakan_pokok: number;
   tunggakan_bunga: number;
   tanggal_jatuh_tempo: string | null;
-  taksasi: number;
-  ikatan: string | null;
 }
 
 /* ------------------------------------------------------------- tindak lanjut */
@@ -131,7 +152,7 @@ export function hitungPeringatan(): {
            COALESCE(frek_tunggakan,0)  AS frek_tunggakan,
            COALESCE(tunggakan_pokok,0) AS tunggakan_pokok,
            COALESCE(tunggakan_bunga,0) AS tunggakan_bunga,
-           tanggal_jatuh_tempo, COALESCE(taksasi,0) AS taksasi, ikatan
+           tanggal_jatuh_tempo
     FROM loans
   `).all() as BarisPinjaman[];
 
@@ -148,68 +169,133 @@ export function hitungPeringatan(): {
 
   const hariIni = Date.now();
 
+  /**
+   * Kredit besar dinaikkan satu tingkat perhatian.
+   *
+   * Bukan karena gejalanya berbeda, melainkan karena akibatnya berbeda: satu
+   * rekening miliaran yang turun ke DPK menggeser rasio portofolio jauh lebih
+   * besar daripada sepuluh rekening kecil dengan gejala yang sama.
+   */
+  const naikkanBilaBesar = (tingkat: TingkatEws, baki: number): TingkatEws =>
+    tingkat === 'YELLOW' && baki >= AMBANG.NOMINAL_BESAR ? 'RED' : tingkat;
+
+  let dilewatiNpl = 0;
+  let dilewatiTakDikenal = 0;
+  let tanpaBuktiTunggakan = 0;
+
   for (const r of rows) {
-    const bermasalah = NPL.includes(r.collectibility);
+    const kol = String(r.collectibility ?? '').trim().toUpperCase();
 
-    /* 1 — Berhenti membayar padahal jadwalnya ada.
+    /*
+     * Lingkup peringatan dini dibatasi pada dua perpindahan saja: Lancar yang
+     * mulai goyah menuju DPK, dan DPK yang mendekati Kurang Lancar. Rekening
+     * yang sudah KL, D, atau M tidak ditampilkan di sini — persoalannya bukan
+     * lagi memperingatkan, melainkan menagih, dan itu ada di modul Collection
+     * & Recovery. Jumlah yang dilewati tetap dilaporkan lewat `diagnostik`
+     * supaya jelas bahwa mereka tidak hilang, hanya tidak dibahas di layar ini.
+     */
+    if (!DIPANTAU.includes(kol)) {
+      if (NPL.includes(kol)) dilewatiNpl++;
+      else dilewatiTakDikenal++;
+      continue;
+    }
+
+    const lancar = kol === 'L';
+    const jalur: JalurEws = lancar ? 'L_KE_DPK' : 'DPK_KE_KL';
+    const tujuan = lancar ? 'DPK' : 'Kurang Lancar';
+
+    /* 1 — Tunggakan sebagai syarat masuk, lalu perilaku bayar sebagai pembeda
+     *     tingkat keparahannya.
      *
-     * Inilah tanda paling awal, dan justru yang paling luput: rekening masih
-     * tercatat Lancar sehingga tidak muncul di laporan NPL mana pun, padahal
-     * bulan ini tidak menyetor sama sekali. */
-    if (!bermasalah && r.jumlah_angsuran > 0 && r.angsuran_masuk <= 0) {
-      const besar = r.outstanding >= AMBANG.NOMINAL_BESAR;
+     * Keduanya digabung menjadi satu peringatan per rekening, bukan dua, karena
+     * yang dibutuhkan petugas adalah satu daftar kerja berisi nama yang harus
+     * didatangi — bukan nama yang sama muncul dua kali dengan sudut pandang
+     * berbeda.
+     *
+     * Tunggakan dijadikan syarat masuk setelah memeriksa data nominatif yang
+     * ada. Dari 79 rekening Lancar yang kolom "angsuran masuk"-nya nol, 71 di
+     * antaranya sama sekali tidak punya tunggakan, baik nominal maupun
+     * frekuensi. Rekening Lancar tanpa tunggakan menurut definisinya memang
+     * tidak sedang menunggak; setoran yang belum tercatat jauh lebih mungkin
+     * berarti tanggal jatuh temponya belum tiba pada saat nominatif diambil.
+     * Menandai ketujuh puluh satu rekening itu sebagai "berhenti membayar"
+     * berarti mengisi daftar kerja dengan tujuh puluh satu kunjungan sia-sia,
+     * dan membuat delapan rekening yang benar-benar bermasalah tenggelam di
+     * antaranya. Jumlah yang tidak lolos syarat ini tetap dilaporkan lewat
+     * `diagnostik` supaya keputusan ini bisa ditinjau, bukan disembunyikan. */
+    const tunggakanNominal = r.tunggakan_pokok + r.tunggakan_bunga;
+    const adaTunggakan = r.frek_tunggakan >= 1 || tunggakanNominal > 0;
+
+    if (!adaTunggakan) {
+      if (r.jumlah_angsuran > 0 && r.angsuran_masuk < r.jumlah_angsuran * AMBANG.BAYAR_CUKUP) {
+        tanpaBuktiTunggakan++;
+      }
+    } else {
+      const berhentiBayar = r.jumlah_angsuran > 0 && r.angsuran_masuk <= 0;
+      const kurangBayar =
+        r.jumlah_angsuran > 0 &&
+        r.angsuran_masuk > 0 &&
+        r.angsuran_masuk < r.jumlah_angsuran * AMBANG.BAYAR_CUKUP;
+
+      /* Jarak ke ambang Kurang Lancar. Hanya bermakna pada jalur DPK. */
+      const sisaLangkah = AMBANG.FT_AMBANG_KL - r.frek_tunggakan;
+
+      let tingkat: TingkatEws = 'YELLOW';
+      if (berhentiBayar) tingkat = 'RED';
+      else if (!lancar && sisaLangkah <= 1) tingkat = 'RED';
+      else if (lancar && r.frek_tunggakan >= 2) tingkat = 'RED';
+      tingkat = naikkanBilaBesar(tingkat, r.outstanding);
+
+      /* Rincian tunggakan, dipakai pada semua ragam keterangan di bawah. */
+      const rincian =
+        (r.frek_tunggakan >= 1 ? `FT ${r.frek_tunggakan}, ` : '') +
+        `tunggakan pokok ${rupiah(r.tunggakan_pokok)} dan bunga ${rupiah(r.tunggakan_bunga)}`;
+
+      /* Keadaan setoran bulan berjalan. */
+      const setoran = berhentiBayar
+        ? `Jadwal angsuran ${rupiah(r.jumlah_angsuran)}, tidak ada setoran masuk.`
+        : kurangBayar
+          ? `Dijadwalkan ${rupiah(r.jumlah_angsuran)}, masuk ${rupiah(r.angsuran_masuk)}, ` +
+            `kurang ${rupiah(r.jumlah_angsuran - r.angsuran_masuk)}.`
+          : 'Setoran bulan berjalan masih sesuai jadwal.';
+
+      /* Apa artinya bagi perpindahan golongan. */
+      const arah = lancar
+        ? 'Rekening yang sudah menunggak umumnya tidak lagi memenuhi syarat golongan Lancar. ' +
+          'Periksa apakah penggolongannya masih tepat atau sudah harus turun ke DPK.'
+        : sisaLangkah <= 0
+          ? `FT sudah menyentuh ambang ${AMBANG.FT_AMBANG_KL}. Penggolongan Kurang Lancar ` +
+            'tinggal menunggu penetapan.'
+          : sisaLangkah === 1
+            ? `FT ${r.frek_tunggakan} dari ambang ${AMBANG.FT_AMBANG_KL}. Satu kali gagal bayar ` +
+              'lagi sudah cukup untuk menyeberang ke Kurang Lancar.'
+            : `FT ${r.frek_tunggakan} dari ambang ${AMBANG.FT_AMBANG_KL} untuk Kurang Lancar.`;
+
       hasil.push({
         ...dasar(r),
-        id: `BAYAR-0-${r.account_number}`,
-        kode: 'EWS-BAYAR-01',
-        kategori: 'PERILAKU_BAYAR',
-        tingkat: besar ? 'RED' : 'YELLOW',
-        judul: 'Berhenti membayar bulan ini',
-        keterangan:
-          `Jadwal angsuran bulan ini ${rupiah(r.jumlah_angsuran)}, tidak ada setoran masuk. ` +
-          `Kolektibilitas masih ${r.collectibility}, jadi belum terhitung NPL.`,
-        nilai: r.outstanding,
+        id: `TUNGGAKAN-${r.account_number}`,
+        kode: berhentiBayar || kurangBayar ? 'EWS-BAYAR-01' : 'EWS-TUNGGAKAN-01',
+        jalur,
+        kategori: berhentiBayar || kurangBayar ? 'PERILAKU_BAYAR' : 'TUNGGAKAN',
+        tingkat,
+        judul: berhentiBayar
+          ? 'Menunggak dan berhenti membayar'
+          : kurangBayar
+            ? 'Menunggak dan setoran kurang dari jadwal'
+            : r.frek_tunggakan >= 1
+              ? `${r.frek_tunggakan} angsuran tertunggak`
+              : 'Ada tunggakan berjalan',
+        keterangan: `${rincian}. ${setoran} ${arah}`,
+        nilai: r.frek_tunggakan > 0 ? r.frek_tunggakan : tunggakanNominal,
         tindakLanjut: null,
       });
     }
 
-    /* 2 — Membayar tetapi kurang dari jadwal. */
-    else if (!bermasalah && r.jumlah_angsuran > 0 &&
-             r.angsuran_masuk > 0 && r.angsuran_masuk < r.jumlah_angsuran * AMBANG.BAYAR_CUKUP) {
-      const kurang = r.jumlah_angsuran - r.angsuran_masuk;
-      hasil.push({
-        ...dasar(r),
-        id: `BAYAR-SEBAGIAN-${r.account_number}`,
-        kode: 'EWS-BAYAR-02',
-        kategori: 'PERILAKU_BAYAR',
-        tingkat: 'YELLOW',
-        judul: 'Setoran kurang dari jadwal',
-        keterangan:
-          `Dijadwalkan ${rupiah(r.jumlah_angsuran)}, masuk ${rupiah(r.angsuran_masuk)}. ` +
-          `Kurang ${rupiah(kurang)}.`,
-        nilai: kurang,
-        tindakLanjut: null,
-      });
-    }
-
-    /* 3 — Tunggakan menumpuk padahal belum digolongkan bermasalah. */
-    if (!bermasalah && r.frek_tunggakan >= AMBANG.FT_PERINGATAN) {
-      hasil.push({
-        ...dasar(r),
-        id: `FT-${r.account_number}`,
-        kode: 'EWS-TUNGGAKAN-01',
-        kategori: 'TUNGGAKAN',
-        tingkat: r.frek_tunggakan >= AMBANG.FT_PERINGATAN * 2 ? 'RED' : 'YELLOW',
-        judul: `${r.frek_tunggakan} angsuran tertunggak`,
-        keterangan:
-          `Tunggakan pokok ${rupiah(r.tunggakan_pokok)} dan bunga ${rupiah(r.tunggakan_bunga)}, ` +
-          `masih digolongkan ${r.collectibility}. Periksa apakah penggolongannya sudah tepat.`,
-        nilai: r.frek_tunggakan,
-        tindakLanjut: null,
-      });
-    }
-
-    /* 4 — Sudah lewat jatuh tempo tetapi baki debet belum nol. */
+    /* 2 — Sudah lewat jatuh tempo tetapi baki debet belum nol.
+     *
+     * Pada rekening yang belum bermasalah, ini janggal: kreditnya seharusnya
+     * sudah lunas. Selama baki debet masih ada, penurunan golongan tinggal
+     * menunggu waktu. */
     if (r.tanggal_jatuh_tempo && r.outstanding > 0) {
       const jt = new Date(r.tanggal_jatuh_tempo).getTime();
       if (Number.isFinite(jt) && jt < hariIni) {
@@ -218,97 +304,19 @@ export function hitungPeringatan(): {
           ...dasar(r),
           id: `JT-${r.account_number}`,
           kode: 'EWS-TEMPO-01',
+          jalur,
           kategori: 'JATUH_TEMPO',
-          tingkat: bermasalah ? 'YELLOW' : 'RED',
+          tingkat: 'RED',
           judul: `Lewat jatuh tempo ${hari.toLocaleString('id-ID')} hari`,
           keterangan:
-            `Jatuh tempo ${r.tanggal_jatuh_tempo}, baki debet masih ${rupiah(r.outstanding)}. ` +
-            (bermasalah
-              ? 'Sudah tergolong bermasalah, perlu langkah penyelesaian.'
-              : 'Belum digolongkan bermasalah walaupun sudah lewat tempo.'),
+            `Jatuh tempo ${r.tanggal_jatuh_tempo}, baki debet masih ${rupiah(r.outstanding)} ` +
+            `padahal golongannya masih ${kol}. Selesaikan pelunasan atau perpanjangan sebelum ` +
+            `turun ke ${tujuan}.`,
           nilai: hari,
           tindakLanjut: null,
         });
       }
     }
-
-    /* 5 — Agunan tidak lagi menutup baki debet. */
-    if (r.taksasi > 0 && r.outstanding > r.taksasi) {
-      const selisih = r.outstanding - r.taksasi;
-      hasil.push({
-        ...dasar(r),
-        id: `AGUNAN-${r.account_number}`,
-        kode: 'EWS-AGUNAN-01',
-        kategori: 'AGUNAN',
-        tingkat: bermasalah ? 'RED' : 'YELLOW',
-        judul: 'Agunan tidak menutup baki debet',
-        keterangan:
-          `Baki debet ${rupiah(r.outstanding)} melampaui taksasi ${rupiah(r.taksasi)}. ` +
-          `Selisih ${rupiah(selisih)} tidak terjamin.`,
-        nilai: selisih,
-        tindakLanjut: null,
-      });
-    }
-
-    /* 6 — Bermasalah dengan pengikatan yang lemah.
-     *
-     * SKMHT belum memberi hak eksekusi seperti APHT, dan "tanpa ikatan" berarti
-     * tidak ada dasar kebendaan sama sekali. Bila kreditnya sudah bermasalah,
-     * inilah yang menentukan seberapa besar yang bisa ditarik kembali. */
-    if (bermasalah && r.ikatan && AMBANG.IKATAN_LEMAH.test(r.ikatan)) {
-      hasil.push({
-        ...dasar(r),
-        id: `IKATAN-${r.account_number}`,
-        kode: 'EWS-IKATAN-01',
-        kategori: 'PENGIKATAN',
-        tingkat: 'RED',
-        judul: 'Bermasalah dengan pengikatan lemah',
-        keterangan:
-          `Kolektibilitas ${r.collectibility} dengan pengikatan "${r.ikatan}". ` +
-          `Eksekusi agunan tidak dapat langsung dilakukan, dahulukan penyelesaian secara musyawarah.`,
-        nilai: r.outstanding,
-        tindakLanjut: null,
-      });
-    }
-  }
-
-  /* 7 — Pemusatan kredit bermasalah pada satu petugas. */
-  const perPetugas = new Map<string, { n: number; baki: number; npl: number }>();
-  for (const r of rows) {
-    const p = r.officer_name?.trim();
-    if (!p) continue;
-    const o = perPetugas.get(p) ?? { n: 0, baki: 0, npl: 0 };
-    o.n++; o.baki += r.outstanding;
-    if (NPL.includes(r.collectibility)) o.npl += r.outstanding;
-    perPetugas.set(p, o);
-  }
-  const bakiBank = rows.reduce((s, r) => s + r.outstanding, 0);
-  const nplBank = rows.filter(r => NPL.includes(r.collectibility)).reduce((s, r) => s + r.outstanding, 0);
-  const rasioBank = bakiBank > 0 ? (nplBank / bakiBank) * 100 : 0;
-
-  for (const [petugas, o] of perPetugas) {
-    if (o.n < AMBANG.MIN_PORTOFOLIO_PETUGAS || o.baki <= 0) continue;
-    const rasio = (o.npl / o.baki) * 100;
-    if (rasio - rasioBank < AMBANG.SELISIH_NPL_PETUGAS) continue;
-    hasil.push({
-      id: `PETUGAS-${petugas}`,
-      kode: 'EWS-KONSENTRASI-01',
-      kategori: 'KONSENTRASI',
-      tingkat: rasio - rasioBank >= AMBANG.SELISIH_NPL_PETUGAS * 2 ? 'RED' : 'YELLOW',
-      judul: `NPL portofolio ${petugas} ${rasio.toFixed(1)}%`,
-      keterangan:
-        `${o.n} rekening senilai ${rupiah(o.baki)}, bermasalah ${rupiah(o.npl)}. ` +
-        `Rata-rata bank ${rasioBank.toFixed(1)}%.`,
-      acuan: petugas,
-      nama: petugas,
-      petugas,
-      wilayah: null,
-      kelurahan: null,
-      kolektibilitas: null,
-      bakiDebet: o.baki,
-      nilai: rasio,
-      tindakLanjut: null,
-    });
   }
 
   // Tempelkan tindak lanjut yang sudah dicatat petugas.
@@ -319,37 +327,74 @@ export function hitungPeringatan(): {
     if (l) p.tindakLanjut = { status: l.status, catatan: l.catatan, diperbaruiPada: l.diperbarui_pada };
   }
 
-  // Merah dulu, lalu nominal terbesar.
-  hasil.sort((a, b) =>
-    a.tingkat === b.tingkat ? b.bakiDebet - a.bakiDebet : a.tingkat === 'RED' ? -1 : 1);
+  /*
+   * Merah dulu, lalu jalur yang paling dekat dengan NPL, baru nominal terbesar.
+   * DPK yang mendekati KL didahulukan atas Lancar yang mulai goyah karena
+   * jaraknya ke NPL tinggal satu langkah.
+   */
+  hasil.sort((a, b) => {
+    if (a.tingkat !== b.tingkat) return a.tingkat === 'RED' ? -1 : 1;
+    if (a.jalur !== b.jalur) return a.jalur === 'DPK_KE_KL' ? -1 : 1;
+    return b.bakiDebet - a.bakiDebet;
+  });
 
   const belum = hasil.filter(p => !p.tindakLanjut || p.tindakLanjut.status === 'TERBUKA');
+
+  /*
+   * Rekening unik, bukan jumlah peringatan. Satu rekening bisa memicu beberapa
+   * aturan sekaligus — misalnya menunggak sekaligus berhenti membayar — dan
+   * menjumlahkan baki debetnya per peringatan akan menghitungnya berkali-kali.
+   */
+  const bakiUnik = (daftar: PeringatanEws[]) =>
+    [...new Map(daftar.map(p => [p.acuan, p.bakiDebet])).values()].reduce((s, v) => s + v, 0);
+
+  const lKeDpk = hasil.filter(p => p.jalur === 'L_KE_DPK');
+  const dpkKeKl = hasil.filter(p => p.jalur === 'DPK_KE_KL');
+
   const ringkas = {
     total: hasil.length,
     merah: hasil.filter(p => p.tingkat === 'RED').length,
     kuning: hasil.filter(p => p.tingkat === 'YELLOW').length,
     belumDitangani: belum.length,
     sudahDitangani: hasil.length - belum.length,
-    // Nilai yang dipertaruhkan dihitung dari rekening unik, bukan dijumlah
-    // per peringatan — satu rekening bisa memicu beberapa aturan sekaligus.
-    nilaiTerdampak: [...new Map(
-      hasil.filter(p => p.kategori !== 'KONSENTRASI').map(p => [p.acuan, p.bakiDebet]),
-    ).values()].reduce((s, v) => s + v, 0),
+    nilaiTerdampak: bakiUnik(hasil),
+    /* Per jalur, karena keduanya menuntut tindakan yang berbeda. */
+    lKeDpk: new Set(lKeDpk.map(p => p.acuan)).size,
+    dpkKeKl: new Set(dpkKeKl.map(p => p.acuan)).size,
+    nilaiLKeDpk: bakiUnik(lKeDpk),
+    nilaiDpkKeKl: bakiUnik(dpkKeKl),
   };
 
   const kolomKosong = (nama: string) =>
     (db.prepare(`SELECT COUNT(*) AS n FROM loans WHERE ${nama} IS NULL OR ${nama} = 0`).get() as any).n;
+
+  const cacahGolongan = (gol: string[]) =>
+    rows.filter(r => gol.includes(String(r.collectibility ?? '').trim().toUpperCase())).length;
 
   return {
     peringatan: hasil,
     ringkas,
     diagnostik: {
       totalPinjaman: rows.length,
-      rasioNplBank: Number(rasioBank.toFixed(2)),
+      /* Populasi yang benar-benar diperiksa aturan di atas. */
+      rekeningLancar: cacahGolongan(['L']),
+      rekeningDpk: cacahGolongan(['DPK']),
+      dilewatiKarenaNpl: dilewatiNpl,
+      dilewatiKarenaGolonganTidakDikenal: dilewatiTakDikenal,
+      /*
+       * Rekening yang setorannya belum penuh tetapi tunggakannya nol. Tidak
+       * ditandai karena tidak dapat dibedakan dari tanggal jatuh tempo yang
+       * belum tiba saat nominatif diambil. Dilaporkan agar keputusan ini
+       * terlihat dan bisa ditinjau.
+       */
+      setoranBelumPenuhTanpaTunggakan: tanpaBuktiTunggakan,
       tanpaJadwalAngsuran: kolomKosong('jumlah_angsuran'),
       tanpaTanggalJatuhTempo: (db.prepare('SELECT COUNT(*) AS n FROM loans WHERE tanggal_jatuh_tempo IS NULL').get() as any).n,
-      tanpaTaksasi: kolomKosong('taksasi'),
       ambang: AMBANG,
+      catatanLingkup:
+        'Peringatan dini hanya mencakup rekening Lancar yang berpotensi turun ke DPK dan '
+        + 'rekening DPK yang mendekati Kurang Lancar. Rekening yang sudah KL, D, atau M '
+        + 'ditangani modul Collection & Recovery, bukan di sini.',
     },
   };
 }
@@ -379,7 +424,10 @@ router.get('/alerts', (req, res) => {
         tersedia: false,
         alasan: 'Belum ada data kredit. Unggah berkas Nominatif Kredit lewat menu Data Center terlebih dahulu.',
         peringatan: [],
-        ringkas: { total: 0, merah: 0, kuning: 0, belumDitangani: 0, sudahDitangani: 0, nilaiTerdampak: 0 },
+        ringkas: {
+          total: 0, merah: 0, kuning: 0, belumDitangani: 0, sudahDitangani: 0,
+          nilaiTerdampak: 0, lKeDpk: 0, dpkKeKl: 0, nilaiLKeDpk: 0, nilaiDpkKeKl: 0,
+        },
       });
     }
     res.json({ tersedia: true, ...hitungPeringatan() });
