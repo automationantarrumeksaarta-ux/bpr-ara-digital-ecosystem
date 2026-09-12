@@ -514,36 +514,18 @@ export function getAllUsersList(): UserProfile[] {
   return INITIAL_USERS;
 }
 
-export function getMemberRoleTier(memberTab: string): RoleTier {
-  if (memberTab === 'REKAP PUSAT') return 'TOP';
-  const allUsers = getAllUsersList();
-  const user = allUsers.find(
-    u => u.assignedMemberTab === memberTab || u.name.toUpperCase().includes(memberTab)
-  );
-  if (user) {
-    if (user.roleTier) return TIER_MIGRATION_MAP[user.roleTier as string] || user.roleTier;
-    if (user.role === 'Staff / Member') return 'LOW';
-    if (user.role === 'Atasan / Manager') return 'MID';
-    if (user.role === 'Super Admin') return 'Super Admin';
-  }
-  return 'LOW';
-}
-
-export function canViewTier(viewerTier: string, targetTier: string): boolean {
-  const tierWeights: Record<string, number> = {
-    'Super Admin': 50,
-    'TOP': 40,
-    'HIGH': 30,
-    'MID': 20,
-    'LOW': 10
-  };
-  
-  const viewerWeight = tierWeights[viewerTier] || 10;
-  const targetWeight = tierWeights[targetTier] || 10;
-  
-  // A viewer can only view target tiers that have an equal or lower weight
-  return viewerWeight >= targetWeight;
-}
+/*
+ * getMemberRoleTier() dan canViewTier() dihapus.
+ *
+ * Keduanya menghitung bobot tingkatan — Super Admin 50, TOP 40, HIGH 30, MID
+ * 20, LOW 10 — untuk menentukan siapa boleh melihat siapa, tetapi tidak pernah
+ * dipanggil dari mana pun di seluruh aplikasi. Kewenangan yang benar-benar
+ * berlaku ditentukan peran pada struktur organisasi dan atasan langsung pada
+ * task_routes, bukan bobot tingkatan.
+ *
+ * Menyimpan aturan yang tidak pernah berjalan lebih berbahaya daripada tidak
+ * punya aturan sama sekali: ia terbaca seolah ada penjagaan di sana.
+ */
 
 /**
  * Calculates aging/overdue days based on deadline and current date.

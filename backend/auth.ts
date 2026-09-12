@@ -71,18 +71,23 @@ router.post('/register', async (req, res) => {
     const userId = 'usr-' + Date.now().toString(36) + Math.random().toString(36).substring(2, 5);
 
     /*
-     * Tingkat kewenangan tidak boleh ditentukan oleh pendaftarnya sendiri.
+     * Tier tidak lagi dibaca dari permintaan pendaftaran.
      *
-     * Formulir pendaftaran menyediakan pilihan tier sampai 'Super Admin', dan
-     * nilainya dikirim apa adanya ke sini lalu tersimpan. Tiga endpoint admin
-     * menerima `roleTier === 'Super Admin'` sebagai bukti kewenangan, jadi
-     * seorang pendaftar dapat menuliskan kewenangannya sendiri. Yang sempat
-     * menahannya hanyalah kebetulan pada pencarian OTP, dan kebetulan bukan
-     * penjagaan. Tier ditetapkan admin lewat /users/:id/role, bukan di sini.
+     * Dua alasan. Pertama soal keamanan: formulir dulu menyediakan pilihan
+     * sampai 'Super Admin' dan nilainya tersimpan apa adanya, sementara tiga
+     * endpoint admin menerima `roleTier === 'Super Admin'` sebagai bukti
+     * kewenangan — artinya pendaftar dapat menuliskan kewenangannya sendiri.
+     *
+     * Kedua soal gunanya: tingkatan HIGH, MID, dan LOW tidak menjaga apa pun.
+     * Satu-satunya tier yang berpengaruh adalah 'Super Admin' dan 'TOP', dan
+     * keduanya memang hanya boleh ditetapkan admin. Jenjang yang sebenarnya
+     * dipakai sistem ini datang dari peran pada struktur organisasi dan dari
+     * atasan langsung pada task_routes.
+     *
+     * Setiap pendaftar mulai dari tingkat terendah. Admin menaikkannya lewat
+     * /users/:id/status bila memang perlu.
      */
-    const TIER_BOLEH_DAFTAR = ['LOW', 'MID', 'HIGH'];
-    const tierDiminta = String(roleTier ?? '').toUpperCase();
-    const tierAman = TIER_BOLEH_DAFTAR.includes(tierDiminta) ? tierDiminta : 'LOW';
+    const tierAman = 'LOW';
 
     db.prepare(`
       INSERT INTO users (id, username, email, password_hash, name, role, roleTier, unit, status)

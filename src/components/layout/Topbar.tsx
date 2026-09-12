@@ -14,13 +14,11 @@ import {
   Layers,
   ArrowRight,
   LogOut,
-  Users,
   Menu,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { UserRole } from '../../types';
 import { NotificationInboxPopover } from '../ui/notification-inbox-popover';
-import StrukturManajemenModal from '../common/StrukturManajemenModal';
 import { Breadcrumb } from './Breadcrumb';
 import { useNavigate } from 'react-router-dom';
 
@@ -49,7 +47,6 @@ export const Topbar: React.FC<TopbarProps> = ({ onMobileMenuToggle }) => {
   } = useApp();
 
   const [isRoleMenuOpen, setIsRoleMenuOpen] = useState(false);
-  const [isOrgModalOpen, setIsOrgModalOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
 
   const redAlertsCount = ewsAlerts.filter((a) => a.severity === 'RED' && a.status !== 'RESOLVED').length;
@@ -113,13 +110,15 @@ export const Topbar: React.FC<TopbarProps> = ({ onMobileMenuToggle }) => {
           </button>
         )}
 
-        {/* Org Directory Button */}
-        <button
-          onClick={() => setIsOrgModalOpen(true)}
-          className="hidden sm:flex relative items-center justify-center h-10 px-3 gap-2 text-slate-600 dark:text-slate-300 bg-white dark:bg-[#18181B] border border-slate-200 dark:border-slate-800 rounded-lg hover:bg-slate-50 transition-colors shadow-sm"
-        >
-          <Users className="w-4 h-4" strokeWidth={2} />
-        </button>
+        {/*
+          Tombol direktori struktur organisasi dihapus.
+
+          Isinya daftar nama dan jabatan yang ditulis tetap di dalam kode, tidak
+          terhubung ke tabel pengguna maupun ke task_routes, sehingga berubah
+          hanya bila kodenya diubah. Halaman yang menampilkan susunan organisasi
+          tetapi tidak ikut berubah saat orangnya berganti lebih menyesatkan
+          daripada tidak ada sama sekali.
+        */}
 
         {/* Notifications */}
         <NotificationInboxPopover />
@@ -186,10 +185,6 @@ export const Topbar: React.FC<TopbarProps> = ({ onMobileMenuToggle }) => {
 
       </div>
       
-      <StrukturManajemenModal 
-        isOpen={isOrgModalOpen} 
-        onClose={() => setIsOrgModalOpen(false)} 
-      />
     </header>
   );
 };

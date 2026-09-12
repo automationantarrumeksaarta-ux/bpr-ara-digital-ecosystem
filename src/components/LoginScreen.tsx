@@ -26,7 +26,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   const [loginEmail, setLoginEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [regUnit, setRegUnit] = useState<string>('');
-  const [regRoleTier, setRegRoleTier] = useState<RoleTier | ''>('');
   
   // OTP State
   const [otpCode, setOtpCode] = useState('');
@@ -104,7 +103,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
     e.preventDefault();
     setErrorMsg('');
 
-    if (!regName.trim() || !regUsername.trim() || !regEmail.trim() || !regPassword || !regUnit || !regRoleTier) {
+    if (!regName.trim() || !regUsername.trim() || !regEmail.trim() || !regPassword || !regUnit) {
       setErrorMsg('Harap lengkapi semua kolom form pendaftaran.');
       return;
     }
@@ -378,30 +377,22 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                         </div>
                       </div>
 
-                      {/* Role Tier */}
-                      <div className="relative flex items-center border border-gray-200 dark:border-gray-700 rounded-2xl bg-white dark:bg-[#18181A] overflow-hidden focus-within:border-gray-400 transition-colors group shadow-sm">
-                        <div className="flex-1 px-4 py-2 flex flex-col justify-center">
-                          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Role Tier</label>
-                          <select required value={regRoleTier} onChange={(e) => setRegRoleTier(e.target.value as RoleTier)} className="w-full bg-transparent text-sm font-bold text-gray-900 dark:text-white focus:outline-none appearance-none cursor-pointer">
-                            {/*
-                              TOP dan Super Admin dihapus dari pilihan.
+                      {/*
+                        Pilihan "Role Tier" dihapus dari pendaftaran.
 
-                              Tier yang dipilih pendaftar tersimpan apa adanya,
-                              sementara tiga endpoint admin menerima
-                              `roleTier === 'Super Admin'` sebagai bukti
-                              kewenangan. Artinya siapa pun dapat menuliskan
-                              kewenangannya sendiri di formulir pendaftaran.
-                              Server kini juga menolaknya; pilihan di sini
-                              dirapikan agar layarnya jujur soal apa yang
-                              sebenarnya bisa diminta.
-                            */}
-                            <option value="" disabled>Pilih Tier</option>
-                            <option value="LOW">LOW</option>
-                            <option value="MID">MID</option>
-                            <option value="HIGH">HIGH</option>
-                          </select>
-                        </div>
-                      </div>
+                        Tingkatan HIGH/MID/LOW tidak menjaga apa pun: satu-satunya
+                        tier yang benar-benar berpengaruh adalah 'Super Admin' dan
+                        'TOP', dan keduanya memang tidak boleh ditentukan sendiri
+                        oleh pendaftar. Dua fungsi yang dulu menghitung bobot tier,
+                        canViewTier() dan getMemberRoleTier(), tidak pernah
+                        dipanggil dari mana pun.
+
+                        Jenjangnya sudah ditentukan dua hal yang nyata dan diisi
+                        admin: peran pada struktur organisasi, dan atasan langsung
+                        pada task_routes. Meminta orang menilai dirinya sendiri
+                        "saya LOW" atau "saya HIGH" saat mendaftar hanya menambah
+                        pertanyaan yang jawabannya tidak dipakai.
+                      */}
                     </div>
                   </div>
 
@@ -459,7 +450,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                           username: regUsername.trim().toLowerCase().replace(/\s+/g, ''), 
                           email: regEmail.trim(), 
                           password: regPassword || '123', 
-                          roleTier: regRoleTier, 
                           unit: regUnit,
                         otpCode: code // Send the code entered by the user
                         })
