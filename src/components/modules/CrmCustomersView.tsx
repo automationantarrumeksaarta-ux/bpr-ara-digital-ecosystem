@@ -11,6 +11,7 @@ import { rupiah, rupiahRingkas, tanggalPendek } from '../credit/pipeline';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/Table';
 import { Button } from '../ui/Button';
 import { cn } from '../../lib/utils';
+import { ambilApi } from '../../utils/api';
 
 /**
  * CRM Nasabah.
@@ -78,10 +79,7 @@ export const CrmCustomersView: React.FC = () => {
     setMemuat(true);
     setGalat(null);
     try {
-      const res = await fetch('/api/crm/nasabah', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
-      });
-      const json = await res.json();
+      const { res, json } = await ambilApi('/api/crm/nasabah');
       if (!res.ok) throw new Error(json?.error ?? 'Gagal memuat nasabah');
       setTersedia(!!json.tersedia);
       setAlasan(json.alasan ?? null);
@@ -283,11 +281,11 @@ const DetailNasabah: React.FC<{ nasabah: Nasabah }> = ({ nasabah }) => {
     (async () => {
       setMemuat(true);
       try {
-        const res = await fetch(`/api/crm/nasabah/${encodeURIComponent(nasabah.kunci)}`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
-        });
-        const json = await res.json();
+        const { res, json } = await ambilApi(`/api/crm/nasabah/${encodeURIComponent(nasabah.kunci)}`);
         if (!batal) setRinci(res.ok ? json : null);
+      } catch {
+        /* Rincian gagal dimuat bukan alasan untuk menjatuhkan panelnya. */
+        if (!batal) setRinci(null);
       } finally {
         if (!batal) setMemuat(false);
       }

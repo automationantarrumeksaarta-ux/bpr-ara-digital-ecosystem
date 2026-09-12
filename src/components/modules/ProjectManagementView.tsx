@@ -9,6 +9,7 @@ import {
   BarisAntrean, BelumAdaPilihan, Kosong, KosongKarenaSaringan, NadaPill, Panel, StageWorkbench,
 } from '../credit/StageParts';
 import { tanggalPendek } from '../credit/pipeline';
+import { ambilApi } from '../../utils/api';
 import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
 import { cn } from '../../lib/utils';
@@ -114,10 +115,7 @@ export const ProjectManagementView: React.FC = () => {
     setMemuat(true);
     setGalat(null);
     try {
-      const res = await fetch('/api/projects', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
-      });
-      const json = await res.json();
+      const { res, json } = await ambilApi('/api/projects');
       if (!res.ok) throw new Error(json?.error ?? 'Gagal memuat proyek');
       setProyek(json.data ?? []);
     } catch (e: any) {
@@ -307,12 +305,17 @@ const DetailProyek: React.FC<{
     (async () => {
       setMemuat(true);
       try {
-        const res = await fetch(`/api/projects/${proyek.id}/reports`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
-        });
-        const json = await res.json();
+        const { res, json } = await ambilApi(`/api/projects/${proyek.id}/reports`);
         if (batal) return;
         setLaporan(res.ok ? (json.data ?? []) : []);
+      } catch {
+        /*
+         * Daftar laporan bukan isi utama panel ini, jadi kegagalannya tidak
+         * boleh menjatuhkan seluruh komponen. Sebelumnya tidak ada `catch` di
+         * sini sama sekali, sehingga balasan yang bukan JSON menjadi penolakan
+         * janji yang tidak tertangani.
+         */
+        if (!batal) setLaporan([]);
       } finally {
         if (!batal) setMemuat(false);
       }
@@ -325,19 +328,14 @@ const DetailProyek: React.FC<{
     setMengirim(true);
     setGalat(null);
     try {
-      const res = await fetch(`/api/projects/${proyek.id}/reports`, {
+      const { res, json } = await ambilApi(`/api/projects/${proyek.id}/reports`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
-        },
         body: JSON.stringify({
           body: isi.trim(),
           progress: progres === '' ? undefined : Number(progres),
           status,
         }),
       });
-      const json = await res.json();
       if (!res.ok) throw new Error(json?.error ?? 'Gagal menyimpan laporan');
       setIsi('');
       setProgres('');
@@ -512,12 +510,8 @@ const FormProyek: React.FC<{
     setMengirim(true);
     setGalat(null);
     try {
-      const res = await fetch('/api/projects', {
+      const { res, json } = await ambilApi('/api/projects', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
-        },
         body: JSON.stringify({
           title: judul.trim(),
           description: keterangan.trim(),
@@ -527,7 +521,6 @@ const FormProyek: React.FC<{
           target: Number(target) || 100,
         }),
       });
-      const json = await res.json();
       if (!res.ok) throw new Error(json?.error ?? 'Gagal menyimpan proyek');
       onTersimpan();
     } catch (e: any) {

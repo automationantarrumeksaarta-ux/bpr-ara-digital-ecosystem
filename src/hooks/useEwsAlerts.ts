@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { ambilApi } from '../utils/api';
 
 /**
  * Peringatan dini risiko kredit, dihitung server dari tabel `loans`.
@@ -93,10 +94,7 @@ export function useEwsAlerts(): HasilEws {
       setMemuat(true);
       setGalat(null);
       try {
-        const res = await fetch('/api/ews/alerts', {
-          headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
-        });
-        const json = await res.json();
+        const { res, json } = await ambilApi('/api/ews/alerts');
         if (dibatalkan) return;
 
         if (!res.ok) throw new Error(json?.error ?? 'Gagal memuat peringatan');
@@ -123,18 +121,11 @@ export function useEwsAlerts(): HasilEws {
   }, [pemicu]);
 
   const simpanTindakLanjut = useCallback(async (id: string, status: string, catatan?: string) => {
-    const res = await fetch(`/api/ews/alerts/${encodeURIComponent(id)}/tindak-lanjut`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
-      },
-      body: JSON.stringify({ status, catatan }),
-    });
-    if (!res.ok) {
-      const json = await res.json().catch(() => ({}));
-      throw new Error(json?.error ?? 'Gagal menyimpan tindak lanjut');
-    }
+    const { res, json } = await ambilApi(
+      `/api/ews/alerts/${encodeURIComponent(id)}/tindak-lanjut`,
+      { method: 'PUT', body: JSON.stringify({ status, catatan }) },
+    );
+    if (!res.ok) throw new Error(json?.error ?? 'Gagal menyimpan tindak lanjut');
     setPemicu(n => n + 1);
   }, []);
 

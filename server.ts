@@ -88,15 +88,6 @@ function getGeminiClient() {
   return aiClient;
 }
 
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    system: 'BPR ARA Digital Ecosystem Backend',
-    timestamp: new Date().toISOString(),
-  });
-});
-
 // API Routes
 import authRoutes from './backend/auth.js';
 import notificationRoutes from './backend/notifications.js';
@@ -107,15 +98,42 @@ import ewsRoutes from './backend/ews.js';
 import projectRoutes from './backend/projects.js';
 import crmRoutes from './backend/crm.js';
 
-app.use('/api/auth', authRoutes);
-app.use('/api/notifications', notificationRoutes);
-app.use('/api/attendances', attendanceRoutes);
-app.use('/api/activities', activityRoutes);
-app.use('/api/payroll', payrollRoutes);
-app.use('/api/ews', ewsRoutes);
-app.use('/api/projects', projectRoutes);
-app.use('/api/crm', crmRoutes);
-app.use('/api', parserRoutes);
+/**
+ * Satu daftar router, dipakai dua kali: untuk memasangnya, dan untuk
+ * melaporkannya lewat /api/health.
+ *
+ * Alasannya konkret. Modul Proyek, CRM, dan Peringatan Dini pernah gagal di
+ * server dengan pesan `Unexpected token '<'` karena binaan backend yang
+ * berjalan di sana lebih tua daripada binaan frontend-nya — rutenya belum ada,
+ * jadi permintaan jatuh ke penangkap SPA dan dibalas halaman HTML. Menelusuri
+ * itu butuh mencoba rute satu per satu. Dengan daftar ini, satu permintaan ke
+ * /api/health sudah menjawabnya. Daftarnya tidak bisa melenceng dari kenyataan
+ * karena pemasangan dan pelaporan membaca sumber yang sama.
+ */
+const ROUTER_API: Array<[string, express.Router]> = [
+  ['/api/auth', authRoutes],
+  ['/api/notifications', notificationRoutes],
+  ['/api/attendances', attendanceRoutes],
+  ['/api/activities', activityRoutes],
+  ['/api/payroll', payrollRoutes],
+  ['/api/ews', ewsRoutes],
+  ['/api/projects', projectRoutes],
+  ['/api/crm', crmRoutes],
+  ['/api', parserRoutes],
+];
+
+// Health check
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    system: 'BPR ARA Digital Ecosystem Backend',
+    timestamp: new Date().toISOString(),
+    /* Rute yang benar-benar terpasang di binaan yang sedang berjalan. */
+    rute: ROUTER_API.map(([awalan]) => awalan),
+  });
+});
+
+for (const [awalan, router] of ROUTER_API) app.use(awalan, router);
 
 // AI Assistant endpoint
 app.post('/api/ai/chat', async (req, res) => {
@@ -181,6 +199,36 @@ Pedoman Utama:
       details: error.message,
     });
   }
+});
+
+/**
+ * Endpoint API yang tidak dikenal harus menjawab sebagai API.
+ *
+ * Sebelum ini, `/api/apa-pun` yang tidak terpasang lolos ke penangkap SPA dan
+ * dibalas `dist/index.html` dengan status 200. Di sisi peramban, `res.json()`
+ * lalu mencoba mengurai halaman HTML itu dan melempar
+ * `Unexpected token '<', "<!doctype "... is not valid JSON` — pesan yang
+ * menunjuk ke pengurai JSON, padahal masalahnya ada di server dan sama sekali
+ * tidak menyebut rute mana yang hilang.
+ *
+ * Penjaga ini harus berada setelah seluruh router API dan sebelum penangkap
+ * SPA, termasuk sebelum middleware Vite pada mode pengembangan yang juga
+ * membalas index.html untuk jalur apa pun.
+ */
+app.use('/api', (req, res) => {
+  res.status(404).json({
+    error: 'Endpoint tidak dikenal',
+    jalur: req.originalUrl,
+    /*
+     * Disebutkan supaya penyebab paling sering — backend di server lebih tua
+     * daripada frontend-nya — bisa langsung dikenali tanpa menebak.
+     */
+    petunjuk:
+      'Rute ini tidak terpasang di server yang sedang berjalan. Bila modulnya '
+      + 'sudah ada di kode terbaru, kemungkinan besar backend di server belum '
+      + 'dibangun ulang. Periksa daftar rute lewat /api/health.',
+    ruteTerpasang: ROUTER_API.map(([awalan]) => awalan),
+  });
 });
 
 async function startServer() {
