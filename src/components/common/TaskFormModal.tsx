@@ -139,11 +139,19 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
   const [penyelesaian, setPenyelesaian] = useState('');
   const [syncCalendar, setSyncCalendar] = useState(true);
 
-  // BEIS Fields
-  const [beisDomain, setBeisDomain] = useState<BEISDomainCode>('CRD');
-  const [beisLevel, setBeisLevel] = useState<BEISLevelCode>('L03');
-  const [beisCategory, setBeisCategory] = useState<string>('AKR');
-  const [unit, setUnit] = useState<string>('BIS');
+  /*
+   * BEIS. Nilai awalnya diturunkan dari unit pengguna, bukan dipatok, supaya
+   * kotak pilihan tidak pernah sempat menampilkan unit yang keliru pada render
+   * pertama sebelum efek pengisian sempat berjalan.
+   */
+  const unitBawaan = currentUserUnit || currentUser?.unit || 'BIS';
+  const domainBawaan = domainDisarankanUntukUnit(unitBawaan)[0] ?? 'ADM';
+  const domainObjBawaan = BEIS_DOMAINS.find(d => d.code === domainBawaan);
+
+  const [beisDomain, setBeisDomain] = useState<BEISDomainCode>(domainBawaan);
+  const [beisLevel, setBeisLevel] = useState<BEISLevelCode>(domainObjBawaan?.level ?? 'L01');
+  const [beisCategory, setBeisCategory] = useState<string>(domainObjBawaan?.categories[0]?.code ?? '');
+  const [unit, setUnit] = useState<string>(unitBawaan);
   const [outputDoD, setOutputDoD] = useState<string>('');
   const [outputDoD2, setOutputDoD2] = useState<string>('');
   const [outcome, setOutcome] = useState<string>('');
@@ -168,7 +176,33 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  /**
+   * Mengisi formulir setiap kali dibuka.
+   *
+   * Seluruh isi efek ini dulu terbungkus `if (editingTask)`, dan syarat itu
+   * terbalik dari maksudnya. Akibatnya ada dua:
+   *
+   * Pertama, pada tugas baru `editingTask` bernilai null sehingga tidak ada
+   * satu pun baris di sini yang dijalankan. Formulir bertahan pada nilai bawaan
+   * `useState` yang dipatok — BIS, CRD, L03, AKR. Unit pengguna tidak pernah
+   * dibaca, betapa pun benar tersimpannya di basis data. Inilah sebabnya orang
+   * yang mendaftar dengan unit OPS tetap melihat BIS saat membuat aktivitas:
+   * datanya sampai dengan utuh ke `currentUser.unit`, hanya tidak pernah
+   * dipakai.
+   *
+   * Kedua, pada tugas yang sedang disunting, cabang `!loadedFromDraft` justru
+   * mengosongkan kembali seluruh isian yang baru saja diambil dari tugas itu.
+   * Dan bila kebetulan ada draf tugas baru yang tersimpan, draf itu menimpa
+   * data tugas yang sedang dibuka.
+   *
+   * Sekarang keduanya dipisah tegas: tugas yang dibuka diisi dari dirinya
+   * sendiri dan tidak pernah bersentuhan dengan draf; tugas baru memulihkan
+   * draf bila ada, selain itu memakai nilai awal yang diturunkan dari unit
+   * pengguna.
+   */
   useEffect(() => {
+    if (!isOpen) return;
+
     if (editingTask) {
       setTanggal(editingTask.tanggal || new Date().toISOString().split('T')[0]);
       setDeskripsiTugas(editingTask.deskripsiTugas || '');
@@ -184,86 +218,64 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
       setBeisDomain(editingTask.beisDomain || 'CRD');
       setBeisLevel(editingTask.beisLevel || 'L03');
       setBeisCategory(editingTask.beisCategory || 'AKR');
-      setUnit(editingTask.unit || 'BIS');
+      setUnit(editingTask.unit || currentUserUnit || 'BIS');
       setOutputDoD(editingTask.outputDoD || '');
       setOutputDoD2(editingTask.outputDoD2 || '');
       setOutcome(editingTask.outcome || '');
       setCategory(editingTask.category || 'Bisnis');
       setSubcategory(editingTask.subcategory || 'Aktivitas Umum, AM dan Bisnis');
       setValidatorTags(editingTask.validator ? editingTask.validator.split(',').map(s => s.trim()) : []);
-      let loadedFromDraft = false;
-      try {
-        const draftStr = localStorage.getItem('task_form_draft');
-        if (draftStr && isOpen) {
-          const draft = JSON.parse(draftStr);
-          if (draft.deskripsiTugas || draft.outputDoD || draft.penyelesaian) {
-            setTanggal(draft.tanggal || new Date().toISOString().split('T')[0]);
-            setDeskripsiTugas(draft.deskripsiTugas || '');
-            setJenisTeknis(draft.jenisTeknis || 'Rutinitas Harian');
-            setTimeline(draft.timeline || 'Harian');
-            setPrioritas(draft.prioritas || 'P1');
-            setStatus(draft.status || 'In Progress');
-            setTanggalFU(draft.tanggalFU || '');
-            setPenyelesaian(draft.penyelesaian || '');
-            setOutputDoD(draft.outputDoD || '');
-            setOutputDoD2(draft.outputDoD2 || '');
-            setOutcome(draft.outcome || '');
-            setSyncCalendar(draft.syncCalendar ?? true);
-            setBeisDomain(draft.beisDomain || 'CRD');
-            setBeisLevel(draft.beisLevel || 'L03');
-            setBeisCategory(draft.beisCategory || 'AKR');
-            setUnit(draft.unit || currentUserUnit || 'BIS');
-            setCategory(draft.category || 'Bisnis');
-            setSubcategory(draft.subcategory || 'Lainnya');
-            setValidatorTags(draft.validatorTags || []);
-            loadedFromDraft = true;
-          }
-        }
-      } catch (e) {
-        console.warn('Could not load draft');
-      }
-
-      if (!loadedFromDraft) {
-        setTanggal(new Date().toISOString().split('T')[0]);
-        setDeskripsiTugas('');
-        setJenisTeknis('Rutinitas Harian');
-        setTimeline('Harian');
-        setPrioritas('P1');
-        setStatus('In Progress');
-        setTanggalFU('');
-        setPenyelesaian('');
-        setOutputDoD('');
-        setOutputDoD2('');
-        setOutcome('');
-        setSyncCalendar(true);
-
-        /*
-         * Nilai awal kode BEIS diturunkan dari unit pengguna, bukan dipatok.
-         * Sebelumnya formulir selalu terbuka pada CRD / L03 / AKR — Credit,
-         * Akad Kredit — untuk semua orang, termasuk petugas Human Capital dan
-         * IT yang tidak pernah menyentuh akad kredit. Akibatnya setiap orang
-         * harus memperbaiki tiga pilihan sebelum mulai menulis, dan yang lupa
-         * memperbaikinya menghasilkan kode BEIS yang salah domain.
-         */
-        const unitAwal = currentUserUnit || currentUser?.unit || 'BIS';
-        const domainAwal = domainDisarankanUntukUnit(unitAwal)[0] ?? 'ADM';
-        const domainObjAwal = BEIS_DOMAINS.find(d => d.code === domainAwal);
-        setUnit(unitAwal);
-        setBeisDomain(domainAwal);
-        setBeisLevel(domainObjAwal?.level ?? 'L01');
-        setBeisCategory(domainObjAwal?.categories[0]?.code ?? '');
-        setOutputDoD('');
-        setOutcome('');
-        // Auto-set Fungsi/Jabatan based on user's unit code from registration
-        const userUnit = unitAwal;
-        const autoCategory = UNIT_TO_CATEGORY[userUnit] || 'Lainnya';
-        setCategory(autoCategory);
-        const autoSubcategory = SUBCATEGORY_MAPPING[autoCategory]?.[0] || 'Lainnya';
-        setSubcategory(autoSubcategory as Subcategory);
-        setValidatorTags([]);
-        setValidatorInput('');
-      }
+      setValidatorInput('');
+      return;
     }
+
+    /* ---------------------------------------------------------- tugas baru */
+
+    /*
+     * Nilai awal kode BEIS diturunkan dari unit pengguna, bukan dipatok.
+     * Sebelumnya formulir selalu terbuka pada CRD / L03 / AKR — Credit, Akad
+     * Kredit — untuk semua orang, termasuk petugas Human Capital dan IT yang
+     * tidak pernah menyentuh akad kredit.
+     */
+    const unitAwal = currentUserUnit || currentUser?.unit || 'BIS';
+    const domainAwal = domainDisarankanUntukUnit(unitAwal)[0] ?? 'ADM';
+    const domainObjAwal = BEIS_DOMAINS.find(d => d.code === domainAwal);
+    const autoCategory = UNIT_TO_CATEGORY[unitAwal] || 'Lainnya';
+    const autoSubcategory = SUBCATEGORY_MAPPING[autoCategory]?.[0] || 'Lainnya';
+
+    let draft: any = null;
+    try {
+      const draftStr = localStorage.getItem('task_form_draft');
+      if (draftStr) {
+        const isi = JSON.parse(draftStr);
+        if (isi.deskripsiTugas || isi.outputDoD || isi.outcome) draft = isi;
+      }
+    } catch {
+      /* Draf rusak bukan alasan untuk menolak membuka formulir. */
+    }
+
+    setTanggal(draft?.tanggal || new Date().toISOString().split('T')[0]);
+    setDeskripsiTugas(draft?.deskripsiTugas || '');
+    setJenisTeknis(draft?.jenisTeknis || 'Rutinitas Harian');
+    setTimeline(draft?.timeline || 'Harian');
+    setPrioritas(draft?.prioritas || 'P1');
+    setStatus(draft?.status || 'In Progress');
+    setTanggalFU(draft?.tanggalFU || '');
+    setOutputDoD(draft?.outputDoD || '');
+    setOutputDoD2(draft?.outputDoD2 || '');
+    setOutcome(draft?.outcome || '');
+    setSyncCalendar(draft?.syncCalendar ?? true);
+    /* Tugas baru selalu lahir tanpa bukti, jadi draf pun tidak memulihkannya. */
+    setPenyelesaian('');
+
+    setUnit(draft?.unit || unitAwal);
+    setBeisDomain(draft?.beisDomain || domainAwal);
+    setBeisLevel(draft?.beisLevel || domainObjAwal?.level || 'L01');
+    setBeisCategory(draft?.beisCategory || domainObjAwal?.categories[0]?.code || '');
+    setCategory(draft?.category || autoCategory);
+    setSubcategory((draft?.subcategory || autoSubcategory) as Subcategory);
+    setValidatorTags(draft?.validatorTags || []);
+    setValidatorInput('');
   }, [editingTask, defaultMemberTab, isOpen, autoAssignedTo, currentUserUnit, currentUser]);
 
   // Save draft to localStorage for new tasks

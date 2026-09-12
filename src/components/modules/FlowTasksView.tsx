@@ -80,11 +80,14 @@ export const FlowTasksView: React.FC = () => {
       {/* Pengingat tugas lewat tenggat; tidak muncul bila tidak ada. */}
       <PengingatTugas tugas={tugasSaya} className="mx-4 sm:mx-6 mb-2" />
 
+      {/* `currentUserUnit` diteruskan apa adanya. Mengubah nilai kosong menjadi
+          'BIS' di sini hanya akan menyembunyikan unit yang memang belum terisi,
+          sementara kedua komponen penerimanya sudah punya nilai jatuh sendiri. */}
       <TaskTableView
         tasks={tugasSaya}
         userRole={currentUser.role as any}
         currentUser={currentUser as any}
-        currentUserUnit={currentUser.unit || 'BIS'}
+        currentUserUnit={currentUser.unit}
         onUpdateTask={handleUpdateTask}
         onDeleteTask={deleteFlowTask}
         onEditTask={handleEditTask}
@@ -101,7 +104,7 @@ export const FlowTasksView: React.FC = () => {
         defaultMemberTab={selectedTab}
         userRole={currentUser.role as any}
         currentUser={currentUser as any}
-        currentUserUnit={currentUser.unit || 'BIS'}
+        currentUserUnit={currentUser.unit}
       />
     </div>
   );
