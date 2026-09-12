@@ -93,3 +93,27 @@ export async function ambilApi(
   });
   return { res, json: await bacaJson(res) };
 }
+
+/**
+ * Membersihkan jejak sesi di peramban saat pengguna keluar.
+ *
+ * Bukan hanya tokennya. `task_form_draft` menyimpan isi formulir aktivitas yang
+ * belum dikirim, dan deskripsi tugas sering memuat nama nasabah. Draf itu
+ * bertahan sampai dihapus, jadi pada komputer bersama isian orang sebelumnya
+ * terbuka untuk orang berikutnya.
+ */
+export function bersihkanSesi(): void {
+  const kunci = [
+    'auth_token',
+    'task_form_draft',
+    'beis_categories',
+    'beis_validators',
+  ];
+  for (const k of kunci) {
+    try {
+      localStorage.removeItem(k);
+    } catch {
+      /* Peramban yang memblokir penyimpanan tidak boleh menggagalkan proses keluar. */
+    }
+  }
+}

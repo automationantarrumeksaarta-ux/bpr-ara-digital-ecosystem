@@ -21,6 +21,7 @@ import { UserRole } from '../../types';
 import { NotificationInboxPopover } from '../ui/notification-inbox-popover';
 import { Breadcrumb } from './Breadcrumb';
 import { useNavigate } from 'react-router-dom';
+import { bersihkanSesi } from '../../utils/api';
 
 interface TopbarProps {
   onMobileMenuToggle: () => void;
@@ -173,7 +174,7 @@ export const Topbar: React.FC<TopbarProps> = ({ onMobileMenuToggle }) => {
         {/* Logout Button */}
         <button
           onClick={() => {
-            localStorage.removeItem('auth_token');
+            bersihkanSesi();
             setIsAuthenticated(false);
             window.location.reload();
           }}

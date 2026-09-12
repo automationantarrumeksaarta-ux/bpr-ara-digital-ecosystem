@@ -8,6 +8,7 @@ import {
   Building
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { ambilApi } from '../../utils/api';
 
 // --- Types for SK Direksi 2026 ---
 
@@ -93,11 +94,24 @@ export const PayrollView: React.FC = () => {
     return rrGrade.multiplier >= nplGrade.multiplier ? rrGrade : nplGrade;
   }, [currentRR, currentNPL]);
 
-  // Dummy ecosystem data mapped to SK Direksi Roles
+  /*
+   * Daftar pegawai beserta komponen gajinya masih kosong.
+   *
+   * Sistem ini belum menyimpan data gaji di mana pun: tidak ada tabel untuk
+   * gaji pokok, tunjangan makan, potongan, maupun nominal dasar KPI. Daftarnya
+   * dibiarkan kosong dan dijelaskan di layar, bukan diisi angka contoh —
+   * nominal gaji karangan yang tampil di layar penggajian jauh lebih berbahaya
+   * daripada layar yang mengaku belum punya datanya.
+   */
   const employees: EmployeeKPI[] = useMemo(() => [], []);
 
   const [selectedEmp, setSelectedEmp] = useState<EmployeeKPI | null>(null);
   const [payrollStatus, setPayrollStatus] = useState<Record<string, 'DRAFT' | 'APPROVED'>>({});
+  /* Periode slip mengikuti bulan berjalan; dipakai sebagai kunci bersama
+     employee_id di tabel payroll_slips. */
+  const periodeSlip = new Date().toISOString().slice(0, 7);
+  const [galatSlip, setGalatSlip] = useState<string | null>(null);
+  const [menyimpanSlip, setMenyimpanSlip] = useState(false);
 
   // Core Calculator Functions
   const calculateTotalKpiScore = (emp: EmployeeKPI) => {
@@ -122,9 +136,45 @@ export const PayrollView: React.FC = () => {
     return baseIncentive * macroMultiplier;
   };
 
-  const approvePayroll = (empId: string) => {
-    setPayrollStatus(prev => ({ ...prev, [empId]: 'APPROVED' }));
-    setSelectedEmp(null);
+  /**
+   * Menyetujui slip gaji.
+   *
+   * Sebelumnya hanya menulis ke `payrollStatus`, sebuah state React. Layar
+   * menyatakan "Slip Gaji Telah Disetujui", halaman dimuat ulang, dan
+   * persetujuannya hilang. Endpoint `POST /api/payroll/slips` sudah ada sejak
+   * lama dan tidak pernah dipanggil, tabel `payroll_slips` kosong, sementara
+   * APK memanggil `GET /api/payroll/me` untuk menampilkan slip pegawai. Jadi
+   * rantainya putus di tengah dan pegawai tidak pernah melihat slipnya.
+   */
+  const approvePayroll = async (empId: string) => {
+    const emp = employees.find(e => e.id === empId);
+    if (!emp) return;
+    setGalatSlip(null);
+    setMenyimpanSlip(true);
+    try {
+      const { res, json } = await ambilApi('/api/payroll/slips', {
+        method: 'POST',
+        body: JSON.stringify({
+          period: periodeSlip,
+          employee_id: emp.id,
+          employee_name: emp.name,
+          role: emp.role,
+          base_salary: emp.baseSalary,
+          meal_allowance: emp.mealAllowance,
+          incentive: Math.round(calculateFinalIncentive(emp, currentMacro.multiplier)),
+          deductions: emp.deductions,
+          macro_grade: currentMacro.grade,
+          status: 'APPROVED',
+        }),
+      });
+      if (!res.ok) throw new Error(json?.error ?? 'Gagal menyimpan slip gaji');
+      setPayrollStatus(prev => ({ ...prev, [empId]: 'APPROVED' }));
+      setSelectedEmp(null);
+    } catch (e: any) {
+      setGalatSlip(e?.message ?? 'Gagal menyimpan slip gaji.');
+    } finally {
+      setMenyimpanSlip(false);
+    }
   };
 
   const currentMacro = activeMacroGrade;
@@ -261,6 +311,34 @@ export const PayrollView: React.FC = () => {
               <Download size={14} /> Ekspor Laporan
             </button>
           </div>
+          {galatSlip && (
+            <div role="alert" className="mx-4 mb-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-medium leading-relaxed text-red-700">
+              {galatSlip}
+            </div>
+          )}
+
+          {/*
+            Keadaan kosong menyebut apa yang kurang, bukan sekadar tabel tanpa
+            baris. Tanpa penjelasan, layar penggajian yang kosong terbaca
+            seolah sistemnya rusak.
+          */}
+          {employees.length === 0 ? (
+            <div className="px-6 py-14 text-center">
+              <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                Belum ada data gaji pegawai
+              </p>
+              <p className="mx-auto mt-2 max-w-md text-xs leading-relaxed text-slate-500">
+                Modul ini menghitung slip dari gaji pokok, tunjangan makan, potongan, dan nominal
+                dasar KPI tiap pegawai. Keempatnya belum tersimpan di sistem, sehingga belum ada
+                yang bisa dihitung maupun disetujui.
+              </p>
+              <p className="mx-auto mt-3 max-w-md text-[11px] leading-relaxed text-slate-400">
+                Persetujuan slip sendiri sudah tersambung ke basis data, jadi begitu data gaji
+                tersedia, slip yang disetujui akan langsung terbaca di menu Info Gaji pada aplikasi
+                pegawai.
+              </p>
+            </div>
+          ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse min-w-[800px]">
               <thead>
@@ -345,6 +423,7 @@ export const PayrollView: React.FC = () => {
               </tbody>
             </table>
           </div>
+          )}
         </div>
       </div>
 
@@ -476,8 +555,8 @@ export const PayrollView: React.FC = () => {
                     <button onClick={() => setSelectedEmp(null)} className="w-full px-4 py-3.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 transition-colors cursor-pointer">
                       Tutup / Revisi Nanti
                     </button>
-                    <button onClick={() => approvePayroll(selectedEmp.id)} className="w-full px-4 py-3.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-lg shadow-slate-900/20 dark:shadow-white/20">
-                      <CheckCircle size={18} /> Kunci & Approve Slip
+                    <button disabled={menyimpanSlip} onClick={() => approvePayroll(selectedEmp.id)} className="w-full px-4 py-3.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-lg shadow-slate-900/20 dark:shadow-white/20">
+                      <CheckCircle size={18} /> {menyimpanSlip ? 'Menyimpan…' : 'Kunci & Approve Slip'}
                     </button>
                   </div>
                 ) : (

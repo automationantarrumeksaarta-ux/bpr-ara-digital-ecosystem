@@ -7,6 +7,7 @@ import { useApp } from '../../../context/AppContext';
 import { kecilkanGambar } from '../../../utils/gambar';
 import { AppBar, Avatar, Badge, Card, IsianTeks, LembarPenuh, ListGroup, ListRow, PesanKecil, Screen, Section, Stack, TombolUtama } from '../ui/primitives';
 import { ink, radius, surface, text, tone } from '../ui/tokens';
+import { bersihkanSesi } from '../../../utils/api';
 
 /**
  * Profil pegawai.
@@ -31,7 +32,7 @@ const MobileProfile: React.FC = () => {
   const keluar = () => {
     // Token wajib dibuang. Versi sebelumnya hanya mengosongkan state React,
     // sehingga auth_token tetap tersimpan dan sesi hidup lagi setelah refresh.
-    localStorage.removeItem('auth_token');
+    bersihkanSesi();
     setIsAuthenticated(false);
     setCurrentUser(null);
     navigate('/', { replace: true });

@@ -448,6 +448,51 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     };
   }, [isAuthenticated]);
   const [ewsAlerts, setEwsAlerts] = useState<EwsAlert[]>(INITIAL_EWS_ALERTS);
+
+  /*
+   * Peringatan dini diambil dari server, bukan dibiarkan sebagai array kosong.
+   *
+   * `INITIAL_EWS_ALERTS` tidak pernah diisi apa pun, sementara delapan tempat
+   * membacanya: lencana merah di bilah atas, penanda di menu samping, ringkasan
+   * dashboard eksekutif, beranda APK, pencarian global, dan dashboard
+   * kepatuhan. Semuanya selalu menunjukkan nol berapa pun peringatan yang
+   * sebenarnya ada.
+   *
+   * Endpoint ini dibatasi peran; bagi yang tidak berwenang membaca data
+   * nasabah, hasilnya tetap kosong dan itu memang benar.
+   */
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let batal = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/ews/alerts', { headers: headerAuth() });
+        if (!res.ok) return;
+        const json = await res.json();
+        if (batal || !json?.peringatan) return;
+        setEwsAlerts(json.peringatan.map((p: any): EwsAlert => ({
+          id: p.id,
+          alertCode: p.kode,
+          category: 'CREDIT_QUALITY',
+          severity: p.tingkat === 'RED' ? 'RED' : 'YELLOW',
+          title: p.judul,
+          description: p.keterangan,
+          module: 'EWS' as any,
+          entityType: 'LOAN',
+          entityId: p.acuan,
+          entityReference: `${p.acuan} — ${p.nama}`,
+          branchId: p.wilayah as any,
+          triggeredAt: new Date().toISOString(),
+          status: p.tindakLanjut?.status === 'SELESAI' ? 'RESOLVED'
+            : p.tindakLanjut?.status === 'DITINDAKLANJUTI' ? 'REVIEW'
+              : 'ACTION_REQUIRED',
+        })));
+      } catch {
+        /* Lencana yang kosong lebih baik daripada lencana yang mengarang. */
+      }
+    })();
+    return () => { batal = true; };
+  }, [isAuthenticated]);
   const [antiFraudFlags, setAntiFraudFlags] = useState<AntiFraudRedFlag[]>(INITIAL_ANTI_FRAUD_FLAGS);
   const [auditTrail, setAuditTrail] = useState<AuditTrailRecord[]>(INITIAL_AUDIT_TRAIL);
   const [attendances, setAttendances] = useState<HrAttendanceRecord[]>(INITIAL_ATTENDANCE);
