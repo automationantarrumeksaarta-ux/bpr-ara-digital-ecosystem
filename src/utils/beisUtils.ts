@@ -259,6 +259,54 @@ export function getBeisCategoriesForDomain(domainCode: BEISDomainCode): BEISCate
   return domainObj ? domainObj.categories : [];
 }
 
+/**
+ * Domain yang lazim dikerjakan tiap unit operasional, yang paling sering lebih
+ * dahulu.
+ *
+ * Kode BEIS tersusun menurun: unit menentukan domain apa yang masuk akal, dan
+ * domain menentukan kategori apa yang tersedia. Sebelumnya tidak ada pemetaan
+ * ini sama sekali, sehingga formulir aktivitas membuka dua belas domain dan
+ * seluruh kategori dari semuanya kepada siapa pun — seorang petugas Collection
+ * harus menyaring sendiri kategori Funding, Human Capital, dan IT hanya untuk
+ * mencatat satu kunjungan penagihan.
+ *
+ * Daftar ini menyarankan, bukan membatasi. Domain di luar daftar tetap dapat
+ * dipilih, hanya dikelompokkan terpisah, karena satu unit sesekali memang
+ * mengerjakan hal di luar kebiasaannya.
+ */
+const DOMAIN_PER_UNIT: Record<string, BEISDomainCode[]> = {
+  DIR: ['EXE', 'CRK', 'CRD', 'FND'],
+  KOM: ['EXE', 'CRK'],
+  BIS: ['CRD', 'MKT', 'FND', 'COL'],
+  KPT: ['CRK', 'LGL'],
+  AUD: ['CRK'],
+  PMO: ['KIM', 'EXE', 'ITD'],
+  OPS: ['OPS'],
+  COL: ['COL', 'CRD', 'LGL'],
+  FND: ['FND', 'MKT'],
+  HCM: ['HCM'],
+  ITD: ['ITD'],
+  LGL: ['LGL', 'CRD', 'CRK'],
+};
+
+/**
+ * Domain administratif dan pembelajaran berlaku untuk semua unit: setiap orang
+ * membuat notulen, mengurus dokumen, dan mengikuti pelatihan.
+ */
+const DOMAIN_UMUM: BEISDomainCode[] = ['ADM', 'KIM'];
+
+/** Domain yang disarankan untuk sebuah unit, sudah termasuk domain umum. */
+export function domainDisarankanUntukUnit(unitCode: string): BEISDomainCode[] {
+  const khusus = DOMAIN_PER_UNIT[unitCode] ?? [];
+  return [...khusus, ...DOMAIN_UMUM.filter(d => !khusus.includes(d))];
+}
+
+/** Domain di luar saran, tetap dapat dipilih. */
+export function domainLainnyaUntukUnit(unitCode: string): BEISDomainCode[] {
+  const disarankan = domainDisarankanUntukUnit(unitCode);
+  return BEIS_DOMAINS.map(d => d.code).filter(c => !disarankan.includes(c));
+}
+
 export const BEIS_STATUSES: { code: BEISTaskStatus; label: string; badgeClass: string; desc: string }[] = [
   { 
     code: 'Planned', 

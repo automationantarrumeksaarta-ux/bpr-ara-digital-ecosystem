@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { TaskItem, JenisTeknis, Timeline, Prioritas, BEISTaskItemStatus as TaskStatus, BEISUserRole as UserRole, BEISLevelCode, BEISDomainCode, BEISUserProfile as UserProfile, Category, Subcategory } from '../../types';
-import { BEIS_DOMAINS, BEIS_STATUSES, BEIS_UNITS, generateBeisTaskId, generateEvidenceId, sanitizePersonalData, getBeisCategoriesForDomain } from '../../utils/beisUtils';
+import {
+  BEIS_DOMAINS, BEIS_STATUSES, BEIS_UNITS, generateBeisTaskId, generateEvidenceId,
+  sanitizePersonalData, getBeisCategoriesForDomain,
+  domainDisarankanUntukUnit, domainLainnyaUntukUnit,
+} from '../../utils/beisUtils';
 import { INITIAL_USERS } from '../../mock/initialData';
 import { useApp } from '../../context/AppContext';
 import { X, Calendar, Check, ShieldCheck, ShieldAlert, Award, Search, ChevronDown } from 'lucide-react';
@@ -233,15 +237,25 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
         setOutcome('');
         setSyncCalendar(true);
 
-        // BEIS Defaults
-        setBeisDomain('CRD');
-        setBeisLevel('L03');
-        setBeisCategory('AKR');
-        setUnit(currentUserUnit || 'BIS');
+        /*
+         * Nilai awal kode BEIS diturunkan dari unit pengguna, bukan dipatok.
+         * Sebelumnya formulir selalu terbuka pada CRD / L03 / AKR — Credit,
+         * Akad Kredit — untuk semua orang, termasuk petugas Human Capital dan
+         * IT yang tidak pernah menyentuh akad kredit. Akibatnya setiap orang
+         * harus memperbaiki tiga pilihan sebelum mulai menulis, dan yang lupa
+         * memperbaikinya menghasilkan kode BEIS yang salah domain.
+         */
+        const unitAwal = currentUserUnit || currentUser?.unit || 'BIS';
+        const domainAwal = domainDisarankanUntukUnit(unitAwal)[0] ?? 'ADM';
+        const domainObjAwal = BEIS_DOMAINS.find(d => d.code === domainAwal);
+        setUnit(unitAwal);
+        setBeisDomain(domainAwal);
+        setBeisLevel(domainObjAwal?.level ?? 'L01');
+        setBeisCategory(domainObjAwal?.categories[0]?.code ?? '');
         setOutputDoD('');
         setOutcome('');
         // Auto-set Fungsi/Jabatan based on user's unit code from registration
-        const userUnit = currentUserUnit || currentUser?.unit || 'BIS';
+        const userUnit = unitAwal;
         const autoCategory = UNIT_TO_CATEGORY[userUnit] || 'Lainnya';
         setCategory(autoCategory);
         const autoSubcategory = SUBCATEGORY_MAPPING[autoCategory]?.[0] || 'Lainnya';
@@ -268,25 +282,45 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
     }
   }, [isOpen, isNewTask, tanggal, deskripsiTugas, jenisTeknis, timeline, prioritas, status, tanggalFU, penyelesaian, syncCalendar, beisDomain, beisLevel, beisCategory, unit, outputDoD, outputDoD2, outcome, category, subcategory, validatorTags]);
 
-  // When domain changes, auto update level & default category
+  /*
+   * Ketiga pilihan kode BEIS tersusun menurun: unit menentukan domain yang
+   * masuk akal, domain menentukan kategori yang tersedia. Mengubah yang di atas
+   * selalu menyesuaikan yang di bawahnya, supaya tidak pernah ada gabungan yang
+   * tidak nyambung.
+   *
+   * Sebelumnya urutannya terbalik di layar — kategori lebih dulu, unit paling
+   * akhir — dan tidak ada satu pun penyaringan. Daftar kategori memuat seluruh
+   * kategori dari dua belas domain sekaligus, jadi mengganti domain tidak
+   * mengubah apa pun yang terlihat. Memilih kategori dari domain lain diam-diam
+   * memindahkan domainnya, dan itulah yang membingungkan: pilihan di bawah
+   * mengubah pilihan di atas tanpa memberi tahu.
+   */
   const handleDomainChange = (domainCode: BEISDomainCode) => {
     setBeisDomain(domainCode);
     const domainObj = BEIS_DOMAINS.find(d => d.code === domainCode);
-    if (domainObj) {
-      setBeisLevel(domainObj.level);
-      if (domainObj.defaultCategories.length > 0) {
-        setBeisCategory(domainObj.defaultCategories[0]);
-      }
+    if (!domainObj) return;
+    setBeisLevel(domainObj.level);
+    /* Kategori lama hampir pasti milik domain lain, jadi selalu disetel ulang. */
+    const pertama = domainObj.categories[0]?.code;
+    if (pertama) setBeisCategory(pertama);
+  };
+
+  const handleUnitChange = (unitCode: string) => {
+    setUnit(unitCode);
+    /*
+     * Domain ikut menyesuaikan hanya bila yang sedang terpilih memang tidak
+     * disarankan untuk unit baru. Kalau masih masuk akal, pilihan orangnya
+     * dibiarkan — mengganti sesuatu yang sudah benar terasa seperti kehilangan
+     * pekerjaan.
+     */
+    const disarankan = domainDisarankanUntukUnit(unitCode);
+    if (!disarankan.includes(beisDomain) && disarankan.length > 0) {
+      handleDomainChange(disarankan[0]);
     }
   };
 
   const handleCategoryChange = (catCode: string) => {
     setBeisCategory(catCode);
-    const cat = ALL_CATEGORIES.find(c => c.code === catCode);
-    if (cat) {
-      setBeisDomain(cat.domainCode);
-      setBeisLevel(cat.level);
-    }
   };
 
   const handleDescriptionChange = (text: string) => {
@@ -338,8 +372,16 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
       arahanAtasanUtama: editingTask?.arahanAtasanUtama || '',
       prioritas,
       status,
-      penyelesaian: penyelesaian,
-      evidenceId: penyelesaian.trim() ? (editingTask?.evidenceId || generateEvidenceId(finalTaskId, 1)) : editingTask?.evidenceId,
+      /*
+       * Tugas baru selalu lahir tanpa bukti. Kolomnya memang disembunyikan di
+       * layar, tetapi nilainya masih bisa terbawa dari draf yang tersimpan di
+       * peramban, jadi pemaksaan ini dilakukan di titik penyimpanan — satu-
+       * satunya tempat yang menentukan apa yang benar-benar tercatat.
+       */
+      penyelesaian: isNewTask ? '' : penyelesaian,
+      evidenceId: !isNewTask && penyelesaian.trim()
+        ? (editingTask?.evidenceId || generateEvidenceId(finalTaskId, 1))
+        : editingTask?.evidenceId,
       tanggalFU,
       validator: [...validatorTags, ...(validatorInput.trim() ? [validatorInput.trim()] : [])].join(', '),
       outputDoD,
@@ -476,8 +518,75 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
               </div>
             </div>
 
+            {/*
+              Urutannya mengikuti arah kebergantungan: unit menentukan domain,
+              domain menentukan kategori. Sebelumnya terbalik, kategori lebih
+              dulu dan unit paling akhir, sehingga orang memilih kategori dari
+              daftar yang belum disaring lalu menemukan domain dan levelnya
+              berubah sendiri di belakang.
+            */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {/* Category (Searchable) */}
+              {/* 1. Unit Operasional */}
+              <div>
+                <label className="block text-[11px] font-bold text-gray-600 dark:text-gray-400 mb-1">
+                  Unit Operasional
+                </label>
+                <select
+                  value={unit}
+                  onChange={(e) => handleUnitChange(e.target.value)}
+                  className="w-full px-2.5 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-mono font-bold text-gray-900 dark:text-white"
+                >
+                  {BEIS_UNITS.map(u => (
+                    <option key={u.code} value={u.code}>
+                      {u.code} - {u.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-[10px] text-gray-400">
+                  Terisi dari unit Anda saat mendaftar. Dapat diganti bila kegiatannya di unit lain.
+                </p>
+              </div>
+
+              {/* 2. Domain & Level — disarankan menurut unit */}
+              <div>
+                <label className="block text-[11px] font-bold text-gray-600 dark:text-gray-400 mb-1">
+                  Domain &amp; Level
+                </label>
+                <select
+                  value={beisDomain}
+                  onChange={(e) => handleDomainChange(e.target.value as BEISDomainCode)}
+                  className="w-full px-2.5 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-bold text-gray-900 dark:text-white"
+                >
+                  {/*
+                    Dikelompokkan, bukan disaring keras. Domain di luar kebiasaan
+                    unit tetap dapat dipilih karena satu unit sesekali memang
+                    mengerjakan hal di luar kebiasaannya — yang tidak boleh
+                    terjadi hanyalah orang harus mencarinya di antara dua belas
+                    pilihan yang semuanya tampak sama penting.
+                  */}
+                  <optgroup label={`Lazim untuk ${unit}`}>
+                    {domainDisarankanUntukUnit(unit).map(code => {
+                      const d = BEIS_DOMAINS.find(x => x.code === code);
+                      return d ? (
+                        <option key={d.code} value={d.code}>[{d.level}] {d.code} - {d.title}</option>
+                      ) : null;
+                    })}
+                  </optgroup>
+                  <optgroup label="Domain lain">
+                    {domainLainnyaUntukUnit(unit).map(code => {
+                      const d = BEIS_DOMAINS.find(x => x.code === code);
+                      return d ? (
+                        <option key={d.code} value={d.code}>[{d.level}] {d.code} - {d.title}</option>
+                      ) : null;
+                    })}
+                  </optgroup>
+                </select>
+                <p className="mt-1 text-[10px] text-gray-400">
+                  {BEIS_DOMAINS.find(d => d.code === beisDomain)?.description}
+                </p>
+              </div>
+
+              {/* 3. Kategori Kode BEIS — hanya milik domain terpilih */}
               <div className="relative" ref={categoryDropdownRef}>
                 <label className="block text-[11px] font-bold text-gray-600 dark:text-gray-400 mb-1">
                   Kategori Kode BEIS
@@ -509,10 +618,28 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                       />
                     </div>
                     <div className="overflow-y-auto p-1 flex-1">
-                      {ALL_CATEGORIES.filter(c => `${c.code} ${c.label}`.toLowerCase().includes(categorySearchQuery.toLowerCase())).length === 0 ? (
-                        <div className="px-3 py-2 text-xs text-gray-500 text-center">Tidak ditemukan</div>
-                      ) : (
-                        ALL_CATEGORIES.filter(c => `${c.code} ${c.label}`.toLowerCase().includes(categorySearchQuery.toLowerCase())).map(c => (
+                      {/*
+                        Hanya kategori milik domain terpilih. Inilah inti
+                        kebingungannya dulu: daftar ini memuat seluruh kategori
+                        dari dua belas domain, jadi mengganti Domain & Level
+                        tidak mengubah apa pun yang terlihat di sini.
+                      */}
+                      {(() => {
+                        const kategoriDomain = getBeisCategoriesForDomain(beisDomain);
+                        const q = categorySearchQuery.toLowerCase();
+                        const cocok = kategoriDomain.filter(
+                          c => `${c.code} ${c.label}`.toLowerCase().includes(q),
+                        );
+                        if (cocok.length === 0) {
+                          return (
+                            <div className="px-3 py-3 text-[11px] text-gray-500 text-center leading-relaxed">
+                              {kategoriDomain.length === 0
+                                ? 'Domain ini belum punya kategori.'
+                                : `Tidak ada kategori "${categorySearchQuery}" pada domain ${beisDomain}. Ganti Domain & Level bila kategorinya ada di domain lain.`}
+                            </div>
+                          );
+                        }
+                        return cocok.map(c => (
                           <div
                             key={c.code}
                             onClick={() => {
@@ -521,55 +648,20 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                               setCategorySearchQuery('');
                             }}
                             className={`px-2.5 py-1.5 text-[11px] font-mono font-bold cursor-pointer rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 truncate ${
-                              beisCategory === c.code 
-                                ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white' 
+                              beisCategory === c.code
+                                ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
                                 : 'text-gray-700 dark:text-gray-300'
                             }`}
                           >
                             {c.code} - {c.label}
                           </div>
-                        ))
-                      )}
+                        ));
+                      })()}
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* Domain & Level */}
-              <div>
-                <label className="block text-[11px] font-bold text-gray-600 dark:text-gray-400 mb-1">
-                  Domain & Level
-                </label>
-                <select
-                  value={beisDomain}
-                  onChange={(e) => handleDomainChange(e.target.value as BEISDomainCode)}
-                  className="w-full px-2.5 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-bold text-gray-900 dark:text-white"
-                >
-                  {BEIS_DOMAINS.map(d => (
-                    <option key={d.code} value={d.code}>
-                      [{d.level}] {d.code} - {d.title}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Unit Code */}
-              <div>
-                <label className="block text-[11px] font-bold text-gray-600 dark:text-gray-400 mb-1">
-                  Unit Operasional
-                </label>
-                <select
-                  value={unit}
-                  onChange={(e) => setUnit(e.target.value)}
-                  className="w-full px-2.5 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-mono font-bold text-gray-900 dark:text-white"
-                >
-                  {BEIS_UNITS.map(u => (
-                    <option key={u.code} value={u.code}>
-                      {u.code} - {u.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
             </div>
           </div>
 
@@ -662,23 +754,48 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
 
           {/* Deadline & Validator — directly visible, no "advanced" toggle */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between mb-1">
-                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300">
+            {/*
+              Bukti hanya dapat diisi setelah tugasnya ada.
+
+              Sebelumnya kolom ini terbuka sejak awal, sehingga sebuah tugas
+              dapat dibuat sudah lengkap dengan tautan buktinya pada detik yang
+              sama — padahal saat itu belum ada pekerjaan yang dikerjakan.
+              Bukti yang dicatat bersamaan dengan rencananya tidak membuktikan
+              apa pun, dan itu merusak arti Evidence Rate yang dihitung modul
+              BEIS sekaligus membuka jalan bagi tugas yang lahir langsung dalam
+              keadaan "sudah ada buktinya".
+            */}
+            {isNewTask ? (
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-gray-400 dark:text-gray-500">
                   Evidence / Link Bukti Dokumen
                 </label>
-                <span className="text-[10px] text-emerald-600 font-mono font-bold">
-                  Suffix: {editingTask?.evidenceId || generateEvidenceId(previewTaskId, 1)}
-                </span>
+                <div className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-800/40 border border-dashed border-gray-300 dark:border-gray-700 rounded-xl text-[11px] leading-relaxed text-gray-500">
+                  Diisi nanti, setelah tugasnya dikerjakan. Buka kembali tugas ini dari Papan Tugas
+                  untuk melampirkan buktinya. Nomor buktinya{' '}
+                  <span className="font-mono font-bold">{generateEvidenceId(previewTaskId, 1)}</span>,
+                  dibuat otomatis.
+                </div>
               </div>
-              <input 
-                type="text"
-                value={penyelesaian}
-                onChange={(e) => setPenyelesaian(e.target.value)}
-                placeholder="https://... atau URL Evidence E01"
-                className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-medium text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
-              />
-            </div>
+            ) : (
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300">
+                    Evidence / Link Bukti Dokumen
+                  </label>
+                  <span className="text-[10px] text-emerald-600 font-mono font-bold">
+                    Suffix: {editingTask?.evidenceId || generateEvidenceId(previewTaskId, 1)}
+                  </span>
+                </div>
+                <input
+                  type="text"
+                  value={penyelesaian}
+                  onChange={(e) => setPenyelesaian(e.target.value)}
+                  placeholder="https://... atau URL Evidence E01"
+                  className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-medium text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                />
+              </div>
+            )}
             <div className="space-y-1.5">
               <label className="block text-xs font-bold text-gray-700 dark:text-gray-300">
                 Deadline (Tanggal FU) <span className="text-red-500">*</span>

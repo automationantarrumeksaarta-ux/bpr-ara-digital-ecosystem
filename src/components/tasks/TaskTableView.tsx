@@ -31,7 +31,10 @@ import {
   Download,
   AlertTriangle,
   Camera,
-  Search
+  Search,
+  /* Dipakai modal jejak audit; sebelumnya terlewat sehingga modalnya gagal
+     dirender begitu dibuka. */
+  UserCircle2
 } from 'lucide-react';
 import { ActivityAbsenceModal } from '../common/ActivityAbsenceModal';
 import { ArahanModal } from '../common/ArahanModal';
@@ -913,15 +916,24 @@ export const TaskTableView: React.FC<TaskTableViewProps> = ({
                     />
                   </div>
                   <div className="overflow-y-auto p-1 flex-1">
-                    {ALL_CATEGORIES.filter(c => `${c.code} ${c.label}`.toLowerCase().includes(evCategorySearchQuery.toLowerCase())).length === 0 ? (
-                      <div className="px-3 py-2 text-xs text-gray-500 text-center">Tidak ditemukan</div>
+                    {/*
+                      Hanya kategori milik domain terpilih. `evCategories` sudah
+                      dihitung dari domain sejak awal tetapi tidak pernah
+                      dipakai di sini, sehingga daftarnya tetap memuat seluruh
+                      kategori dari dua belas domain dan mengganti domain tidak
+                      mengubah apa pun yang terlihat.
+                    */}
+                    {evCategories.filter(c => `${c.code} ${c.label}`.toLowerCase().includes(evCategorySearchQuery.toLowerCase())).length === 0 ? (
+                      <div className="px-3 py-3 text-[11px] text-gray-500 text-center leading-relaxed">
+                        Tidak ada kategori itu pada domain {evDomain}. Ganti domain bila kategorinya
+                        ada di domain lain.
+                      </div>
                     ) : (
-                      ALL_CATEGORIES.filter(c => `${c.code} ${c.label}`.toLowerCase().includes(evCategorySearchQuery.toLowerCase())).map(c => (
+                      evCategories.filter(c => `${c.code} ${c.label}`.toLowerCase().includes(evCategorySearchQuery.toLowerCase())).map(c => (
                         <div
                           key={c.code}
                           onClick={() => {
                             setEvCategory(c.code);
-                            setEvDomain(c.domainCode); // Update domain too
                             setIsEvCategoryOpen(false);
                             setEvCategorySearchQuery('');
                           }}
