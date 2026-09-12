@@ -117,3 +117,30 @@ export function bersihkanSesi(): void {
     }
   }
 }
+
+/**
+ * Alamat server untuk sumber daya yang TIDAK lewat `fetch`.
+ *
+ * `main.tsx` menambal `window.fetch` agar panggilan `/api/...` dari aplikasi
+ * native diarahkan ke `VITE_API_BASE`. Tambalan itu tidak menolong `<img src>`,
+ * `<video src>`, maupun tautan unduhan: peramban memuatnya sendiri tanpa
+ * melewati fetch. Di dalam APK, halaman disajikan dari `http://localhost`,
+ * sehingga `/uploads/foto.jpg` dicari di localhost dan tidak pernah ditemukan —
+ * yang tampil ikon gambar rusak.
+ *
+ * Foto baru disimpan sebagai data URL sehingga tidak butuh alamat server sama
+ * sekali. Fungsi ini untuk berkas lama yang terlanjur tersimpan sebagai jalur
+ * `/uploads/...`.
+ */
+export function alamatBerkas(url: string | null | undefined): string {
+  if (!url) return '';
+  /* Data URL dan alamat lengkap dipakai apa adanya. */
+  if (/^(data:|blob:|https?:)/i.test(url)) return url;
+
+  const native = Boolean((window as any).Capacitor?.isNativePlatform?.());
+  if (!native) return url;
+
+  const dasar = String((import.meta as any).env?.VITE_API_BASE ?? '').replace(/\/$/, '');
+  if (!dasar) return url;
+  return `${dasar}${url.startsWith('/') ? '' : '/'}${url}`;
+}

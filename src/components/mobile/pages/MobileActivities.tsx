@@ -7,6 +7,8 @@ import { useGeolocation } from '../../../hooks/useGeolocation';
 import { AppBar, Card, EmptyState, Screen, Skeleton, Stack } from '../ui/primitives';
 import { MiniMap } from '../ui/MiniMap';
 import { ink, radius, surface, text, tone } from '../ui/tokens';
+import { alamatBerkas, ambilApi } from '../../../utils/api';
+import { kecilkanGambar } from '../../../utils/gambar';
 
 /**
  * Aktivitas lapangan.
@@ -98,7 +100,7 @@ const MobileActivities: React.FC = () => {
             {daftar.map(a => (
               <Card key={a.id} flush className="overflow-hidden">
                 <img
-                  src={a.photo_url}
+                  src={alamatBerkas(a.photo_url)}
                   alt={a.description ?? 'Foto aktivitas'}
                   className="w-full aspect-[4/3] object-cover bg-slate-100"
                   loading="lazy"
@@ -188,27 +190,37 @@ const FormAktivitas: React.FC<{ onTutup: () => void; onTersimpan: () => void }> 
     setMengirim(true);
     setError(null);
     try {
-      const fd = new FormData();
-      fd.append('file', file);
-      const unggah = await fetch('/api/upload', { method: 'POST', body: fd });
-      if (!unggah.ok) throw new Error('Foto gagal diunggah');
-      const hasil = await unggah.json();
+      /*
+       * Foto disimpan sebagai data URL, bukan diunggah sebagai berkas.
+       *
+       * Dua sebab. Pertama, unggahan multipart dari APK tidak dapat diandalkan:
+       * CapacitorHttp membaca badan permintaan sebagai teks sehingga isi biner
+       * rusak. Kedua, hasil unggahan dikembalikan sebagai jalur `/uploads/...`,
+       * dan di dalam APK halaman disajikan dari http://localhost sehingga jalur
+       * itu dicari di localhost dan tidak pernah ketemu — itulah ikon gambar
+       * rusak yang terlihat di layar Aktivitas.
+       *
+       * Ukurannya dibatasi 1024 piksel tanpa pemotongan persegi: ini foto bukti
+       * kunjungan, dan memotongnya menjadi bujur sangkar dapat membuang bagian
+       * yang justru menjadi buktinya.
+       */
+      const fotoDataUrl = await kecilkanGambar(file, {
+        maksPiksel: 1024,
+        mutu: 0.72,
+        potongPersegi: false,
+        batasByte: 700 * 1024,
+      });
 
-      const res = await fetch('/api/activities', {
+      const { res, json } = await ambilApi('/api/activities', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
-        },
         body: JSON.stringify({
-          photo_url: hasil?.data?.url,
+          photo_url: fotoDataUrl,
           lat: posisi.lat,
           lng: posisi.lng,
           location: alamat ?? `${posisi.lat.toFixed(5)}, ${posisi.lng.toFixed(5)}`,
           description: keterangan,
         }),
       });
-      const json = await res.json();
       if (!res.ok) throw new Error(json?.error ?? 'Gagal menyimpan aktivitas');
       onTersimpan();
     } catch (e: any) {

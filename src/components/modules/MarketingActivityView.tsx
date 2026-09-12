@@ -8,6 +8,7 @@ import { tanggalPendek } from '../credit/pipeline';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/Table';
 import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
+import { alamatBerkas } from '../../utils/api';
 
 /**
  * Rekap Aktivitas Lapangan.
@@ -243,7 +244,7 @@ export const MarketingActivityView: React.FC = () => {
                         onClick={() => setLihatFoto(a)}
                         className="block h-11 w-11 overflow-hidden rounded-lg border border-border transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       >
-                        <img src={a.photo_url} alt="Foto kunjungan" className="h-full w-full object-cover" />
+                        <img src={alamatBerkas(a.photo_url)} alt="Foto kunjungan" className="h-full w-full object-cover" />
                       </button>
                     ) : (
                       <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-surface-muted">
@@ -288,7 +289,7 @@ export const MarketingActivityView: React.FC = () => {
       >
         {lihatFoto?.photo_url && (
           <div className="space-y-3">
-            <img src={lihatFoto.photo_url} alt="Foto kunjungan" className="w-full rounded-xl" />
+            <img src={alamatBerkas(lihatFoto.photo_url)} alt="Foto kunjungan" className="w-full rounded-xl" />
             {lihatFoto.description && (
               <p className="text-xs leading-relaxed text-foreground">{lihatFoto.description}</p>
             )}
