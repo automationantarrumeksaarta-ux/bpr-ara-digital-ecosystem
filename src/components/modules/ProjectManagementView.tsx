@@ -237,7 +237,19 @@ export const ProjectManagementView: React.FC = () => {
             icon={ClipboardList}
             judul="Pilih proyek untuk melihat laporannya"
             keterangan="Klik salah satu proyek di sebelah kiri. Riwayat laporan kemajuan dan lembar pelaporannya akan terbuka di sini."
-            antreanKosong={daftar.length === 0}
+            /*
+             * Saat pemuatan gagal, panel ini tidak boleh ikut menyatakan
+             * daftarnya kosong. Daftar di sebelah kiri sudah berkata "gagal
+             * memuat", dan panel yang berkata "tidak ada yang perlu dikerjakan"
+             * di sebelahnya membuat kegagalan terbaca sebagai keadaan normal.
+             */
+            antreanKosong={!galat && !memuat && daftar.length === 0}
+            judulKosong={adaSaringan ? 'Tidak ada proyek yang cocok' : 'Belum ada proyek'}
+            keteranganKosong={
+              adaSaringan
+                ? 'Saringan yang dipakai menyisakan nol proyek. Hapus saringannya untuk melihat seluruh daftar.'
+                : 'Buat proyek pertama lewat tombol Proyek baru, lalu tetapkan ketuanya. Siapa pun dapat ditetapkan sebagai ketua.'
+            }
           />
         ) : (
           <DetailProyek

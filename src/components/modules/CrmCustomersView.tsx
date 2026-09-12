@@ -232,6 +232,12 @@ export const CrmCustomersView: React.FC = () => {
             judul="Pilih nasabah untuk melihat rinciannya"
             keterangan="Klik salah satu nama di sebelah kiri. Seluruh rekening kredit dan simpanannya akan terbuka di sini."
             antreanKosong={daftar.length === 0}
+            judulKosong={adaSaringan ? 'Tidak ada nasabah yang cocok' : 'Belum ada nasabah'}
+            keteranganKosong={
+              adaSaringan
+                ? 'Saringan yang dipakai menyisakan nol nasabah. Hapus saringannya untuk melihat seluruh daftar.'
+                : 'Daftar nasabah dirangkum dari berkas nominatif kredit, tabungan, dan deposito. Unggah berkasnya lewat menu Data Center.'
+            }
           />
         ) : (
           <DetailNasabah nasabah={aktif} />

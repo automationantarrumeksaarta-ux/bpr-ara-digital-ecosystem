@@ -203,14 +203,30 @@ export const BelumAdaPilihan: React.FC<{
   judul: string;
   keterangan: string;
   antreanKosong?: boolean;
-}> = ({ icon, judul, keterangan, antreanKosong }) => (
+  /**
+   * Kalimat saat antreannya memang kosong.
+   *
+   * Bawaannya berbicara soal "berkas" dan "tahap sebelumnya" karena komponen
+   * ini lahir untuk pipeline kredit. Halaman lain memakai kerangka yang sama
+   * tetapi isinya bukan berkas kredit, dan kalimat bawaan itu muncul apa adanya
+   * di sana — halaman Proyek sempat menampilkan "Belum ada berkas di tahap ini"
+   * padahal yang kosong adalah daftar proyek.
+   */
+  judulKosong?: string;
+  keteranganKosong?: string;
+}> = ({ icon, judul, keterangan, antreanKosong, judulKosong, keteranganKosong }) => (
   <Panel>
     <Kosong
       icon={icon}
-      judul={antreanKosong ? 'Belum ada berkas di tahap ini' : judul}
+      judul={
+        antreanKosong
+          ? judulKosong ?? 'Belum ada berkas di tahap ini'
+          : judul
+      }
       keterangan={
         antreanKosong
-          ? 'Berkas akan muncul di sini setelah tahap sebelumnya selesai. Tidak ada yang perlu dikerjakan sekarang.'
+          ? keteranganKosong
+            ?? 'Berkas akan muncul di sini setelah tahap sebelumnya selesai. Tidak ada yang perlu dikerjakan sekarang.'
           : keterangan
       }
     />
