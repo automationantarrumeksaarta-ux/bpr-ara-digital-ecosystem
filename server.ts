@@ -122,6 +122,28 @@ const ROUTER_API: Array<[string, express.Router]> = [
   ['/api', parserRoutes],
 ];
 
+/**
+ * Kapan berkas server yang sedang dijalankan ini terakhir ditulis.
+ *
+ * Dibaca dari berkasnya sendiri, bukan dari tanda yang disuntikkan saat
+ * membangun, supaya tidak bisa ikut basi bersama isinya.
+ *
+ * Ini menjawab pertanyaan yang berulang kali memakan waktu: "binaan mana yang
+ * sedang berjalan?". Pernah terjadi `dist/server.cjs` di server tertinggal
+ * berhari-hari sementara frontend-nya mutakhir, karena skrip build dulu
+ * menjalankan `vite build && esbuild`, dan ketika `vite build` gagal, esbuild
+ * tidak pernah dijalankan sehingga bundel lama tetap di tempatnya. Prosesnya
+ * sendiri sudah berkali-kali dijalankan ulang, jadi tidak ada satu pun petunjuk
+ * di layar yang menunjukkan bahwa yang berjalan adalah kode lama.
+ */
+function waktuBinaan(): string | null {
+  try {
+    return fs.statSync(_filename).mtime.toISOString();
+  } catch {
+    return null;
+  }
+}
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({
@@ -130,6 +152,11 @@ app.get('/api/health', (req, res) => {
     timestamp: new Date().toISOString(),
     /* Rute yang benar-benar terpasang di binaan yang sedang berjalan. */
     rute: ROUTER_API.map(([awalan]) => awalan),
+    binaan: {
+      berkas: _filename,
+      dibangunPada: waktuBinaan(),
+      mode: process.env.NODE_ENV === 'production' ? 'produksi' : 'pengembangan',
+    },
   });
 });
 
@@ -256,6 +283,21 @@ async function startServer() {
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`BPR ARA Digital Ecosystem server running on http://0.0.0.0:${PORT}`);
+    /*
+     * Dicetak setiap kali menyala supaya log pm2 menyimpan jejak binaan mana
+     * yang dijalankan. Tanpa ini, satu-satunya cara mengetahuinya adalah
+     * mencoba rutenya satu per satu dari luar.
+     */
+    console.log(`  berkas       : ${_filename}`);
+    console.log(`  dibangun pada: ${waktuBinaan() ?? 'tidak diketahui'}`);
+    console.log(`  mode         : ${process.env.NODE_ENV === 'production' ? 'produksi' : 'pengembangan'}`);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(
+        '  PERHATIAN: mode pengembangan menyajikan frontend langsung dari kode sumber, '
+        + 'sehingga tampilan bisa mutakhir sementara backend memakai bundel lama. '
+        + 'Jalankan dengan NODE_ENV=production untuk melayani dari dist/.',
+      );
+    }
   });
 }
 
