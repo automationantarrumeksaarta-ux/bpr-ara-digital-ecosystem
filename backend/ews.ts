@@ -1,6 +1,7 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import db from './db.js';
+import { JWT_SECRET, wajibPeran, PERAN_LIHAT_NASABAH } from './keamanan.js';
 
 /**
  * Sistem Peringatan Dini (Early Warning System) berbasis data kredit sungguhan.
@@ -24,7 +25,7 @@ import db from './db.js';
  */
 
 const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'ara_secret_key_2026';
+
 
 /* ------------------------------------------------------------------ ambang */
 
@@ -415,7 +416,8 @@ function wajibMasuk(req: express.Request, res: express.Response): any | null {
   }
 }
 
-router.get('/alerts', (req, res) => {
+/* Peringatan menyebut nama nasabah dan nomor rekeningnya. */
+router.get('/alerts', wajibPeran(PERAN_LIHAT_NASABAH), (req, res) => {
   if (!wajibMasuk(req, res)) return;
   try {
     const jumlah = (db.prepare('SELECT COUNT(*) AS n FROM loans').get() as any).n;
@@ -438,7 +440,7 @@ router.get('/alerts', (req, res) => {
 });
 
 /** Mencatat tindak lanjut. Peringatannya sendiri tetap dihitung dari data. */
-router.put('/alerts/:id/tindak-lanjut', (req, res) => {
+router.put('/alerts/:id/tindak-lanjut', wajibPeran(PERAN_LIHAT_NASABAH), (req, res) => {
   const pengguna = wajibMasuk(req, res);
   if (!pengguna) return;
 

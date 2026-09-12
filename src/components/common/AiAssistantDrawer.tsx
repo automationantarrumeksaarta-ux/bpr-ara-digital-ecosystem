@@ -13,6 +13,7 @@ import {
   FileText,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { headerAuth } from '../../utils/api';
 
 interface Message {
   id: string;
@@ -109,7 +110,7 @@ export const AiAssistantDrawer: React.FC = () => {
 
       const response = await fetch('/api/ai/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...headerAuth() },
         body: JSON.stringify({
           prompt: textToSend,
           context: systemContext,

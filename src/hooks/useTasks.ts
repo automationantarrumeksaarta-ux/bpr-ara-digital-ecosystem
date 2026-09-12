@@ -1,4 +1,5 @@
 import { TaskItem, EvidenceFile } from '../types';
+import { headerAuth } from '../utils/api';
 
 export const useGetTaskEvidence = (fileId?: string) => {
   return {
@@ -20,6 +21,7 @@ export const useUploadTaskEvidence = () => {
       
       const res = await fetch('/api/upload', {
         method: 'POST',
+        headers: headerAuth(),
         body: formData,
       });
       

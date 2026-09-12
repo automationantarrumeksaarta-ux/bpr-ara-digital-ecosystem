@@ -1,9 +1,10 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import { db } from './db.js';
+import { JWT_SECRET } from './keamanan.js';
 
 const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'ara_secret_key_2026';
+
 
 function penggunaDari(req: express.Request) {
   const header = req.headers.authorization;

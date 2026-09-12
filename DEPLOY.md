@@ -80,6 +80,29 @@ pm2 save
 dari `dist/`, jadi tampilan dan backend tidak bisa lagi berbeda versi: keduanya
 ikut berubah hanya setelah build dan restart yang berhasil.
 
+## Setelah pembaruan keamanan
+
+Dua hal berubah dan keduanya terasa oleh pengguna.
+
+**Semua orang perlu masuk lagi.** Bila `JWT_SECRET` belum disetel, server membuat
+kunci acak dan menyimpannya di `data/.rahasia-jwt`. Kunci lama yang tertulis di
+kode tidak berlaku lagi, jadi sesi yang sedang berjalan berakhir. Ini hanya
+sekali. Untuk menentukan kuncinya sendiri, setel `JWT_SECRET` di `.env`.
+
+**APK lama tidak bisa absen lagi.** Absensi kini mengambil identitas dari token,
+bukan dari badan permintaan, dan menolak permintaan tanpa token. APK yang sudah
+terpasang belum mengirim token, jadi perlu dibangun ulang dan dipasang ulang:
+
+```bash
+npm run build
+npx cap sync android
+# lalu bangun APK-nya di Android Studio dan sebarkan
+```
+
+**Akun baru sekarang perlu diaktifkan.** Buka menu Super Admin, cari pegawainya,
+lalu tekan **Aktifkan** di kolom perannya. Sebelum ini tombolnya memang tidak
+pernah ada, dan akun baru berstatus PENDING selamanya.
+
 ## Data
 
 Beberapa modul menghitung seluruh angkanya dari berkas yang diunggah, dan tidak

@@ -3,6 +3,19 @@ import { db } from './db.js';
 import {
   KANTOR, RADIUS_ABSEN_METER, AKURASI_MAKS_METER, periksaLokasiAbsen,
 } from './kantor.js';
+import { punyaPeran, PERAN_ADMIN } from './keamanan.js';
+
+/**
+ * Identitas absensi diambil dari token, bukan dari badan permintaan.
+ *
+ * Sebelumnya `user_id` dibaca dari `req.body` dan tidak ada pemeriksaan token
+ * sama sekali di berkas ini. Satu permintaan tanpa login sudah cukup untuk
+ * mencatat absen masuk atas nama siapa pun, dengan koordinat dan swafoto yang
+ * juga ditentukan pengirimnya. Seluruh kerja anti-joki — swafoto wajib,
+ * geofence 50 meter, pemeriksaan akurasi GPS — tidak berarti apa-apa selama
+ * identitasnya sendiri dapat ditulis bebas.
+ */
+const idAbsen = (req: express.Request): string | null => req.pengguna?.id ?? null;
 
 const router = express.Router();
 
@@ -111,10 +124,21 @@ router.get('/kantor', (_req, res) => {
 // Get attendance records for a user
 router.get('/', (req, res) => {
   try {
-    const { user_id, month, year } = req.query;
-    if (!user_id) {
+    const { month, year } = req.query;
+    const diminta = String(req.query.user_id ?? '') || idAbsen(req);
+    if (!diminta) {
       return res.status(400).json({ error: 'user_id is required' });
     }
+
+    /*
+     * Riwayat absensi memuat titik lokasi dan swafoto, jadi bukan data yang
+     * boleh dibaca sembarang orang. Selain admin, seseorang hanya dapat
+     * membaca riwayatnya sendiri.
+     */
+    if (diminta !== idAbsen(req) && !punyaPeran(req.pengguna, PERAN_ADMIN)) {
+      return res.status(403).json({ error: 'Anda hanya dapat melihat absensi Anda sendiri' });
+    }
+    const user_id = diminta;
 
     let query = 'SELECT * FROM attendances WHERE user_id = ?';
     const params: any[] = [user_id];
@@ -137,9 +161,11 @@ router.get('/', (req, res) => {
 // Clock In
 router.post('/clock-in', (req, res) => {
   try {
-    const { user_id, lat, lng, location, akurasi, selfie } = req.body;
+    const { lat, lng, location, akurasi, selfie } = req.body;
+    /* `user_id` dari badan permintaan sengaja diabaikan. */
+    const user_id = idAbsen(req);
     if (!user_id) {
-      return res.status(400).json({ error: 'user_id is required' });
+      return res.status(401).json({ error: 'Anda perlu masuk terlebih dahulu' });
     }
 
     const foto = periksaSelfie(selfie);
@@ -199,9 +225,11 @@ router.post('/clock-in', (req, res) => {
 // Clock Out
 router.post('/clock-out', (req, res) => {
   try {
-    const { user_id, lat, lng, location, akurasi, selfie } = req.body;
+    const { lat, lng, location, akurasi, selfie } = req.body;
+    /* `user_id` dari badan permintaan sengaja diabaikan. */
+    const user_id = idAbsen(req);
     if (!user_id) {
-      return res.status(400).json({ error: 'user_id is required' });
+      return res.status(401).json({ error: 'Anda perlu masuk terlebih dahulu' });
     }
 
     const foto = periksaSelfie(selfie);

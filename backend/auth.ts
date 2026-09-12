@@ -5,7 +5,7 @@ import { db } from './db.js';
 import { sendOtpEmail } from './email.js';
 
 const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'ara_secret_key_2026';
+import { JWT_SECRET, wajibPeran, barisPenggunaDariToken as penggunaDariToken, punyaPeran, PERAN_ADMIN, PERAN_LIHAT_NASABAH } from './keamanan.js';
 
 // Send OTP
 router.post('/send-otp', async (req, res) => {
@@ -70,6 +70,20 @@ router.post('/register', async (req, res) => {
     const password_hash = await bcrypt.hash(password, salt);
     const userId = 'usr-' + Date.now().toString(36) + Math.random().toString(36).substring(2, 5);
 
+    /*
+     * Tingkat kewenangan tidak boleh ditentukan oleh pendaftarnya sendiri.
+     *
+     * Formulir pendaftaran menyediakan pilihan tier sampai 'Super Admin', dan
+     * nilainya dikirim apa adanya ke sini lalu tersimpan. Tiga endpoint admin
+     * menerima `roleTier === 'Super Admin'` sebagai bukti kewenangan, jadi
+     * seorang pendaftar dapat menuliskan kewenangannya sendiri. Yang sempat
+     * menahannya hanyalah kebetulan pada pencarian OTP, dan kebetulan bukan
+     * penjagaan. Tier ditetapkan admin lewat /users/:id/role, bukan di sini.
+     */
+    const TIER_BOLEH_DAFTAR = ['LOW', 'MID', 'HIGH'];
+    const tierDiminta = String(roleTier ?? '').toUpperCase();
+    const tierAman = TIER_BOLEH_DAFTAR.includes(tierDiminta) ? tierDiminta : 'LOW';
+
     db.prepare(`
       INSERT INTO users (id, username, email, password_hash, name, role, roleTier, unit, status)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING')
@@ -79,8 +93,10 @@ router.post('/register', async (req, res) => {
       email,
       password_hash,
       name || username,
-      role || 'User',
-      roleTier || 'LOW',
+      /* Peran selalu 'User' sampai admin menetapkannya; tidak diambil dari
+         permintaan pendaftaran. */
+      'User',
+      tierAman,
       unit || 'PMO'
     );
 
@@ -94,8 +110,8 @@ router.post('/register', async (req, res) => {
         username,
         email,
         name: name || username,
-        role: role || 'User',
-        roleTier: roleTier || 'LOW',
+        role: 'User',
+        roleTier: tierAman,
         unit: unit || 'PMO',
         status: 'PENDING'
       }
@@ -177,6 +193,22 @@ router.post('/login', async (req, res) => {
     
     if (!isMatch) {
       return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    /*
+     * Status diperiksa di sini, bukan hanya di /login-otp.
+     *
+     * Sebelumnya hanya /login-otp yang menolak akun PENDING, padahal /login
+     * inilah yang menerbitkan token. Keduanya memakai tabel OTP yang sama, dan
+     * `forgot-password` juga menerbitkan OTP ke tabel itu tanpa memeriksa
+     * status. Jadi akun yang belum disetujui admin cukup menempuh jalur lupa
+     * sandi untuk memperoleh kode, lalu memakainya di sini dan mendapat token
+     * penuh. Persetujuan admin terlewati sepenuhnya.
+     */
+    if (String(user.status).toUpperCase() !== 'ACTIVE') {
+      return res.status(403).json({
+        error: 'Akun Anda belum aktif. Silakan hubungi admin untuk mengaktifkan akun Anda.',
+      });
     }
 
     const { otpCode } = req.body;
@@ -274,6 +306,12 @@ router.get('/me', (req, res) => {
 });
 
 // Get all users (for Super Admin panel)
+/*
+ * Direktori pegawai: nama, surel, peran, dan unit seluruh karyawan. Dibaca
+ * banyak layar untuk memilih penerima tugas, jadi tidak dibatasi pada admin —
+ * tetapi tetap menuntut akun yang aktif, dan itu kini dijamin oleh penjaga di
+ * server.ts.
+ */
 router.get('/users', async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
@@ -305,8 +343,14 @@ router.put('/users/:id/role', async (req, res) => {
     const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, JWT_SECRET) as any;
     
+    /*
+     * Perbandingan peran lewat punyaPeran(), bukan `!==` beruntun. Nama peran
+     * di sistem ini ditulis dengan huruf besar-kecil yang tidak seragam
+     * ('PENGEMBANGAN SDM' di daftar peran, 'Pengembangan SDM' di daftar izin),
+     * dan perbandingan persis membuat orang yang berwenang justru ditolak.
+     */
     const requestingUser = db.prepare('SELECT role, roleTier FROM users WHERE id = ?').get(decoded.id) as any;
-    if (!requestingUser || (requestingUser.role !== 'Super Admin' && requestingUser.role !== 'Master Admin' && requestingUser.roleTier !== 'Super Admin')) {
+    if (!punyaPeran(requestingUser, PERAN_ADMIN)) {
       return res.status(403).json({ error: 'Forbidden: Admin access required' });
     }
 
@@ -327,6 +371,57 @@ router.put('/users/:id/role', async (req, res) => {
   } catch (error) {
     console.error('Update role error:', error);
     res.status(500).json({ error: 'Failed to update role' });
+  }
+});
+
+/**
+ * Mengaktifkan atau menonaktifkan akun.
+ *
+ * Sebelumnya endpoint ini tidak ada, dan tidak ada satu pun kueri di seluruh
+ * backend yang pernah menyetel `status` menjadi ACTIVE. Pendaftar baru selalu
+ * berstatus PENDING selamanya, dan panel Super Admin tidak punya tombol untuk
+ * mengubahnya. Artinya jalur masuk yang sah memang tidak pernah ada, dan
+ * satu-satunya cara pegawai baru dapat masuk adalah lubang pada /login yang
+ * kini ditutup. Menutup lubang itu tanpa menyediakan pintunya akan membuat
+ * tidak ada seorang pun bisa didaftarkan.
+ *
+ * Tier ikut dapat ditetapkan di sini karena pendaftar tidak lagi boleh memilih
+ * tiernya sendiri.
+ */
+router.put('/users/:id/status', wajibPeran(PERAN_ADMIN), (req, res) => {
+  try {
+    const { status, roleTier } = req.body ?? {};
+    const { id } = req.params;
+
+    const SAH = ['ACTIVE', 'PENDING', 'INACTIVE'];
+    const statusBaru = String(status ?? '').toUpperCase();
+    if (!SAH.includes(statusBaru)) {
+      return res.status(400).json({ error: `Status harus salah satu dari: ${SAH.join(', ')}` });
+    }
+
+    /* Seorang admin tidak boleh menonaktifkan dirinya sendiri; itu dapat
+       menyisakan sistem tanpa admin yang bisa masuk. */
+    if (id === req.pengguna?.id && statusBaru !== 'ACTIVE') {
+      return res.status(400).json({ error: 'Anda tidak dapat menonaktifkan akun Anda sendiri' });
+    }
+
+    if (roleTier !== undefined) {
+      const TIER_SAH = ['LOW', 'MID', 'HIGH', 'TOP', 'Super Admin'];
+      if (!TIER_SAH.includes(String(roleTier))) {
+        return res.status(400).json({ error: `Tier harus salah satu dari: ${TIER_SAH.join(', ')}` });
+      }
+      db.prepare('UPDATE users SET roleTier = ? WHERE id = ?').run(roleTier, id);
+    }
+
+    const info = db.prepare('UPDATE users SET status = ? WHERE id = ?').run(statusBaru, id);
+    if (info.changes === 0) {
+      return res.status(404).json({ error: 'Pengguna tidak ditemukan' });
+    }
+
+    res.json({ success: true, status: statusBaru });
+  } catch (error) {
+    console.error('Update status error:', error);
+    res.status(500).json({ error: 'Gagal memperbarui status pengguna' });
   }
 });
 
@@ -366,8 +461,14 @@ router.put('/role-permissions/:role', async (req, res) => {
     const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, JWT_SECRET) as any;
     
+    /*
+     * Perbandingan peran lewat punyaPeran(), bukan `!==` beruntun. Nama peran
+     * di sistem ini ditulis dengan huruf besar-kecil yang tidak seragam
+     * ('PENGEMBANGAN SDM' di daftar peran, 'Pengembangan SDM' di daftar izin),
+     * dan perbandingan persis membuat orang yang berwenang justru ditolak.
+     */
     const requestingUser = db.prepare('SELECT role, roleTier FROM users WHERE id = ?').get(decoded.id) as any;
-    if (!requestingUser || (requestingUser.role !== 'Super Admin' && requestingUser.role !== 'Master Admin' && requestingUser.roleTier !== 'Super Admin')) {
+    if (!punyaPeran(requestingUser, PERAN_ADMIN)) {
       return res.status(403).json({ error: 'Forbidden: Admin access required' });
     }
 
@@ -426,8 +527,14 @@ router.put('/task-routes/:userId', async (req, res) => {
     const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, JWT_SECRET) as any;
 
+    /*
+     * Perbandingan peran lewat punyaPeran(), bukan `!==` beruntun. Nama peran
+     * di sistem ini ditulis dengan huruf besar-kecil yang tidak seragam
+     * ('PENGEMBANGAN SDM' di daftar peran, 'Pengembangan SDM' di daftar izin),
+     * dan perbandingan persis membuat orang yang berwenang justru ditolak.
+     */
     const requestingUser = db.prepare('SELECT role, roleTier FROM users WHERE id = ?').get(decoded.id) as any;
-    if (!requestingUser || (requestingUser.role !== 'Super Admin' && requestingUser.role !== 'Master Admin' && requestingUser.roleTier !== 'Super Admin')) {
+    if (!punyaPeran(requestingUser, PERAN_ADMIN)) {
       return res.status(403).json({ error: 'Forbidden: Admin access required' });
     }
 
@@ -597,17 +704,11 @@ router.delete('/tasks/:taskId', (req, res) => {
  * yang sama — tidak ada salinan data profil terpisah di sisi mana pun.
  */
 
-/** Ambil pengguna dari token; null bila token tidak sah. */
-function penggunaDariToken(req: express.Request) {
-  const header = req.headers.authorization;
-  if (!header?.startsWith('Bearer ')) return null;
-  try {
-    const payload = jwt.verify(header.slice(7), JWT_SECRET) as any;
-    return db.prepare('SELECT * FROM users WHERE id = ?').get(payload.id) as any ?? null;
-  } catch {
-    return null;
-  }
-}
+/*
+ * Salinan lokal penggunaDariToken() dihapus; yang dipakai adalah versi
+ * terpusat di keamanan.ts, supaya hanya ada satu tempat yang menentukan siapa
+ * pemilik sebuah token.
+ */
 
 /** Bentuk pengguna yang aman dikirim ke klien — tanpa password_hash. */
 const tanpaSandi = (u: any) => {

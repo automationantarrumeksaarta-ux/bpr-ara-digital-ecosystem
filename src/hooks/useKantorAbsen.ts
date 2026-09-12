@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { headerAuth } from '../utils/api';
 
 /**
  * Daftar kantor dan aturan radius absen, diambil dari server.
@@ -73,7 +74,7 @@ export function useKantorAbsen(posisi: { lat: number; lng: number; akurasi?: num
     let dibatalkan = false;
     (async () => {
       try {
-        const res = await fetch('/api/attendances/kantor');
+        const res = await fetch('/api/attendances/kantor', { headers: headerAuth() });
         const json = await res.json();
         if (dibatalkan) return;
         setKantor(json.kantor ?? []);

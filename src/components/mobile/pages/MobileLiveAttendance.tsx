@@ -12,6 +12,7 @@ import { MiniMap } from '../ui/MiniMap';
 import { LembarPenuh, PesanKecil, TombolUtama } from '../ui/primitives';
 import { ink, radius, surface, text, tone } from '../ui/tokens';
 import { kecilkanGambar } from '../../../utils/gambar';
+import { headerAuth } from '../../../utils/api';
 
 type Aksi = 'masuk' | 'pulang';
 
@@ -56,8 +57,9 @@ const MobileLiveAttendance: React.FC = () => {
     try {
       const res = await fetch(`/api/attendances/clock-${aksi === 'masuk' ? 'in' : 'out'}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...headerAuth() },
         body: JSON.stringify({
+          /* Diabaikan server; identitas absensi diambil dari token. */
           user_id: currentUser.id,
           lat: posisi.lat,
           lng: posisi.lng,

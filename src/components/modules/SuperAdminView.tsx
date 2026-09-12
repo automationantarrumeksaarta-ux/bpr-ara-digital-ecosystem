@@ -13,6 +13,7 @@ import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs';
 import { Modal } from '../ui/Modal';
+import { headerAuth } from '../../utils/api';
 
 export const SuperAdminView: React.FC = () => {
   const { rolePermissions, updateRolePermissions, taskRoutes, updateTaskRoute } = useApp();
@@ -55,6 +56,34 @@ export const SuperAdminView: React.FC = () => {
         if (res.ok) console.log(`Role updated for ${userId} to ${newRole}`);
         else console.error('Failed to update role in DB');
       } catch (e) { console.error('Error updating role:', e); }
+    }
+  };
+
+  /**
+   * Mengaktifkan atau menonaktifkan akun.
+   *
+   * Sebelumnya panel ini tidak punya tombol apa pun untuk itu, dan backend juga
+   * tidak punya endpointnya. Pendaftar baru berstatus PENDING selamanya: tidak
+   * ada satu pun kueri di seluruh sistem yang pernah menyetel status menjadi
+   * ACTIVE. Akibatnya jalur masuk yang sah memang tidak pernah ada.
+   */
+  const [memprosesStatus, setMemprosesStatus] = useState<string | null>(null);
+
+  const ubahStatusAkun = async (userId: string, statusBaru: 'ACTIVE' | 'INACTIVE') => {
+    setMemprosesStatus(userId);
+    try {
+      const res = await fetch(`/api/auth/users/${userId}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...headerAuth() },
+        body: JSON.stringify({ status: statusBaru }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error ?? 'Gagal memperbarui status');
+      setDbUsers(dbUsers.map((u: any) => (u.id === userId ? { ...u, status: statusBaru } : u)));
+    } catch (e: any) {
+      alert(e?.message ?? 'Gagal memperbarui status akun');
+    } finally {
+      setMemprosesStatus(null);
     }
   };
 
@@ -135,7 +164,7 @@ export const SuperAdminView: React.FC = () => {
         roleTitle: u.role || 'User',
         branchId: u.unit || 'PMO',
         unit: u.unit || 'PMO',
-        status: u.status || 'active',
+        status: u.status || 'PENDING',
         avatarColor: '#6366f1',
         created_at: u.created_at,
       }));
@@ -215,6 +244,29 @@ export const SuperAdminView: React.FC = () => {
                       </td>
                       <td className="px-6 py-4">
                         <Badge variant={user.role === 'Master Admin' ? 'danger' : 'primary'}>{user.role}</Badge>
+                        {/* Status akun ditampilkan berdampingan dengan perannya, karena
+                            peran tanpa akun aktif tidak memberi akses apa pun. */}
+                        <div className="mt-1.5 flex items-center gap-1.5">
+                          <Badge variant={String(user.status).toUpperCase() === 'ACTIVE' ? 'success' : 'warning'}>
+                            {String(user.status).toUpperCase() === 'ACTIVE' ? 'Aktif' : 'Belum aktif'}
+                          </Badge>
+                          {user.created_at && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-[10px] py-0.5 h-auto"
+                              disabled={memprosesStatus === user.id}
+                              onClick={() => ubahStatusAkun(
+                                user.id,
+                                String(user.status).toUpperCase() === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE',
+                              )}
+                            >
+                              {memprosesStatus === user.id
+                                ? 'Menyimpan…'
+                                : String(user.status).toUpperCase() === 'ACTIVE' ? 'Nonaktifkan' : 'Aktifkan'}
+                            </Button>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex flex-wrap gap-1 max-w-[220px]">

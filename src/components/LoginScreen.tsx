@@ -383,12 +383,22 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                         <div className="flex-1 px-4 py-2 flex flex-col justify-center">
                           <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Role Tier</label>
                           <select required value={regRoleTier} onChange={(e) => setRegRoleTier(e.target.value as RoleTier)} className="w-full bg-transparent text-sm font-bold text-gray-900 dark:text-white focus:outline-none appearance-none cursor-pointer">
+                            {/*
+                              TOP dan Super Admin dihapus dari pilihan.
+
+                              Tier yang dipilih pendaftar tersimpan apa adanya,
+                              sementara tiga endpoint admin menerima
+                              `roleTier === 'Super Admin'` sebagai bukti
+                              kewenangan. Artinya siapa pun dapat menuliskan
+                              kewenangannya sendiri di formulir pendaftaran.
+                              Server kini juga menolaknya; pilihan di sini
+                              dirapikan agar layarnya jujur soal apa yang
+                              sebenarnya bisa diminta.
+                            */}
                             <option value="" disabled>Pilih Tier</option>
                             <option value="LOW">LOW</option>
                             <option value="MID">MID</option>
                             <option value="HIGH">HIGH</option>
-                            <option value="TOP">TOP</option>
-                            <option value="Super Admin">Super Admin</option>
                           </select>
                         </div>
                       </div>

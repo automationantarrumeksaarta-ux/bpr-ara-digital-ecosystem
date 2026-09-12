@@ -1,14 +1,30 @@
 import express from 'express';
 import { db } from './db.js';
+import { punyaPeran, PERAN_ADMIN } from './keamanan.js';
 
 const router = express.Router();
+
+/**
+ * Notifikasi milik siapa ditentukan oleh token, bukan oleh parameter kueri.
+ *
+ * Sebelumnya `userId`, `role`, dan `username` dibaca dari query string tanpa
+ * pemeriksaan token sama sekali, sehingga notifikasi siapa pun dapat dibaca
+ * hanya dengan menebak id-nya. `POST /` bahkan menerima notifikasi baru tanpa
+ * login, jadi siapa pun dapat mengirim pemberitahuan yang tampak berasal dari
+ * sistem ke akun mana pun — termasuk yang menyuruh membuka tautan.
+ */
 
 // Get user notifications
 router.get('/', (req: any, res) => {
   try {
-    const { userId, role, username } = req.query;
-    if (!userId && !role && !username) {
-      return res.status(400).json({ error: 'Missing identifying parameters' });
+    const pengguna = (req as any).pengguna;
+    /* Selalu dari sesi yang sedang berjalan; parameter kueri tidak dipakai
+       untuk menentukan pemiliknya. */
+    const userId = pengguna?.id;
+    const role = pengguna?.role;
+    const username = pengguna?.username;
+    if (!userId) {
+      return res.status(401).json({ error: 'Anda perlu masuk terlebih dahulu' });
     }
 
     const notifications = db.prepare(`
@@ -65,12 +81,24 @@ router.put('/:id/read', (req, res) => {
 router.post('/', (req, res) => {
   try {
     const { id, userId, title, message, module, priority, timestamp } = req.body;
+
+    /*
+     * Mengirim notifikasi ke orang lain adalah tindakan atas nama sistem, jadi
+     * dibatasi pada admin. Selain itu seseorang hanya dapat membuat notifikasi
+     * untuk dirinya sendiri.
+     */
+    const pengirim = (req as any).pengguna;
+    const sasaran = userId ?? pengirim?.id;
+    if (sasaran !== pengirim?.id && !punyaPeran(pengirim, PERAN_ADMIN)) {
+      return res.status(403).json({ error: 'Anda tidak dapat mengirim notifikasi untuk pengguna lain' });
+    }
+
     db.prepare(`
       INSERT INTO notifications (id, user_id, title, message, module, priority, timestamp, read)
       VALUES (?, ?, ?, ?, ?, ?, ?, 0)
     `).run(
       id || `notif-${Date.now()}`,
-      userId,
+      sasaran,
       title,
       message,
       module || 'SYSTEM',

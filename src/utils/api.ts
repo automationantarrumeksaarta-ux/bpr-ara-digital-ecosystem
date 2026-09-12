@@ -61,6 +61,19 @@ export async function bacaJson(res: Response): Promise<any> {
 }
 
 /**
+ * Header penanda sesi.
+ *
+ * Dipisah tersendiri karena unggahan berkas memakai `FormData`, dan pada
+ * permintaan seperti itu `Content-Type` tidak boleh disetel sendiri — peramban
+ * perlu menuliskannya lengkap dengan pembatas bagian. Jadi ada pemanggil yang
+ * hanya butuh potongan Authorization-nya saja.
+ */
+export function headerAuth(): Record<string, string> {
+  const token = localStorage.getItem('auth_token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+/**
  * `fetch` yang selalu menyertakan token dan membaca hasilnya lewat
  * {@link bacaJson}. Mengembalikan balasan mentahnya juga supaya pemanggil tetap
  * bisa memeriksa `res.ok` dan status.

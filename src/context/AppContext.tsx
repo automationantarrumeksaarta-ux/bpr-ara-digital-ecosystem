@@ -28,6 +28,7 @@ import {
   PencapaianBisnisAO,
   AgunanItem,
 } from '../types';
+import { headerAuth } from '../utils/api';
 import {
   INITIAL_BRANCHES,
   INITIAL_USERS,
@@ -284,7 +285,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     (async () => {
       try {
-        const res = await fetch('/api/metrics');
+        const res = await fetch('/api/metrics', { headers: headerAuth() });
         if (!res.ok) return;
         const data = await res.json();
         if (batal || !data) return;

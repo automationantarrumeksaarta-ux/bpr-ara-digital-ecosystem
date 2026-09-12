@@ -10,6 +10,7 @@ import multer from 'multer';
 import cors from 'cors';
 import parserRoutes from './backend/parser.js';
 import { initDb } from './backend/db.js';
+import { wajibMasuk } from './backend/keamanan.js';
 
 dotenv.config();
 
@@ -54,7 +55,8 @@ const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } }); // 1
 app.use('/uploads', express.static(uploadDir));
 
 // Upload endpoint
-app.post('/api/upload', upload.single('file'), (req, res) => {
+/* Unggahan berkas ikut dijaga; sebelumnya siapa pun dapat menaruh berkas di server. */
+app.post('/api/upload', wajibMasuk, upload.single('file'), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No file uploaded' });
   }
@@ -123,6 +125,23 @@ const ROUTER_API: Array<[string, express.Router]> = [
 ];
 
 /**
+ * Rute yang boleh diakses tanpa masuk.
+ *
+ * Hanya `/api/auth`, karena di dalamnya ada pintu masuknya sendiri — login,
+ * pendaftaran, dan lupa sandi — yang menjaga dirinya masing-masing. Selain itu
+ * tidak ada.
+ *
+ * Penjagaan sengaja dipasang di sini, bukan di dalam tiap modul. Ketika tiap
+ * modul menjaga dirinya sendiri, tiga di antaranya ternyata tidak menjaga apa
+ * pun: `parser.ts`, `attendance.ts`, dan `notifications.ts` tidak memuat satu
+ * pun pemeriksaan token. Akibatnya `/api/metrics` membagikan NPL, baki debet,
+ * tabungan, deposito, laba berjalan, dan nama seluruh AO kepada siapa saja yang
+ * membuka alamatnya. Dipasang di titik ini, modul baru ikut terjaga tanpa perlu
+ * ada yang mengingatnya.
+ */
+const TANPA_PENJAGA = new Set(['/api/auth']);
+
+/**
  * Kapan berkas server yang sedang dijalankan ini terakhir ditulis.
  *
  * Dibaca dari berkasnya sendiri, bukan dari tanda yang disuntikkan saat
@@ -160,10 +179,13 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-for (const [awalan, router] of ROUTER_API) app.use(awalan, router);
+for (const [awalan, router] of ROUTER_API) {
+  if (TANPA_PENJAGA.has(awalan)) app.use(awalan, router);
+  else app.use(awalan, wajibMasuk, router);
+}
 
 // AI Assistant endpoint
-app.post('/api/ai/chat', async (req, res) => {
+app.post('/api/ai/chat', wajibMasuk, async (req, res) => {
   try {
     const { prompt, userRole, branchName, contextData } = req.body;
 

@@ -1,6 +1,7 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import db from './db.js';
+import { JWT_SECRET, wajibPeran, PERAN_LIHAT_NASABAH } from './keamanan.js';
 
 /**
  * CRM Nasabah.
@@ -25,7 +26,7 @@ import db from './db.js';
  */
 
 const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'ara_secret_key_2026';
+
 
 const NPL = ['KL', 'D', 'M'];
 const URUTAN_KOL = ['L', 'DPK', 'KL', 'D', 'M'];
@@ -178,7 +179,8 @@ function rangkumNasabah(): { daftar: Nasabah[]; diagnostik: Record<string, unkno
 
 /* ------------------------------------------------------------------- rute */
 
-router.get('/nasabah', (req, res) => {
+/* Daftar nasabah beserta baki debet dan saldonya: data tingkat perorangan. */
+router.get('/nasabah', wajibPeran(PERAN_LIHAT_NASABAH), (req, res) => {
   const pengguna = penggunaDari(req);
   if (!pengguna) return res.status(401).json({ error: 'Tidak memiliki akses' });
 
@@ -219,7 +221,7 @@ router.get('/nasabah', (req, res) => {
 });
 
 /** Rincian seluruh rekening milik satu nasabah. */
-router.get('/nasabah/:kunci', (req, res) => {
+router.get('/nasabah/:kunci', wajibPeran(PERAN_LIHAT_NASABAH), (req, res) => {
   const pengguna = penggunaDari(req);
   if (!pengguna) return res.status(401).json({ error: 'Tidak memiliki akses' });
 

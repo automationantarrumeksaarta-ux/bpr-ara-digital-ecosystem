@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { UploadCloud, CheckCircle2, AlertTriangle, FileSpreadsheet, RefreshCw, BarChart2, Server } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { headerAuth } from '../../utils/api';
 
 export const DataCenterUploadView: React.FC = () => {
   const { setMacroMetrics, macroMetrics } = useApp();
@@ -46,6 +47,8 @@ export const DataCenterUploadView: React.FC = () => {
       // punya rute sendiri agar tidak saling menutupi.
       const res = await fetch('/api/reports/upload', {
         method: 'POST',
+        /* Tanpa Content-Type: peramban yang menuliskannya lengkap dengan pembatas. */
+        headers: headerAuth(),
         body: formData
       });
 
@@ -64,7 +67,7 @@ export const DataCenterUploadView: React.FC = () => {
       
       // Fetch latest metrics from DB
       try {
-        const metricsRes = await fetch('/api/metrics');
+        const metricsRes = await fetch('/api/metrics', { headers: headerAuth() });
         if (metricsRes.ok) {
           const metrics = await metricsRes.json();
           if (metrics) {

@@ -1,9 +1,10 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import { db } from './db.js';
+import { JWT_SECRET } from './keamanan.js';
 
 const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'ara_secret_key_2026';
+
 
 /** Zona waktu kantor — sama dengan yang dipakai absensi. */
 const ZONA_WAKTU = process.env.TZ_KANTOR || 'Asia/Jakarta';

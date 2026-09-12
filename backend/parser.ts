@@ -6,6 +6,7 @@ import {
   resolveWilayah, resolveKabupaten, resolveKecamatan,
   normalizeKolektibilitas, isBermasalah, KOLEK_BERMASALAH,
 } from './wilayah.js';
+import { wajibPeran, PERAN_ADMIN, PERAN_LIHAT_NASABAH } from './keamanan.js';
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -14,7 +15,12 @@ const upload = multer({ storage: multer.memoryStorage() });
 // oleh handler upload lampiran di server.ts yang terdaftar lebih dahulu
 // (multer .single('file') vs .array('files') -> LIMIT_UNEXPECTED_FILE / 500).
 // Sekarang dipisah supaya keduanya bisa hidup berdampingan.
-router.post('/reports/upload', upload.array('files'), (req, res) => {
+/*
+ * Unggahan nominatif menimpa seluruh data kredit, tabungan, dan deposito,
+ * jadi dibatasi pada admin. Sebelumnya tidak ada pemeriksaan apa pun: siapa
+ * saja dapat mengirim berkas dan mengganti isi seluruh dashboard.
+ */
+router.post('/reports/upload', wajibPeran(PERAN_ADMIN), upload.array('files'), (req, res) => {
   console.log('--- POST /api/reports/upload HIT! ---');
   console.log('Files received:', req.files ? (req.files as any[]).length : 0);
   try {
@@ -123,7 +129,8 @@ router.get('/metrics', (req, res) => {
   }
 });
 
-router.get('/ews', (req, res) => {
+/* Memuat nama nasabah beserta kolektibilitasnya. */
+router.get('/ews', wajibPeran(PERAN_LIHAT_NASABAH), (req, res) => {
   try {
     const alerts = db.prepare('SELECT * FROM ews_alerts ORDER BY updated_at DESC').all();
     res.json(alerts);
