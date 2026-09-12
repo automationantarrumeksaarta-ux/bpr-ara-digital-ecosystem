@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Phone,
   MapPin,
@@ -14,20 +14,72 @@ import {
   Clock
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { useJanjiBayar, useKreditBermasalah } from '../../hooks/useCollection';
 
 export const CollectionMgmtView: React.FC = () => {
   const {
-    collectionCases,
-    ptpRecords,
-    recordPromiseToPay,
     openCustomer360,
     setActiveModule,
     macroMetrics,
   } = useApp();
 
-  const [selectedCaseId, setSelectedCaseId] = useState<string>(
-    collectionCases.length > 0 ? collectionCases[0].id : ''
+  /*
+   * Daftar kasus penagihan datang dari tabel `loans`, bukan dari
+   * `collectionCases` di AppContext yang isinya array kosong dan tidak pernah
+   * diisi apa pun. Selama ini 97 rekening bermasalah senilai miliaran rupiah
+   * sudah ada di sistem sementara halaman ini menampilkan layar kosong.
+   */
+  const { memuat, galat, data: nplList, simpanTindakan } = useKreditBermasalah();
+  const { data: semuaJanji, tambah: tambahJanji } = useJanjiBayar();
+  const [galatAksi, setGalatAksi] = useState<string | null>(null);
+
+  /* Bentuk yang diharapkan tampilan ini, diturunkan dari data nominatif. */
+  const collectionCases = useMemo(
+    () => nplList.map(n => ({
+      id: n.id,
+      facilityId: n.id,
+      facilityNumber: n.id,
+      cif: '',
+      debtorName: n.debtorName,
+      phone: '',
+      address: n.region,
+      branchId: n.branch,
+      outstandingBalance: n.outstandingPrincipal,
+      overdueAmount: n.tunggakanPokok + n.interestArrears,
+      dpdDays: n.daysOverdue,
+      collectibility: n.kol,
+      collectorId: '',
+      collectorName: n.aoName,
+      ptpRecords: [],
+      visitHistory: [],
+      actionStatus: n.actionStatus,
+      actionNotes: n.actionNotes,
+    })),
+    [nplList],
   );
+
+  const ptpRecords = useMemo(
+    () => semuaJanji.map(j => ({
+      id: j.id,
+      caseId: j.accountNumber,
+      facilityId: j.accountNumber,
+      cif: '',
+      debtorName: j.debtorName,
+      promiseDate: j.promiseDate,
+      promisedAmount: j.promisedAmount,
+      notes: j.notes,
+      status: j.status,
+    })),
+    [semuaJanji],
+  );
+
+  const [selectedCaseId, setSelectedCaseId] = useState<string>('');
+
+  /* Pilihan awal ditetapkan setelah datanya tiba, bukan saat render pertama
+     ketika daftarnya masih kosong. */
+  useEffect(() => {
+    if (!selectedCaseId && collectionCases.length > 0) setSelectedCaseId(collectionCases[0].id);
+  }, [collectionCases, selectedCaseId]);
   const [activeFilter, setActiveFilter] = useState<'ALL' | 'DPK' | 'KL' | 'D' | 'M'>('ALL');
 
   const activeCase = collectionCases.find((c) => c.id === selectedCaseId);
@@ -45,29 +97,38 @@ export const CollectionMgmtView: React.FC = () => {
     notes: '',
   });
 
-  const handleCreatePtp = (e: React.FormEvent) => {
+  const handleCreatePtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeCase) return;
-
-    recordPromiseToPay({
-      caseId: activeCase.id,
-      facilityId: activeCase.facilityId,
-      cif: activeCase.cif,
-      debtorName: activeCase.debtorName,
-      promiseDate: ptpForm.promiseDate,
-      promisedAmount: ptpForm.promisedAmount,
-      notes: ptpForm.notes,
-    });
-
-    setIsPtpModalOpen(false);
-    alert('Janji Bayar (PTP) Berhasil Dicatat! Pengingat otomatis terjadwal di kalender.');
+    setGalatAksi(null);
+    try {
+      /* Benar-benar tersimpan ke tabel janji_bayar. Sebelumnya hanya masuk
+         state React dan hilang saat halaman dimuat ulang, padahal layarnya
+         sudah menyatakan "berhasil dicatat". */
+      await tambahJanji({
+        accountNumber: activeCase.id,
+        debtorName: activeCase.debtorName,
+        aoName: activeCase.collectorName,
+        branch: activeCase.branchId,
+        promiseDate: ptpForm.promiseDate,
+        promisedAmount: ptpForm.promisedAmount,
+        notes: ptpForm.notes,
+      });
+      setIsPtpModalOpen(false);
+    } catch (err: any) {
+      setGalatAksi(err?.message ?? 'Gagal menyimpan janji bayar.');
+    }
   };
 
-  const handleIssueSP = (level: string) => {
+  const handleIssueSP = async (level: string) => {
     if (!activeCase) return;
-    const confirmMsg = `Konfirmasi penerbitan Surat Peringatan ${level} untuk ${activeCase.debtorName}?`;
-    if (confirm(confirmMsg)) {
+    if (!confirm(`Konfirmasi penerbitan Surat Peringatan ${level} untuk ${activeCase.debtorName}?`)) return;
+    setGalatAksi(null);
+    try {
+      await simpanTindakan(activeCase.id, 'SURAT_TEGURAN', `Surat Peringatan ${level} diterbitkan.`);
       setSpStatus(prev => ({ ...prev, [activeCase.id]: level }));
+    } catch (err: any) {
+      setGalatAksi(err?.message ?? 'Gagal mencatat penerbitan surat peringatan.');
     }
   };
 
@@ -106,9 +167,21 @@ export const CollectionMgmtView: React.FC = () => {
       {/* Context Breadcrumb */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-4 flex items-center gap-2">
         <span className="text-[10px] font-black text-slate-400 tracking-widest uppercase">
-          COLLECTION & RECOVERY / MANAGEMENT
+          COLLECTION &amp; RECOVERY / MANAGEMENT
         </span>
+        {memuat && <span className="text-[11px] font-bold text-slate-400">Memuat data penagihan…</span>}
+        {!memuat && !galat && (
+          <span className="text-[11px] text-slate-500 tabular-nums">
+            {collectionCases.length} rekening bermasalah dari Nominatif Kredit
+          </span>
+        )}
       </div>
+
+      {(galat || galatAksi) && (
+        <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-medium leading-relaxed text-red-700">
+          {galat ?? galatAksi}
+        </div>
+      )}
       {/* Header Banner */}
       <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>

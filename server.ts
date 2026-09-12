@@ -99,6 +99,7 @@ import payrollRoutes from './backend/payroll.js';
 import ewsRoutes from './backend/ews.js';
 import projectRoutes from './backend/projects.js';
 import crmRoutes from './backend/crm.js';
+import collectionRoutes from './backend/collection.js';
 
 /**
  * Satu daftar router, dipakai dua kali: untuk memasangnya, dan untuk
@@ -121,6 +122,7 @@ const ROUTER_API: Array<[string, express.Router]> = [
   ['/api/ews', ewsRoutes],
   ['/api/projects', projectRoutes],
   ['/api/crm', crmRoutes],
+  ['/api/collection', collectionRoutes],
   ['/api', parserRoutes],
 ];
 
