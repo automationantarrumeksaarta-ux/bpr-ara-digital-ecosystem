@@ -178,26 +178,34 @@ array kosong — jadi hitungannya selalu nol berapa pun peringatan sebenarnya.
 
 ---
 
-## 3. Urutan perbaikan yang disarankan
+## 3. Status perbaikan
 
-**Mendesak**
+| # | Perbaikan | Status |
+| --- | --- | --- |
+| 1 | Pelapor galat di `index.html` | selesai |
+| 2 | Data nasabah dikeluarkan dari konteks asisten AI | selesai |
+| 3 | Server berjalan `NODE_ENV=production` | **belum — tindakan di server** |
+| 4 | Collection, PTP, dan NPL tersambung ke `loans` | selesai |
+| 5 | Persetujuan slip gaji tersimpan ke server | selesai |
+| 6 | Penyimpanan pipeline kredit | **belum** |
+| 7 | Nilai karangan di `createCreditApplication()` | selesai |
+| 8 | Lencana EWS tersambung ke sumber yang benar | selesai |
+| 9 | `currentUser` yang dipatok di PTP dan NPL | selesai |
+| 10 | Draf formulir dibersihkan saat keluar | selesai |
 
-1. Hentikan pelapor galat di `index.html`.
-2. Putuskan kebijakan asisten AI; minimal buang `sampleCustomers`.
-3. Jalankan server dengan `NODE_ENV=production`.
+### Yang masih terbuka
 
-**Berdampak besar pada pekerjaan harian**
+**Pipeline kredit belum menyimpan apa pun.** Tujuh tahap dari Loan Origination
+sampai Disbursement masih hidup di memori React; tidak ada tabelnya dan tidak
+ada endpoint-nya. Pengajuan hilang saat halaman dimuat ulang. Yang sudah
+diperbaiki baru isian karangannya.
 
-4. Sambungkan Collection, PTP, dan NPL ke tabel `loans`, lengkap dengan tabel
-   penyimpanan untuk janji bayar dan restrukturisasi.
-5. Sambungkan persetujuan slip gaji ke `POST /api/payroll/slips`.
-6. Buat tabel dan endpoint untuk pipeline kredit, atau nyatakan di layar bahwa
-   modul itu belum menyimpan apa pun.
-7. Hapus nilai karangan di `createCreditApplication()`; tolak pengajuan yang
-   tidak lengkap.
+**Modul yang tetap kosong karena datanya memang belum ada di sistem:** HR KPI,
+Target Bunga, Pencapaian Bisnis, Analisis Agunan, Audit Log, dan komponen gaji
+pada Payroll. Semuanya membutuhkan sumber data yang belum pernah diunggah atau
+disimpan, bukan sekadar penyambungan kode.
 
-**Kebersihan**
-
-8. Satukan dua sumber EWS, dan sambungkan lencana merah ke sumber yang benar.
-9. Hapus `currentUser` yang dipatok di PtpTrackerView dan NplRestructuringView.
-10. Bersihkan draf formulir saat pengguna keluar.
+**Dua sumber EWS masih ada.** Tabel `ews_alerts` hasil unggahan dan perhitungan
+langsung dari `loans` memakai aturan berbeda. Lencana dan halaman Peringatan
+Dini kini sama-sama memakai perhitungan dari `loans`; tabel lamanya masih
+dibaca `GET /api/ews` dan perlu dipensiunkan.
