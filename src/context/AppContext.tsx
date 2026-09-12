@@ -743,21 +743,44 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
 
+  /**
+   * Membuat berkas pengajuan kredit baru.
+   *
+   * Isian yang kosong TIDAK diisi sendiri. Versi sebelumnya menambal setiap
+   * field yang tidak diisi pemohon dengan nilai tetap: CIF-00892, nama
+   * "Pemohon Kredit", telepon 08123456789, plafon 150 juta, tenor 36 bulan.
+   * Pengajuan yang setengah jadi berubah menjadi berkas yang tampak sah, dan
+   * karena CIF-nya sama untuk semua orang, dua pengajuan berbeda tampak milik
+   * nasabah yang sama. Di berkas kredit, nomor identitas karangan jauh lebih
+   * berbahaya daripada kolom yang kosong.
+   *
+   * Pengajuan tanpa nama, plafon, atau tenor ditolak di sini supaya
+   * kekurangannya ketahuan saat diisi, bukan saat berkasnya sudah berjalan.
+   */
   const createCreditApplication = (appData: Partial<CreditApplication>): CreditApplication => {
+    const kurang: string[] = [];
+    if (!appData.customerName?.trim()) kurang.push('nama pemohon');
+    if (!(Number(appData.requestedPlafon) > 0)) kurang.push('plafon yang diajukan');
+    if (!(Number(appData.requestedTenorMonths) > 0)) kurang.push('jangka waktu');
+    if (kurang.length > 0) {
+      throw new Error(`Pengajuan belum lengkap. Isi dahulu: ${kurang.join(', ')}.`);
+    }
+
     const randomAppNo = `LOS-ARA-2026-08-${String(Math.floor(100 + Math.random() * 900))}`;
     const newApp: CreditApplication = {
       id: `app-${Date.now()}`,
       applicationNumber: randomAppNo,
-      cif: appData.cif || 'CIF-00892',
-      customerName: appData.customerName || 'Pemohon Kredit',
-      phone: appData.phone || '08123456789',
+      /* Dibiarkan kosong bila belum ada; tidak ditambal nilai karangan. */
+      cif: appData.cif?.trim() || '',
+      customerName: appData.customerName!.trim(),
+      phone: appData.phone?.trim() || '',
       branchId: appData.branchId || currentUser.branchId,
       productType: appData.productType || 'KREDIT_MODAL_KERJA_MIKRO',
-      requestedPlafon: appData.requestedPlafon || 150000000,
-      requestedTenorMonths: appData.requestedTenorMonths || 36,
+      requestedPlafon: Number(appData.requestedPlafon),
+      requestedTenorMonths: Number(appData.requestedTenorMonths),
       interestRate: appData.interestRate,
       purpose: appData.purpose || 'MODAL_KERJA',
-      purposeDetails: appData.purposeDetails || 'Tambahan modal kerja usaha.',
+      purposeDetails: appData.purposeDetails?.trim() || '',
       maritalStatus: appData.maritalStatus,
       motherName: appData.motherName,
       spouseName: appData.spouseName,

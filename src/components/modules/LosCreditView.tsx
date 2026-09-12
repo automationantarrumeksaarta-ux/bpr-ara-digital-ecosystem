@@ -193,8 +193,11 @@ export const LosCreditView: React.FC = () => {
     setFormData({ ...formData, rtRw: val });
   };
 
+  const [galatPengajuan, setGalatPengajuan] = useState<string | null>(null);
+
   const handleNewSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setGalatPengajuan(null);
 
     const initialDocs: any[] = [{
       id: `doc-${Date.now()}-form01`,
@@ -217,7 +220,7 @@ export const LosCreditView: React.FC = () => {
       });
     });
 
-    createCreditApplication({
+    const pengajuan = {
       cif: formData.ktp ? `CIF-${formData.ktp.slice(-4)}` : undefined,
       customerName: formData.name,
       phone: formData.wa,
@@ -237,7 +240,20 @@ export const LosCreditView: React.FC = () => {
       purpose: (formData.purpose === 'Modal Kerja Usaha' ? 'MODAL_KERJA' : formData.purpose === 'Investasi' ? 'INVESTASI' : 'KONSUMTIF'),
       purposeDetails: formData.businessType || formData.purpose,
       documents: initialDocs,
-    });
+    };
+
+    try {
+      createCreditApplication(pengajuan);
+    } catch (err: any) {
+      /*
+       * Pengajuan yang belum lengkap ditolak, bukan ditambal nilai karangan.
+       * Pesannya ditampilkan di dalam formulir supaya orangnya tahu kolom mana
+       * yang kurang; menutup modal di sini akan membuang isian yang sudah
+       * diketik.
+       */
+      setGalatPengajuan(err?.message ?? 'Gagal menyimpan pengajuan.');
+      return;
+    }
     setIsNewModalOpen(false);
   };
 
@@ -430,6 +446,15 @@ export const LosCreditView: React.FC = () => {
       >
         <form onSubmit={handleNewSubmit} className="space-y-6">
           <input ref={ocrFileInputRef} type="file" accept="image/*,application/pdf" className="hidden" />
+
+          {galatPengajuan && (
+            <div
+              role="alert"
+              className="rounded-xl border border-danger/30 bg-danger/5 px-4 py-3 text-xs font-medium leading-relaxed text-danger"
+            >
+              {galatPengajuan}
+            </div>
+          )}
 
           {/* Pengisi cepat, dinamai apa adanya. */}
           <div className="rounded-xl border border-border bg-surface-muted px-4 py-3">

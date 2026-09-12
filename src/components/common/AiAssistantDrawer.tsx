@@ -86,26 +86,35 @@ export const AiAssistantDrawer: React.FC = () => {
       const activeEws = ewsAlerts.filter((e) => e.status !== 'RESOLVED');
       const pendingApps = creditApplications.filter((a) => a.currentStage !== 'DISBURSED' && a.currentStage !== 'REJECTED');
 
+      /*
+       * Konteks yang dikirim ke asisten sengaja tidak memuat data perorangan.
+       *
+       * Versi sebelumnya menyertakan `sampleCustomers` berisi CIF, nama
+       * nasabah, dan kolektibilitasnya; `sampleApplications` berisi nama
+       * pemohon beserta plafonnya; dan `activePtps` berisi nama debitur,
+       * nominal, serta tanggal janji bayarnya. Seluruh isi itu diteruskan
+       * server ke Google Gemini, yaitu pihak ketiga di luar bank.
+       *
+       * Yang menahannya selama ini hanyalah kebetulan: klien mengirim field
+       * bernama `context`, sedangkan server membaca `contextData`, sehingga
+       * yang sampai ke Google selalu objek kosong. Kebetulan seperti itu
+       * tinggal menunggu seseorang "memperbaiki" nama field-nya.
+       *
+       * Yang tersisa adalah angka agregat — jumlah dan rasio — yang tidak
+       * menunjuk siapa pun. Perhatikan bahwa teks pertanyaan penggunanya
+       * sendiri tetap dikirim ke Google; peringatannya ditampilkan di layar.
+       */
       const systemContext = {
-        currentUser: { name: currentUser.name, role: currentUser.roleTitle, branch: currentUser.branchId },
+        peran: currentUser.roleTitle,
         metrics: {
           totalLoanOutstanding,
           totalFundingBalance,
-          nplRatio: 2.14,
-          carRatio: 24.8,
-          ldrRatio: 78.4,
           activeEwsCount: activeEws.length,
           redEwsCount: activeEws.filter((e) => e.severity === 'RED').length,
           pendingApplicationsCount: pendingApps.length,
+          activePtpCount: ptpRecords.length,
+          customerCount: customers.length,
         },
-        sampleCustomers: customers.map((c) => ({ cif: c.cif, name: c.name, kol: c.currentCollectibility })),
-        sampleApplications: creditApplications.map((a) => ({
-          no: a.applicationNumber,
-          customer: a.customerName,
-          plafon: a.requestedPlafon,
-          stage: a.currentStage,
-        })),
-        activePtps: ptpRecords.map((p) => ({ debtor: p.debtorName, amount: p.promisedAmount, date: p.promiseDate, status: p.status })),
       };
 
       const response = await fetch('/api/ai/chat', {
@@ -113,7 +122,10 @@ export const AiAssistantDrawer: React.FC = () => {
         headers: { 'Content-Type': 'application/json', ...headerAuth() },
         body: JSON.stringify({
           prompt: textToSend,
-          context: systemContext,
+          /* Server membaca field bernama `contextData`. Sebelumnya dikirim
+             sebagai `context`, sehingga tidak pernah terbaca sama sekali. */
+          contextData: systemContext,
+          userRole: currentUser.roleTitle,
         }),
       });
 
@@ -242,8 +254,17 @@ export const AiAssistantDrawer: React.FC = () => {
             <Send className="w-4 h-4" />
           </button>
         </form>
-        <p className="text-[10px] text-slate-400 text-center mt-2">
-          AI berfungsi sebagai pendukung keputusan. Keputusan akhir kredit tetap berada pada wewenang Komite Kredit BPR ARA.
+        {/*
+          Peringatan ini bukan basa-basi kepatuhan. Pertanyaan yang diketik
+          benar-benar dikirim ke layanan AI di luar bank, sementara data
+          nasabah sudah dikeluarkan dari konteks yang menyertainya. Satu-
+          satunya cara nama nasabah ikut keluar sekarang adalah bila
+          penggunanya sendiri mengetiknya, jadi itulah yang perlu ia ketahui.
+        */}
+        <p className="text-[10px] text-slate-400 text-center mt-2 leading-relaxed">
+          Pertanyaan Anda dikirim ke layanan AI di luar bank. Jangan menuliskan nama nasabah,
+          nomor rekening, atau NIK. Jawaban AI bersifat pendukung; keputusan kredit tetap pada
+          Komite Kredit BPR ARA.
         </p>
       </div>
     </div>
