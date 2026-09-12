@@ -4,59 +4,85 @@ import { useApp } from '../context/AppContext';
 import { firstAccessibleRoute, isPathAllowed } from '../utils/access';
 import { isNativeApp, RUTE_AWAL_MOBILE } from '../utils/platform';
 
-// Import all views
-import { ExecutiveDashboard } from '../components/modules/ExecutiveDashboard';
-import { SuperAdminView } from '../components/modules/SuperAdminView';
-import { CrmCustomersView } from '../components/modules/CrmCustomersView';
-import { MarketingActivityView } from '../components/modules/MarketingActivityView';
-import { FundingDashboardView } from '../components/modules/FundingDashboardView';
-import { LosCreditView } from '../components/modules/LosCreditView';
-import { OtsSurveyView } from '../components/modules/OtsSurveyView';
-import { CreditAnalysisView } from '../components/modules/CreditAnalysisView';
-import { CollateralAppraisalView } from '../components/modules/CollateralAppraisalView';
-import { CreditApprovalView } from '../components/modules/CreditApprovalView';
-import { LegalDocumentsView } from '../components/modules/LegalDocumentsView';
-import { DisbursementPortfolioView } from '../components/modules/DisbursementPortfolioView';
-import { CollectionMgmtView } from '../components/modules/CollectionMgmtView';
-import { PtpTrackerView } from '../components/modules/PtpTrackerView';
-import { NplRestructuringView } from '../components/modules/NplRestructuringView';
-import { EwsRiskView } from '../components/modules/EwsRiskView';
-import { AuditLogView } from '../components/modules/AuditLogView';
-import { BranchNetworkView } from '../components/modules/BranchNetworkView';
-import { FlowTasksView } from '../components/modules/FlowTasksView';
-import { ReportsAnalyticsView } from '../components/modules/ReportsAnalyticsView';
-import { HrKpiView } from '../components/modules/HrKpiView';
-import { PayrollView } from '../components/modules/PayrollView';
-import { BEISDashboard } from '../components/modules/beis/BEISDashboard';
-import { DecisionQueue } from '../components/modules/DecisionQueue';
-import { CalendarView } from '../components/modules/CalendarView';
-import { PeBisnisView } from '../components/modules/PeBisnisView';
-import { DataCenterUploadView } from '../components/modules/DataCenterUploadView';
-import { PeKepatuhanView } from '../components/modules/PeKepatuhanView';
-import { PeAuditView } from '../components/modules/PeAuditView';
-import { HeatMapView } from '../components/modules/HeatMapView';
-import { TargetBungaView } from '../components/modules/TargetBungaView';
-import { PencapaianBisnisView } from '../components/modules/PencapaianBisnisView';
-import { ProjectManagementView } from '../components/modules/ProjectManagementView';
-import { CBSDataCenterView } from '../components/modules/CBSDataCenterView';
-import { ProfileView } from '../components/modules/ProfileView';
+/*
+ * Kerangka yang selalu dibutuhkan begitu aplikasi menyala. Ketiganya tetap
+ * diimpor statis: memecahnya hanya menambah satu putaran tunggu sebelum layar
+ * pertama bisa digambar.
+ */
 import { AppShell } from '../components/layout/AppShell';
 import { LoginScreen } from '../components/LoginScreen';
-
-// Mobile Components
 import { MobileLayout } from '../components/mobile/MobileLayout';
-import MobileHome from '../components/mobile/pages/MobileHome';
-import MobileAttendanceData from '../components/mobile/pages/MobileAttendanceData';
-import MobileLiveAttendance from '../components/mobile/pages/MobileLiveAttendance';
-import MobileNotifications from '../components/mobile/pages/MobileNotifications';
-import MobileProfile from '../components/mobile/pages/MobileProfile';
-import MobileDashboard from '../components/mobile/pages/MobileDashboard';
-import MobileTaskBoard from '../components/mobile/pages/MobileTaskBoard';
-import MobileActivities from '../components/mobile/pages/MobileActivities';
-import MobileInfoGaji from '../components/mobile/pages/MobileInfoGaji';
-import MobileApprovalQueue from '../components/mobile/pages/MobileApprovalQueue';
-import MobileCalendar from '../components/mobile/pages/MobileCalendar';
-import MobileLoanOrigination from '../components/mobile/pages/MobileLoanOrigination';
+
+/**
+ * Seluruh modul dimuat saat rutenya dibuka, bukan saat aplikasi menyala.
+ *
+ * Sebelumnya keempat puluh modul diimpor statis di berkas ini, web dan mobile
+ * sekaligus. Akibatnya semuanya menyatu menjadi satu berkas 1.995 kB — 533 kB
+ * setelah dimampatkan — yang harus selesai diunduh dan diurai sebelum piksel
+ * pertama muncul. Seorang penagih yang membuka layar absensi di ponsel ikut
+ * menunggu dashboard eksekutif, seluruh pipeline kredit, data geografis peta
+ * sebaran, dan dua belas layar mobile yang tidak akan pernah ia buka.
+ *
+ * `<Suspense>` yang membungkus seluruh rute di bawah sudah ada sejak awal, jadi
+ * setiap modul yang belum sampai akan menampilkan pemutar tunggu pada area
+ * isinya saja. Kerangka aplikasi, menu samping, dan bilah atas tetap terlihat.
+ */
+function modul<M extends Record<string, any>, K extends keyof M>(
+  ambil: () => Promise<M>,
+  nama: K,
+): M[K] {
+  return React.lazy(async () => ({ default: (await ambil())[nama] })) as M[K];
+}
+
+const ExecutiveDashboard = modul(() => import('../components/modules/ExecutiveDashboard'), 'ExecutiveDashboard');
+const SuperAdminView = modul(() => import('../components/modules/SuperAdminView'), 'SuperAdminView');
+const CrmCustomersView = modul(() => import('../components/modules/CrmCustomersView'), 'CrmCustomersView');
+const MarketingActivityView = modul(() => import('../components/modules/MarketingActivityView'), 'MarketingActivityView');
+const FundingDashboardView = modul(() => import('../components/modules/FundingDashboardView'), 'FundingDashboardView');
+const LosCreditView = modul(() => import('../components/modules/LosCreditView'), 'LosCreditView');
+const OtsSurveyView = modul(() => import('../components/modules/OtsSurveyView'), 'OtsSurveyView');
+const CreditAnalysisView = modul(() => import('../components/modules/CreditAnalysisView'), 'CreditAnalysisView');
+const CollateralAppraisalView = modul(() => import('../components/modules/CollateralAppraisalView'), 'CollateralAppraisalView');
+const CreditApprovalView = modul(() => import('../components/modules/CreditApprovalView'), 'CreditApprovalView');
+const LegalDocumentsView = modul(() => import('../components/modules/LegalDocumentsView'), 'LegalDocumentsView');
+const DisbursementPortfolioView = modul(() => import('../components/modules/DisbursementPortfolioView'), 'DisbursementPortfolioView');
+const CollectionMgmtView = modul(() => import('../components/modules/CollectionMgmtView'), 'CollectionMgmtView');
+const PtpTrackerView = modul(() => import('../components/modules/PtpTrackerView'), 'PtpTrackerView');
+const NplRestructuringView = modul(() => import('../components/modules/NplRestructuringView'), 'NplRestructuringView');
+const EwsRiskView = modul(() => import('../components/modules/EwsRiskView'), 'EwsRiskView');
+const AuditLogView = modul(() => import('../components/modules/AuditLogView'), 'AuditLogView');
+const BranchNetworkView = modul(() => import('../components/modules/BranchNetworkView'), 'BranchNetworkView');
+const FlowTasksView = modul(() => import('../components/modules/FlowTasksView'), 'FlowTasksView');
+const ReportsAnalyticsView = modul(() => import('../components/modules/ReportsAnalyticsView'), 'ReportsAnalyticsView');
+const HrKpiView = modul(() => import('../components/modules/HrKpiView'), 'HrKpiView');
+const PayrollView = modul(() => import('../components/modules/PayrollView'), 'PayrollView');
+const BEISDashboard = modul(() => import('../components/modules/beis/BEISDashboard'), 'BEISDashboard');
+const DecisionQueue = modul(() => import('../components/modules/DecisionQueue'), 'DecisionQueue');
+const CalendarView = modul(() => import('../components/modules/CalendarView'), 'CalendarView');
+const PeBisnisView = modul(() => import('../components/modules/PeBisnisView'), 'PeBisnisView');
+const DataCenterUploadView = modul(() => import('../components/modules/DataCenterUploadView'), 'DataCenterUploadView');
+const PeKepatuhanView = modul(() => import('../components/modules/PeKepatuhanView'), 'PeKepatuhanView');
+const PeAuditView = modul(() => import('../components/modules/PeAuditView'), 'PeAuditView');
+const HeatMapView = modul(() => import('../components/modules/HeatMapView'), 'HeatMapView');
+const TargetBungaView = modul(() => import('../components/modules/TargetBungaView'), 'TargetBungaView');
+const PencapaianBisnisView = modul(() => import('../components/modules/PencapaianBisnisView'), 'PencapaianBisnisView');
+const ProjectManagementView = modul(() => import('../components/modules/ProjectManagementView'), 'ProjectManagementView');
+const CBSDataCenterView = modul(() => import('../components/modules/CBSDataCenterView'), 'CBSDataCenterView');
+const ProfileView = modul(() => import('../components/modules/ProfileView'), 'ProfileView');
+
+/* Layar mobile memakai export bawaan, jadi tidak perlu penamaan ulang. */
+const MobileHome = React.lazy(() => import('../components/mobile/pages/MobileHome'));
+const MobileAttendanceData = React.lazy(() => import('../components/mobile/pages/MobileAttendanceData'));
+const MobileLiveAttendance = React.lazy(() => import('../components/mobile/pages/MobileLiveAttendance'));
+const MobileNotifications = React.lazy(() => import('../components/mobile/pages/MobileNotifications'));
+const MobileProfile = React.lazy(() => import('../components/mobile/pages/MobileProfile'));
+const MobileDashboard = React.lazy(() => import('../components/mobile/pages/MobileDashboard'));
+const MobileTaskBoard = React.lazy(() => import('../components/mobile/pages/MobileTaskBoard'));
+const MobileActivities = React.lazy(() => import('../components/mobile/pages/MobileActivities'));
+const MobileInfoGaji = React.lazy(() => import('../components/mobile/pages/MobileInfoGaji'));
+const MobileApprovalQueue = React.lazy(() => import('../components/mobile/pages/MobileApprovalQueue'));
+const MobileCalendar = React.lazy(() => import('../components/mobile/pages/MobileCalendar'));
+const MobileLoanOrigination = React.lazy(() => import('../components/mobile/pages/MobileLoanOrigination'));
 
 const FallbackLoading = () => (
   <div className="p-6 flex items-center justify-center h-full">
